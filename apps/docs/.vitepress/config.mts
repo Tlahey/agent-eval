@@ -15,6 +15,7 @@ export default defineConfig({
           { text: "Getting Started", link: "/guide/getting-started" },
           { text: "Configuration", link: "/guide/configuration" },
           { text: "Writing Tests", link: "/guide/writing-tests" },
+          { text: "Runners", link: "/guide/runners" },
           { text: "Judges", link: "/guide/judges" },
           { text: "CLI", link: "/guide/cli" },
           { text: "Contributing", link: "/guide/contributing" },

@@ -13,15 +13,20 @@ export default defineConfig({
 
   // Agent runners to evaluate
   runners: [
-    {
-      name: "copilot-cli",
-      type: "cli",
-      command: 'gh copilot suggest "{{prompt}}"',
-    },
+    // CLI runner: spawns a shell command
     {
       name: "aider",
       type: "cli",
-      command: 'aider --message "{{prompt}}" --yes',
+      command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+    },
+    // API runner: calls an LLM directly
+    {
+      name: "claude-api",
+      type: "api",
+      api: {
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+      },
     },
   ],
 
@@ -33,7 +38,7 @@ export default defineConfig({
 
   // Model matrix (optional): only run specific runners
   matrix: {
-    runners: ["copilot-cli"],
+    runners: ["aider"],
   },
 
   // Output directory for the ledger
@@ -58,22 +63,43 @@ export default defineConfig({
 
 ## Runner Configuration
 
+AgentEval supports two runner types. See the dedicated [Runners guide](/guide/runners) for full details and examples.
+
 ### CLI Runner
+
+Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction.
 
 ```ts
 {
-  name: "my-agent",
+  name: "aider",
   type: "cli",
-  command: 'my-agent-cli "{{prompt}}"',
+  command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
 }
 ```
 
-The `{{prompt}}` placeholder is replaced with the test prompt at runtime.
+### API Runner
+
+Calls an LLM directly via the Vercel AI SDK. The model returns structured file operations.
+
+```ts
+{
+  name: "claude-api",
+  type: "api",
+  api: {
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
+    // apiKey: "sk-ant-...",   // or use ANTHROPIC_API_KEY env var
+    // baseURL: "https://...", // optional custom endpoint
+  },
+}
+```
 
 ## Judge Providers
 
-| Provider    | Package                              | Example Model              |
-| ----------- | ------------------------------------ | -------------------------- |
-| `anthropic` | `@ai-sdk/anthropic`                  | `claude-sonnet-4-20250514` |
-| `openai`    | `@ai-sdk/openai`                     | `gpt-4o`                   |
-| `ollama`    | `@ai-sdk/openai` (OpenAI-compatible) | `llama3`                   |
+The judge evaluates agent output using an LLM. See the [Judges guide](/guide/judges) for scoring, per-test overrides, and provider details.
+
+| Provider    | Package                              | Example Model              | Auth                |
+| ----------- | ------------------------------------ | -------------------------- | ------------------- |
+| `anthropic` | `@ai-sdk/anthropic`                  | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+| `openai`    | `@ai-sdk/openai`                     | `gpt-4o`                   | `OPENAI_API_KEY`    |
+| `ollama`    | `@ai-sdk/openai` (OpenAI-compatible) | `llama3`                   | None (local)        |

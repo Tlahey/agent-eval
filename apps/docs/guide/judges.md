@@ -27,6 +27,12 @@ judge: {
 
 Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in config).
 
+| Model                      | Notes                        |
+| -------------------------- | ---------------------------- |
+| `claude-sonnet-4-20250514` | Recommended — best cost/perf |
+| `claude-opus-4-20250514`   | Most capable, higher cost    |
+| `claude-haiku-3-20250305`  | Fastest, cheapest            |
+
 ### OpenAI
 
 ```ts
@@ -38,6 +44,12 @@ judge: {
 
 Requires `OPENAI_API_KEY` environment variable (or `apiKey` in config).
 
+| Model           | Notes           |
+| --------------- | --------------- |
+| `gpt-4o`        | Recommended     |
+| `gpt-4-turbo`   | High capability |
+| `gpt-3.5-turbo` | Budget option   |
+
 ### Ollama (Local)
 
 ```ts
@@ -48,7 +60,32 @@ judge: {
 }
 ```
 
-No API key needed. Runs locally.
+No API key needed. Runs entirely on your machine.
+
+| Model            | Notes                     |
+| ---------------- | ------------------------- |
+| `llama3`         | Meta's open model         |
+| `mistral`        | Fast, general-purpose     |
+| `deepseek-coder` | Strong on code evaluation |
+
+::: info
+Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama3`.
+:::
+
+### Custom / Enterprise Provider
+
+Any OpenAI-compatible API can be used as a judge via the `openai` provider with a custom `baseURL`:
+
+```ts
+judge: {
+  provider: "openai",
+  model: "company-judge-v2",
+  baseURL: "https://llm.internal.company.com/v1",
+  apiKey: process.env.INTERNAL_LLM_KEY,
+}
+```
+
+This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible chat completions API.
 
 ## Per-Test Model Override
 
@@ -61,6 +98,8 @@ await expect(ctx).toPassJudge({
 });
 ```
 
+This is useful when some tests need a stronger model for accurate evaluation while most can use a cheaper default.
+
 ## Scoring
 
 | Score   | Meaning            |
@@ -72,3 +111,14 @@ await expect(ctx).toPassJudge({
 | 0.0     | Complete failure   |
 
 The judge is instructed to be "strict but fair" and award partial credit.
+
+## Judge Prompt Anatomy
+
+The system prompt sent to the judge includes:
+
+1. **Role**: "You are an expert code reviewer acting as a judge"
+2. **Criteria**: Your `criteria` string from `toPassJudge()`
+3. **Git Diff**: The full diff captured by `ctx.storeDiff()`
+4. **Command Outputs**: All `ctx.runCommand()` results (stdout, stderr, exit codes)
+
+The response is enforced via Zod structured output (`generateObject`), guaranteeing `{ pass, score, reason }` — no prompt injection or malformed JSON.
