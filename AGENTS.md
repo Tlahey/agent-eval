@@ -23,9 +23,13 @@ agent-eval/
 │       ├── 002-sqlite-over-jsonl.md
 │       ├── 003-sequential-execution.md
 │       ├── 004-llm-as-judge.md
-│       └── 005-monorepo-layout.md
+│       ├── 005-monorepo-layout.md
+│       ├── 006-code-quality-gates.md
+│       └── 007-solid-architecture.md
 ├── apps/
-│   └── docs/              ← VitePress documentation site
+│   ├── docs/              ← VitePress documentation site
+│   ├── eval-ui/           ← Dashboard UI (React + Tailwind + Recharts)
+│   └── example-target-app/ ← E2E target app for integration tests
 ├── packages/
 │   └── agent-eval/        ← Core framework (agent-eval)
 │       ├── src/
@@ -52,7 +56,7 @@ agent-eval/
 │       │   └── index.ts   ← Public API (test, expect, defineConfig)
 │       ├── tsup.config.ts ← Build config (ESM + CJS + DTS)
 │       └── tsconfig.json
-└── examples/              ← Example eval test files
+└── docs/adrs/             ← Architecture Decision Records
 ```
 
 ---

@@ -5,7 +5,7 @@
 
 ## Context
 
-As the codebase grows with multiple packages (`packages/agent-eval`, `apps/eval-ui`, `apps/docs`, `apps/dummy-react-app`), maintaining consistent code style and catching errors early becomes critical. Without automated enforcement, style drift and broken commits inevitably creep in — especially when multiple AI agents contribute code alongside human developers.
+As the codebase grows with multiple packages (`packages/agent-eval`, `apps/eval-ui`, `apps/docs`, `apps/example-target-app`), maintaining consistent code style and catching errors early becomes critical. Without automated enforcement, style drift and broken commits inevitably creep in — especially when multiple AI agents contribute code alongside human developers.
 
 ## Decision
 

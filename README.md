@@ -241,21 +241,21 @@ AgentEval follows **SOLID principles** for modularity and extensibility. See the
 ```
 agent-eval/
 ├── apps/
-│   ├── docs/               # VitePress documentation
-│   └── eval-ui/            # Dashboard UI (React + Tailwind + Recharts)
+│   ├── docs/                  # VitePress documentation
+│   ├── eval-ui/               # Dashboard UI (React + Tailwind + Recharts)
+│   └── example-target-app/    # E2E target app for integration tests
 ├── packages/
-│   └── agent-eval/         # Core framework
+│   └── agent-eval/            # Core framework
 │       └── src/
-│           ├── index.ts    # Public API (test, expect, defineConfig)
-│           ├── core/       # Types, config, context, runner, expect
-│           ├── git/        # Git isolation (reset, diff)
-│           ├── judge/      # LLM-as-a-Judge (Vercel AI SDK)
-│           ├── ledger/     # SQLite ledger (node:sqlite)
-│           └── cli/        # CLI binary (Commander.js)
-├── docs/adrs/              # Architecture Decision Records
-├── examples/               # Example config + test files
-├── AGENTS.md               # AI agent development guide
-└── PRD.md                  # Product requirements
+│           ├── index.ts       # Public API (test, expect, defineConfig)
+│           ├── core/          # Types, config, context, runner, expect
+│           ├── git/           # Git isolation (reset, diff)
+│           ├── judge/         # LLM-as-a-Judge (Vercel AI SDK)
+│           ├── ledger/        # SQLite ledger (node:sqlite)
+│           └── cli/           # CLI binary (Commander.js)
+├── docs/adrs/                 # Architecture Decision Records
+├── AGENTS.md                  # AI agent development guide
+└── PRD.md                     # Product requirements
 ```
 
 ### Key Design Decisions

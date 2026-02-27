@@ -115,7 +115,7 @@ You can wrap any logic in a script and use it as a runner:
 }
 ```
 
-Your script receives the prompt as a CLI argument and should modify files in the current working directory. See `apps/dummy-react-app/scripts/mock-agent.mjs` for an example.
+Your script receives the prompt as a CLI argument and should modify files in the current working directory. See `apps/example-target-app/scripts/mock-agent.mjs` for an example.
 
 ---
 

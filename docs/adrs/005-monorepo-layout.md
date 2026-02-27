@@ -16,11 +16,12 @@ Use a **pnpm workspace monorepo** with two top-level directories:
 ```
 agent-eval/
 ├── packages/
-│   └── agent-eval/        # The core framework (published to npm)
+│   └── agent-eval/            # The core framework (published to npm)
 ├── apps/
-│   └── docs/              # VitePress documentation site
-│   └── eval-ui/           # (future) React dashboard
-└── examples/              # Example .eval.ts files and configs
+│   ├── docs/                  # VitePress documentation site
+│   ├── eval-ui/               # React dashboard (Tailwind + Recharts)
+│   └── example-target-app/    # E2E target app for integration tests
+└── docs/adrs/                 # Architecture Decision Records
 ```
 
 ## Rationale
@@ -45,11 +46,12 @@ agent-eval/
 - pnpm workspaces + simple `--filter` commands are sufficient
 - Can adopt Turborepo later if build orchestration becomes a bottleneck
 
-### Why `examples/` at root?
+### Why `example-target-app` in `apps/`?
 
-- Examples demonstrate how end-users will use the framework
-- They are not an "app" (no build step, no deployment)
-- Living at root makes them discoverable in the repo
+- It's a real application with a build step, Vitest tests, and a mock agent
+- Used by E2E integration tests to validate the full AgentEval pipeline
+- Living in `apps/` keeps it consistent with other runnable projects
+- The name makes its role clear: it's the **target** that agents are evaluated against
 
 ## Workspace Configuration
 
