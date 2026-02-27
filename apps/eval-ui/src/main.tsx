@@ -2,8 +2,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { App } from "./App";
-import { Dashboard } from "./pages/Dashboard";
-import { Analytics } from "./pages/Analytics";
+import { Overview } from "./pages/Overview";
+import { Runs } from "./pages/Runs";
+import { EvalDetail } from "./pages/EvalDetail";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
@@ -11,8 +12,9 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route element={<App />}>
-          <Route index element={<Dashboard />} />
-          <Route path="analytics" element={<Analytics />} />
+          <Route index element={<Overview />} />
+          <Route path="runs" element={<Runs />} />
+          <Route path="evals/:testId" element={<EvalDetail />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -1,32 +1,31 @@
-/* ─── Theme Variables (swap these for enterprise branding) ─── */
+/* ─── Dark-first Design System ─── */
 :root {
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f8fafc;
-  --color-border: #e2e8f0;
-  --color-text-base: #0f172a;
-  --color-text-muted: #64748b;
-  --color-text-inverse: #ffffff;
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-primary: #60a5fa;
-    --color-primary-hover: #3b82f6;
-    --color-surface: #0f172a;
-    --color-surface-alt: #1e293b;
-    --color-border: #334155;
-    --color-text-base: #f1f5f9;
-    --color-text-muted: #94a3b8;
-    --color-text-inverse: #0f172a;
-    --color-success: #4ade80;
-    --color-danger: #f87171;
-    --color-warning: #fbbf24;
-  }
+  --color-primary: #6366f1;
+  --color-primary-hover: #818cf8;
+  --color-primary-dim: rgba(99, 102, 241, 0.12);
+  --color-accent: #a78bfa;
+  --color-surface-0: #09090b;
+  --color-surface-1: #0f1117;
+  --color-surface-2: #161822;
+  --color-surface-3: #1e2030;
+  --color-surface-4: #262940;
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-hover: rgba(255, 255, 255, 0.12);
+  --color-text-base: #f0f0f3;
+  --color-text-secondary: #a0a3b1;
+  --color-text-muted: #5f6278;
+  --color-text-inverse: #09090b;
+  --color-success: #34d399;
+  --color-success-dim: rgba(52, 211, 153, 0.12);
+  --color-danger: #f87171;
+  --color-danger-dim: rgba(248, 113, 113, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-dim: rgba(251, 191, 36, 0.12);
+  --color-info: #60a5fa;
+  --color-info-dim: rgba(96, 165, 250, 0.12);
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+  --panel-width: 560px;
 }
 
 @tailwind base;
@@ -36,9 +35,139 @@
 body {
   margin: 0;
   font-family:
+    "Inter",
     system-ui,
     -apple-system,
     sans-serif;
-  background-color: var(--color-surface);
+  background-color: var(--color-surface-0);
   color: var(--color-text-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ─── GitHub-style diff ─── */
+.diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--color-surface-3);
+  border-bottom: 1px solid var(--color-border);
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.diff-file-header:hover {
+  background: var(--color-surface-4);
+}
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 12px;
+  line-height: 20px;
+}
+.diff-table td {
+  padding: 0 12px;
+  white-space: pre;
+  vertical-align: top;
+}
+.diff-ln {
+  width: 1%;
+  min-width: 44px;
+  text-align: right;
+  color: var(--color-text-muted);
+  user-select: none;
+  padding: 0 8px;
+}
+.diff-add {
+  background: rgba(52, 211, 153, 0.08);
+}
+.diff-add .diff-ln {
+  color: rgba(52, 211, 153, 0.5);
+}
+.diff-add .diff-code {
+  color: #6ee7b7;
+}
+.diff-del {
+  background: rgba(248, 113, 113, 0.08);
+}
+.diff-del .diff-ln {
+  color: rgba(248, 113, 113, 0.5);
+}
+.diff-del .diff-code {
+  color: #fca5a5;
+}
+.diff-hunk {
+  background: rgba(96, 165, 250, 0.06);
+  color: var(--color-info);
+}
+.diff-hunk td {
+  padding: 4px 12px;
+  font-style: italic;
+}
+.diff-context .diff-code {
+  color: var(--color-text-muted);
+}
+
+/* ─── Animations ─── */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scaleIn {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-slide-in {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* ─── Score ring ─── */
+.score-ring {
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
