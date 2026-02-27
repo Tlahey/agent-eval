@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { test as evalTest, getRegisteredTests, clearRegisteredTests } from "../index.js";
+import {
+  test as evalTest,
+  getRegisteredTests,
+  clearRegisteredTests,
+  initSession,
+} from "../index.js";
+import type { AgentEvalConfig } from "../core/types.js";
 
 describe("test registration", () => {
   beforeEach(() => {
@@ -55,5 +61,15 @@ describe("test registration", () => {
     const tests = getRegisteredTests();
     tests.pop();
     expect(getRegisteredTests()).toHaveLength(1);
+  });
+
+  it("initSession sets the judge config", () => {
+    const config: AgentEvalConfig = {
+      runners: [{ name: "test", type: "cli", command: "echo" }],
+      judge: { provider: "openai", model: "gpt-4o" },
+    };
+
+    // initSession should not throw
+    expect(() => initSession(config)).not.toThrow();
   });
 });

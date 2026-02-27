@@ -105,4 +105,21 @@ describe("EvalContext", () => {
     expect(logs).toContain("check");
     expect(logs).toContain("all good");
   });
+
+  it("logs includes STDERR section when stderr is present", async () => {
+    const ctx = new EvalContext(tmpDir);
+    await ctx.runCommand("warn", "node -e \"process.stderr.write('warning'); process.exit(1)\"");
+
+    const logs = ctx.logs;
+    expect(logs).toContain("STDERR:");
+    expect(logs).toContain("warning");
+  });
+
+  it("logs omits STDERR section when stderr is empty", async () => {
+    const ctx = new EvalContext(tmpDir);
+    await ctx.runCommand("clean", "echo clean");
+
+    const logs = ctx.logs;
+    expect(logs).not.toContain("STDERR:");
+  });
 });

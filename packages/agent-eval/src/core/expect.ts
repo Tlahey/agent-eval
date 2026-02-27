@@ -10,6 +10,11 @@ export function setJudgeConfig(config: JudgeConfig): void {
   _judgeConfig = config;
 }
 
+/** @internal Reset judge config – used by tests only */
+export function clearJudgeConfig(): void {
+  _judgeConfig = null;
+}
+
 /**
  * Create the fluent expect chain for a test context.
  *
