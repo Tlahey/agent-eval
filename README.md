@@ -15,6 +15,39 @@ Test, judge, and track AI coding agents — locally, sequentially, and model-agn
 - **Data Ledger** — JSONL-based historical tracking of all evaluation results
 - **CLI** — `agenteval run`, `agenteval ledger`, and more
 
+## Why We Built This
+
+### The Paradigm Shift
+
+Testing an AI coding agent is **fundamentally different** from testing a standard JavaScript function.
+
+Traditional software testing evaluates deterministic inputs and outputs in memory. Testing AI coding agents, however, involves long-running tasks, heavy side-effects (mutating real files), and subjective evaluation criteria that require another LLM to act as a judge.
+
+No existing tool was designed for this.
+
+### Why not Vitest or Jest?
+
+While we love the Developer Experience (DX) of Vitest, these frameworks are built for extreme speed and parallel execution. AI agents mutate the actual file system and commit to Git. Running agent tests concurrently in Vitest instantly corrupts the local repository state. Furthermore, agent tasks take minutes to run, conflicting with the millisecond timeouts expected by standard test runners.
+
+### Why not Promptfoo?
+
+[Promptfoo](https://github.com/promptfoo/promptfoo) is an incredible tool for Text-in/Text-out evaluation (like RAGs or Chatbots). However, evaluating code-generating agents requires running CLI commands, capturing Git diffs, and reading compilation logs. Forcing Promptfoo to handle heavy side-effects required fragile workarounds (like complex Bash escaping and JSON parsing hacks). We needed a tool natively designed for file-system operations.
+
+### Why not Langfuse or Cloud LLMOps tools?
+
+[Langfuse](https://langfuse.com/) is perfect for production observability, but it is not a local test runner. Moreover, sending proprietary enterprise code, Next.js build logs, and Git diffs to a third-party cloud service for evaluation raised significant data privacy and security concerns.
+
+### What AgentEval Brings
+
+We built AgentEval to hit the perfect sweet spot:
+
+- **Familiar, Vitest-like syntax** — great Developer Experience with `test()` / `expect()` you already know.
+- **Strict, sequential execution** — automated Git state isolation (`git reset --hard`) between every test. No concurrency corruption.
+- **Provider-agnostic architecture** — easily switch between local CLIs, OpenAI, or Anthropic for both agents and LLM-as-a-Judge.
+- **Local, privacy-first ledger** — track historical performance in a JSONL file without sending your source code to the cloud.
+
+---
+
 ## Quick Start
 
 ### Install
