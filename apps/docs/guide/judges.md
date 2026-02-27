@@ -2,6 +2,18 @@
 
 The **LLM-as-a-Judge** pattern uses a language model to evaluate agent outputs against criteria you define.
 
+::: danger Use a capable model
+The judge is the **most critical component** of your evaluation pipeline. It must understand code, parse git diffs, interpret test output, and make nuanced pass/fail decisions. **Always use a strong, frontier-class model** as the judge — never a small or local model.
+
+**Recommended:** `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `gpt-4o`
+
+**Avoid:** `gpt-3.5-turbo`, `claude-haiku`, local models (llama3, mistral, codellama) — they lack the reasoning depth for reliable code evaluation and will produce noisy, unreliable scores.
+:::
+
+::: tip Avoid self-evaluation bias
+When possible, use a **different provider** for the runner and the judge. If your agent uses Claude, judge with GPT-4o (and vice versa). This prevents the model from being biased toward its own outputs.
+:::
+
 ## How It Works
 
 1. AgentEval builds a prompt with:

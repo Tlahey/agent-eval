@@ -1,13 +1,15 @@
 import { defineConfig } from "agent-eval";
 
 /**
- * API Runner Example — Anthropic
+ * API Runner — Anthropic Claude Sonnet
  *
- * Uses the Anthropic API (Claude) as the coding agent and the judge.
- * The agent receives a prompt and returns structured file operations.
+ * Calls Anthropic directly via Vercel AI SDK.
  *
- * Requirements:
- *   - ANTHROPIC_API_KEY environment variable set
+ * The judge uses OpenAI GPT-4o to avoid self-evaluation bias.
+ *
+ * Prerequisites:
+ *   - ANTHROPIC_API_KEY for the runner
+ *   - OPENAI_API_KEY for the judge
  *
  * Usage:
  *   agenteval run --config evals/api-anthropic/agenteval.config.ts
@@ -26,9 +28,10 @@ export default defineConfig({
     },
   ],
 
+  // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    provider: "openai",
+    model: "gpt-4o",
   },
 
   testFiles: "evals/api-anthropic/**/*.eval.ts",

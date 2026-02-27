@@ -1,10 +1,17 @@
 import { defineConfig } from "agent-eval";
 
 /**
- * Default config — runs ALL eval scenarios across all example directories.
- * For running a single implementation, use --config:
+ * Default config — runs the mock agent against ALL eval scenarios.
  *
+ * For running a specific implementation, use --config:
+ *
+ *   # CLI agents
  *   agenteval run --config evals/cli-mock/agenteval.config.ts
+ *   agenteval run --config evals/cli-copilot/agenteval.config.ts
+ *   agenteval run --config evals/cli-claude/agenteval.config.ts
+ *   agenteval run --config evals/cli-aider/agenteval.config.ts
+ *
+ *   # API agents
  *   agenteval run --config evals/api-openai/agenteval.config.ts
  *   agenteval run --config evals/api-anthropic/agenteval.config.ts
  *   agenteval run --config evals/api-ollama/agenteval.config.ts
@@ -20,6 +27,8 @@ export default defineConfig({
     },
   ],
 
+  // ⚠️ The judge must be a strong model capable of understanding code diffs,
+  // test output, and making nuanced pass/fail decisions.
   judge: {
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",

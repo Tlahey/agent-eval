@@ -9,7 +9,6 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   );
 
   ctx.storeDiff();
-
   await ctx.runCommand("test", "pnpm test");
   await ctx.runCommand("typecheck", "pnpm build");
 

@@ -1,13 +1,16 @@
 import { defineConfig } from "agent-eval";
 
 /**
- * API Runner Example — OpenAI
+ * API Runner — OpenAI GPT-4o
  *
- * Uses the OpenAI API (gpt-4o) as both the coding agent and the judge.
- * The agent receives a prompt and returns structured file operations.
+ * Calls OpenAI directly via Vercel AI SDK. The model returns structured
+ * file operations that AgentEval writes to disk.
  *
- * Requirements:
- *   - OPENAI_API_KEY environment variable set
+ * The judge uses Anthropic Claude to avoid self-evaluation bias.
+ *
+ * Prerequisites:
+ *   - OPENAI_API_KEY for the runner
+ *   - ANTHROPIC_API_KEY for the judge
  *
  * Usage:
  *   agenteval run --config evals/api-openai/agenteval.config.ts
@@ -17,7 +20,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "openai-gpt4o",
+      name: "gpt-4o",
       type: "api",
       api: {
         provider: "openai",
@@ -26,9 +29,10 @@ export default defineConfig({
     },
   ],
 
+  // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
   judge: {
-    provider: "openai",
-    model: "gpt-4o",
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
   },
 
   testFiles: "evals/api-openai/**/*.eval.ts",

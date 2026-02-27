@@ -13,24 +13,35 @@ export default defineConfig({
 
   // Agent runners to evaluate
   runners: [
-    // CLI runner: spawns a shell command
+    // CLI runner: any tool that accepts a prompt via command line
     {
-      name: "aider",
+      name: "copilot",
       type: "cli",
-      command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+      command: 'gh copilot suggest -t shell "{{prompt}}"',
+    },
+    {
+      name: "claude-code",
+      type: "cli",
+      command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+    },
+    {
+      name: "aider-sonnet",
+      type: "cli",
+      command:
+        'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
     },
     // API runner: calls an LLM directly
     {
-      name: "claude-api",
+      name: "gpt-4o-api",
       type: "api",
       api: {
-        provider: "anthropic",
-        model: "claude-sonnet-4-20250514",
+        provider: "openai",
+        model: "gpt-4o",
       },
     },
   ],
 
-  // Judge configuration
+  // Judge configuration — use a strong, capable model
   judge: {
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
@@ -38,7 +49,7 @@ export default defineConfig({
 
   // Model matrix (optional): only run specific runners
   matrix: {
-    runners: ["aider"],
+    runners: ["copilot", "claude-code"],
   },
 
   // Output directory for the ledger
@@ -67,13 +78,35 @@ AgentEval supports two runner types. See the dedicated [Runners guide](/guide/ru
 
 ### CLI Runner
 
-Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction.
+Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction. Most CLI coding agents accept a model flag to choose which LLM to use.
 
 ```ts
+// GitHub Copilot
 {
-  name: "aider",
+  name: "copilot",
   type: "cli",
-  command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+  command: 'gh copilot suggest -t shell "{{prompt}}"',
+}
+
+// Claude Code with specific tools
+{
+  name: "claude-code",
+  type: "cli",
+  command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+}
+
+// Aider with model selection
+{
+  name: "aider-sonnet",
+  type: "cli",
+  command: 'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
+}
+
+// OpenAI Codex CLI
+{
+  name: "codex",
+  type: "cli",
+  command: 'codex "{{prompt}}" --approval-mode full-auto',
 }
 ```
 
@@ -98,8 +131,12 @@ Calls an LLM directly via the Vercel AI SDK. The model returns structured file o
 
 The judge evaluates agent output using an LLM. See the [Judges guide](/guide/judges) for scoring, per-test overrides, and provider details.
 
-| Provider    | Package                              | Example Model              | Auth                |
-| ----------- | ------------------------------------ | -------------------------- | ------------------- |
-| `anthropic` | `@ai-sdk/anthropic`                  | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
-| `openai`    | `@ai-sdk/openai`                     | `gpt-4o`                   | `OPENAI_API_KEY`    |
-| `ollama`    | `@ai-sdk/openai` (OpenAI-compatible) | `llama3`                   | None (local)        |
+::: warning Choose a strong model
+The judge must understand code, parse diffs, and interpret test output. Always use a frontier-class model (`claude-sonnet-4`, `gpt-4o`, `claude-opus-4`). Avoid small or local models — they produce unreliable evaluations.
+:::
+
+| Provider    | Package                              | Recommended Model           | Auth                |
+| ----------- | ------------------------------------ | --------------------------- | ------------------- |
+| `anthropic` | `@ai-sdk/anthropic`                  | `claude-sonnet-4-20250514`  | `ANTHROPIC_API_KEY` |
+| `openai`    | `@ai-sdk/openai`                     | `gpt-4o`                    | `OPENAI_API_KEY`    |
+| `ollama`    | `@ai-sdk/openai` (OpenAI-compatible) | ⚠️ Not recommended as judge | None (local)        |
