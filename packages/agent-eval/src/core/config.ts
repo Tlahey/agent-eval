@@ -6,13 +6,14 @@ import type { AgentEvalConfig } from "./types.js";
 const CONFIG_FILENAMES = ["agenteval.config.ts", "agenteval.config.js", "agenteval.config.mjs"];
 
 const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
-  testFiles: "**/*.eval.{ts,js,mts,mjs}",
+  testFiles: "**/*.{eval,agent-eval}.{ts,js,mts,mjs}",
   outputDir: ".agenteval",
   timeout: 300_000,
 };
 
 /**
  * Resolve and load the agenteval config file from the given directory.
+ * If no config file is found, returns sensible defaults.
  */
 export async function loadConfig(cwd: string = process.cwd()): Promise<AgentEvalConfig> {
   let configPath: string | null = null;
@@ -25,8 +26,14 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<AgentEval
     }
   }
 
+  // No config file → return defaults (don't throw)
   if (!configPath) {
-    throw new Error(`No agenteval config found. Create one of: ${CONFIG_FILENAMES.join(", ")}`);
+    return {
+      ...DEFAULT_CONFIG,
+      rootDir: cwd,
+      runners: [],
+      judge: { provider: "openai", model: "gpt-4o" },
+    } as AgentEvalConfig;
   }
 
   const jiti = createJiti(cwd, { interopDefault: true });

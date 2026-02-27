@@ -9,9 +9,103 @@ import { createJiti } from "jiti";
 import { loadConfig } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
 import { runTest } from "../core/runner.js";
-import { readLedger, getTestIds } from "../ledger/ledger.js";
+import { readLedger, readLedgerByTestId, getTestIds, getRunnerStats } from "../ledger/ledger.js";
 
 program.name("agenteval").description("AI coding agent evaluation framework").version("0.1.0");
+
+// ─── Shared run logic ───
+
+interface RunOptions {
+  config?: string;
+  filter?: string;
+  tag?: string;
+  output?: string;
+}
+
+async function executeRun(opts: RunOptions): Promise<void> {
+  const cwd = process.cwd();
+  const spinner = ora("Loading config...").start();
+
+  try {
+    const config = await loadConfig(cwd);
+
+    // Override outputDir if --output is provided
+    if (opts.output) {
+      config.outputDir = opts.output;
+    }
+
+    initSession(config);
+    spinner.succeed("Config loaded");
+
+    // Discover test files
+    const patterns =
+      typeof config.testFiles === "string"
+        ? [config.testFiles]
+        : (config.testFiles ?? ["**/*.eval.{ts,js,mts,mjs}"]);
+
+    const files = await glob(patterns, {
+      cwd,
+      ignore: ["node_modules/**", "dist/**"],
+      absolute: true,
+    });
+
+    if (files.length === 0) {
+      console.log(chalk.yellow("No test files found."));
+      process.exit(0);
+    }
+
+    console.log(chalk.dim(`Found ${files.length} test file(s)\n`));
+
+    // Load test files sequentially (each file registers tests via test())
+    const jiti = createJiti(cwd, { interopDefault: true });
+
+    let totalPassed = 0;
+    let totalFailed = 0;
+
+    for (const file of files) {
+      clearRegisteredTests();
+      await jiti.import(file);
+
+      let tests = getRegisteredTests();
+
+      // Apply filters
+      if (opts.filter) {
+        tests = tests.filter((t) => t.title.toLowerCase().includes(opts.filter!.toLowerCase()));
+      }
+      if (opts.tag) {
+        tests = tests.filter((t) => t.tags?.includes(opts.tag!));
+      }
+
+      if (tests.length === 0) continue;
+
+      const relPath = file.replace(cwd + "/", "");
+      console.log(chalk.bold(`📄 ${relPath}`));
+
+      // Run each test sequentially
+      for (const testDef of tests) {
+        const results = await runTest(testDef, config);
+        for (const r of results) {
+          if (r.passed) totalPassed++;
+          else totalFailed++;
+        }
+      }
+    }
+
+    // Summary
+    console.log(chalk.bold("\n─── Summary ───"));
+    console.log(chalk.green(`  ✓ ${totalPassed} passed`));
+    if (totalFailed > 0) {
+      console.log(chalk.red(`  ✗ ${totalFailed} failed`));
+    }
+    console.log();
+
+    process.exit(totalFailed > 0 ? 1 : 0);
+  } catch (err: unknown) {
+    spinner.fail("Failed");
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    process.exit(1);
+  }
+}
 
 // ─── Run command ───
 
@@ -21,84 +115,8 @@ program
   .option("-c, --config <path>", "Path to config file")
   .option("-f, --filter <pattern>", "Filter tests by title (substring match)")
   .option("-t, --tag <tag>", "Filter tests by tag")
-  .action(async (opts) => {
-    const cwd = process.cwd();
-    const spinner = ora("Loading config...").start();
-
-    try {
-      const config = await loadConfig(cwd);
-      initSession(config);
-      spinner.succeed("Config loaded");
-
-      // Discover test files
-      const patterns =
-        typeof config.testFiles === "string"
-          ? [config.testFiles]
-          : (config.testFiles ?? ["**/*.eval.{ts,js,mts,mjs}"]);
-
-      const files = await glob(patterns, {
-        cwd,
-        ignore: ["node_modules/**", "dist/**"],
-        absolute: true,
-      });
-
-      if (files.length === 0) {
-        console.log(chalk.yellow("No test files found."));
-        process.exit(0);
-      }
-
-      console.log(chalk.dim(`Found ${files.length} test file(s)\n`));
-
-      // Load test files sequentially (each file registers tests via test())
-      const jiti = createJiti(cwd, { interopDefault: true });
-
-      let totalPassed = 0;
-      let totalFailed = 0;
-
-      for (const file of files) {
-        clearRegisteredTests();
-        await jiti.import(file);
-
-        let tests = getRegisteredTests();
-
-        // Apply filters
-        if (opts.filter) {
-          tests = tests.filter((t) => t.title.toLowerCase().includes(opts.filter.toLowerCase()));
-        }
-        if (opts.tag) {
-          tests = tests.filter((t) => t.tags?.includes(opts.tag));
-        }
-
-        if (tests.length === 0) continue;
-
-        const relPath = file.replace(cwd + "/", "");
-        console.log(chalk.bold(`📄 ${relPath}`));
-
-        // Run each test sequentially
-        for (const testDef of tests) {
-          const results = await runTest(testDef, config);
-          for (const r of results) {
-            if (r.passed) totalPassed++;
-            else totalFailed++;
-          }
-        }
-      }
-
-      // Summary
-      console.log(chalk.bold("\n─── Summary ───"));
-      console.log(chalk.green(`  ✓ ${totalPassed} passed`));
-      if (totalFailed > 0) {
-        console.log(chalk.red(`  ✗ ${totalFailed} failed`));
-      }
-      console.log();
-
-      process.exit(totalFailed > 0 ? 1 : 0);
-    } catch (err: unknown) {
-      spinner.fail("Failed");
-      console.error(chalk.red(err instanceof Error ? err.message : String(err)));
-      process.exit(1);
-    }
-  });
+  .option("-o, --output <dir>", "Override output directory for the ledger database")
+  .action(executeRun);
 
 // ─── Ledger command ───
 
@@ -106,10 +124,18 @@ program
   .command("ledger")
   .description("View the evaluation ledger")
   .option("--json", "Output as JSON")
+  .option("-o, --output <dir>", "Override ledger directory")
   .action(async (opts) => {
     const cwd = process.cwd();
-    const config = await loadConfig(cwd);
-    const outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
+    let outputDir: string;
+
+    if (opts.output) {
+      outputDir = resolve(cwd, opts.output);
+    } else {
+      const config = await loadConfig(cwd);
+      outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
+    }
+
     const entries = readLedger(outputDir);
 
     if (entries.length === 0) {
@@ -141,17 +167,96 @@ program
     }
   });
 
-// ─── UI command (placeholder for Phase 2) ───
+// ─── UI / View handler ───
+
+interface UiOptions {
+  port: string;
+  output?: string;
+}
+
+async function launchDashboard(opts: UiOptions): Promise<void> {
+  const cwd = process.cwd();
+  let outputDir: string;
+
+  if (opts.output) {
+    outputDir = resolve(cwd, opts.output);
+  } else {
+    const config = await loadConfig(cwd);
+    outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
+  }
+
+  const port = parseInt(opts.port, 10);
+
+  console.log(chalk.bold("🧪 AgentEval Dashboard\n"));
+  console.log(chalk.dim(`  Ledger: ${outputDir}/ledger.sqlite`));
+  console.log(chalk.dim(`  Port:   ${port}`));
+  console.log();
+
+  const { createServer } = await import("node:http");
+
+  const server = createServer((req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/json");
+
+    const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+
+    try {
+      if (url.pathname === "/api/runs") {
+        const testId = url.searchParams.get("testId");
+        const entries = testId ? readLedgerByTestId(outputDir, testId) : readLedger(outputDir);
+        res.end(JSON.stringify(entries));
+      } else if (url.pathname === "/api/tests") {
+        res.end(JSON.stringify(getTestIds(outputDir)));
+      } else if (url.pathname === "/api/stats") {
+        const testIds = getTestIds(outputDir);
+        const allStats = testIds.flatMap((id) => getRunnerStats(outputDir, id));
+        res.end(JSON.stringify(allStats));
+      } else {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "Not found" }));
+      }
+    } catch (err: unknown) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+  });
+
+  server.listen(port, () => {
+    console.log(chalk.green(`  ✓ API server running at http://localhost:${port}`));
+    console.log(chalk.dim(`\n  Endpoints:`));
+    console.log(chalk.dim(`    GET /api/runs          All runs (or ?testId=...)`));
+    console.log(chalk.dim(`    GET /api/tests         List of test IDs`));
+    console.log(chalk.dim(`    GET /api/stats         Aggregate stats per runner`));
+    console.log(chalk.dim(`\n  Press Ctrl+C to stop.\n`));
+  });
+}
 
 program
   .command("ui")
-  .description("Launch the evaluation dashboard (Phase 2)")
-  .action(() => {
-    console.log(
-      chalk.yellow(
-        "The visual dashboard is planned for Phase 2. Use `agenteval ledger` to view results.",
-      ),
-    );
-  });
+  .description("Launch the evaluation dashboard")
+  .option("-p, --port <port>", "Port to serve on", "4747")
+  .option("-o, --output <dir>", "Override ledger directory")
+  .action(launchDashboard);
+
+// `view` is an alias for `ui`
+program
+  .command("view")
+  .description("Launch the evaluation dashboard (alias for ui)")
+  .option("-p, --port <port>", "Port to serve on", "4747")
+  .option("-o, --output <dir>", "Override ledger directory")
+  .action(launchDashboard);
+
+// ─── Default command: treat unknown args as `run` ───
+
+const KNOWN_COMMANDS = ["run", "ledger", "ui", "view", "help", "--help", "-h", "--version", "-V"];
+
+// If no command is given (e.g., `agenteval` or `agenteval .`), default to `run`
+if (process.argv.length <= 2 || (process.argv.length === 3 && !process.argv[2].startsWith("-"))) {
+  const arg = process.argv[2];
+  if (arg && !KNOWN_COMMANDS.includes(arg)) {
+    // Treat as `agenteval run` (user typed `agenteval .` or similar)
+    process.argv.splice(2, 0, "run");
+  }
+}
 
 program.parse();

@@ -18,6 +18,7 @@ export default defineConfig({
           { text: "Runners", link: "/guide/runners" },
           { text: "Judges", link: "/guide/judges" },
           { text: "CLI", link: "/guide/cli" },
+          { text: "Architecture", link: "/guide/architecture" },
           { text: "Contributing", link: "/guide/contributing" },
         ],
       },

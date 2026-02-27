@@ -34,8 +34,11 @@ describe("config", () => {
   });
 
   describe("loadConfig", () => {
-    it("throws when no config file exists", async () => {
-      await expect(loadConfig(tmpDir)).rejects.toThrow("No agenteval config found");
+    it("returns default config when no config file exists", async () => {
+      const config = await loadConfig(tmpDir);
+      expect(config.rootDir).toBe(tmpDir);
+      expect(config.outputDir).toBe(".agenteval");
+      expect(config.runners).toEqual([]);
     });
 
     it("loads a .js config file", async () => {
@@ -65,7 +68,7 @@ describe("config", () => {
       expect(config.outputDir).toBe(".agenteval");
       expect(config.timeout).toBe(300_000);
       expect(config.rootDir).toBe(tmpDir);
-      expect(config.testFiles).toBe("**/*.eval.{ts,js,mts,mjs}");
+      expect(config.testFiles).toBe("**/*.{eval,agent-eval}.{ts,js,mts,mjs}");
     });
   });
 });
