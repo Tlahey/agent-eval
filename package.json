@@ -1,0 +1,16 @@
+{
+  "name": "@dkt/agent-eval-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AgentEval – AI coding agent evaluation framework",
+  "scripts": {
+    "build": "pnpm --filter @dkt/agent-eval build",
+    "dev": "pnpm --filter docs dev",
+    "docs:build": "pnpm --filter docs build",
+    "test": "pnpm --filter @dkt/agent-eval test"
+  },
+  "keywords": ["ai", "agent", "eval", "testing", "llm"],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.30.1"
+}
