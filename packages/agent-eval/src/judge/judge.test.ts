@@ -56,7 +56,7 @@ describe("judge", () => {
   });
 
   it("calls generateObject with structured schema and returns result", async () => {
-    const mockResult = { pass: true, score: 0.9, reason: "well implemented" };
+    const mockResult = { pass: true, score: 0.9, reason: "well implemented", improvement: "none" };
     vi.mocked(generateObject).mockResolvedValue({
       object: mockResult,
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
@@ -86,7 +86,7 @@ describe("judge", () => {
 
   it("resolves anthropic provider", async () => {
     vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 1, reason: "ok" },
+      object: { pass: true, score: 1, reason: "ok", improvement: "none" },
     } as never);
 
     const config: JudgeConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
@@ -97,7 +97,7 @@ describe("judge", () => {
 
   it("resolves openai provider", async () => {
     vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.8, reason: "good" },
+      object: { pass: true, score: 0.8, reason: "good", improvement: "none" },
     } as never);
 
     const config: JudgeConfig = { provider: "openai", model: "gpt-4o" };
@@ -108,7 +108,7 @@ describe("judge", () => {
 
   it("resolves ollama provider with default baseURL", async () => {
     vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.7, reason: "decent" },
+      object: { pass: true, score: 0.7, reason: "decent", improvement: "none" },
     } as never);
 
     const config: JudgeConfig = { provider: "ollama", model: "llama3" };
@@ -124,7 +124,7 @@ describe("judge", () => {
 
   it("uses model override when provided", async () => {
     vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.85, reason: "nice" },
+      object: { pass: true, score: 0.85, reason: "nice", improvement: "none" },
     } as never);
 
     const config: JudgeConfig = { provider: "openai", model: "gpt-4o" };
@@ -144,7 +144,7 @@ describe("judge", () => {
 
   it("handles empty context logs", async () => {
     vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: false, score: 0.1, reason: "no output" },
+      object: { pass: false, score: 0.1, reason: "no output", improvement: "add output" },
     } as never);
 
     const ctx = createMockContext({ logs: "", diff: null, commands: [] });
@@ -159,7 +159,7 @@ describe("judge", () => {
 
   it("passes custom apiKey and baseURL to provider", async () => {
     vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.9, reason: "ok" },
+      object: { pass: true, score: 0.9, reason: "ok", improvement: "none" },
     } as never);
 
     const config: JudgeConfig = {
@@ -193,7 +193,12 @@ describe("judge - CLI mode", () => {
   });
 
   it("executes CLI command and parses JSON result", async () => {
-    const mockResult = JSON.stringify({ pass: true, score: 0.85, reason: "looks good" });
+    const mockResult = JSON.stringify({
+      pass: true,
+      score: 0.85,
+      reason: "looks good",
+      improvement: "none",
+    });
     vi.mocked(execSync).mockReturnValue(mockResult);
 
     const config: JudgeConfig = {
@@ -203,12 +208,12 @@ describe("judge - CLI mode", () => {
 
     const result = await judge(createMockContext(), "has unit tests", config);
 
-    expect(result).toEqual({ pass: true, score: 0.85, reason: "looks good" });
+    expect(result).toEqual({ pass: true, score: 0.85, reason: "looks good", improvement: "none" });
     expect(execSync).toHaveBeenCalledOnce();
   });
 
   it("extracts JSON from mixed CLI output", async () => {
-    const output = `Thinking...\n{"pass": false, "score": 0.3, "reason": "missing tests"}\nDone.`;
+    const output = `Thinking...\n{"pass": false, "score": 0.3, "reason": "missing tests", "improvement": "add tests"}\nDone.`;
     vi.mocked(execSync).mockReturnValue(output);
 
     const config: JudgeConfig = {
@@ -225,7 +230,7 @@ describe("judge - CLI mode", () => {
 
   it("replaces {{prompt_file}} with temp file path", async () => {
     vi.mocked(execSync).mockReturnValue(
-      JSON.stringify({ pass: true, score: 1, reason: "perfect" }),
+      JSON.stringify({ pass: true, score: 1, reason: "perfect", improvement: "none" }),
     );
 
     const config: JudgeConfig = {
@@ -268,7 +273,9 @@ describe("judge - CLI mode", () => {
   it("retries on invalid JSON then succeeds", async () => {
     vi.mocked(execSync)
       .mockReturnValueOnce("Not JSON at all")
-      .mockReturnValueOnce(JSON.stringify({ pass: true, score: 0.9, reason: "ok on retry" }));
+      .mockReturnValueOnce(
+        JSON.stringify({ pass: true, score: 0.9, reason: "ok on retry", improvement: "none" }),
+      );
 
     const config: JudgeConfig = {
       type: "cli",
@@ -278,7 +285,7 @@ describe("judge - CLI mode", () => {
 
     const result = await judge(createMockContext(), "criteria", config);
 
-    expect(result).toEqual({ pass: true, score: 0.9, reason: "ok on retry" });
+    expect(result).toEqual({ pass: true, score: 0.9, reason: "ok on retry", improvement: "none" });
     expect(execSync).toHaveBeenCalledTimes(2);
   });
 
@@ -320,18 +327,22 @@ describe("judge - CLI mode", () => {
 
 describe("extractJudgeJson", () => {
   it("parses clean JSON", () => {
-    const result = extractJudgeJson('{"pass": true, "score": 0.9, "reason": "good"}');
-    expect(result).toEqual({ pass: true, score: 0.9, reason: "good" });
+    const result = extractJudgeJson(
+      '{"pass": true, "score": 0.9, "reason": "good", "improvement": "none"}',
+    );
+    expect(result).toEqual({ pass: true, score: 0.9, reason: "good", improvement: "none" });
   });
 
   it("strips markdown code fences", () => {
-    const output = '```json\n{"pass": false, "score": 0.2, "reason": "bad"}\n```';
+    const output =
+      '```json\n{"pass": false, "score": 0.2, "reason": "bad", "improvement": "fix it"}\n```';
     const result = extractJudgeJson(output);
-    expect(result).toEqual({ pass: false, score: 0.2, reason: "bad" });
+    expect(result).toEqual({ pass: false, score: 0.2, reason: "bad", improvement: "fix it" });
   });
 
   it("extracts JSON from preamble text", () => {
-    const output = 'Here is my evaluation:\n{"pass": true, "score": 0.8, "reason": "decent"}\nEnd.';
+    const output =
+      'Here is my evaluation:\n{"pass": true, "score": 0.8, "reason": "decent", "improvement": "none"}\nEnd.';
     const result = extractJudgeJson(output);
     expect(result.score).toBe(0.8);
   });
@@ -341,13 +352,15 @@ describe("extractJudgeJson", () => {
   });
 
   it("throws on malformed JSON", () => {
-    expect(() => extractJudgeJson('{"pass": true, "score": bad, "reason": "x"}')).toThrow(
-      "malformed JSON",
-    );
+    expect(() =>
+      extractJudgeJson('{"pass": true, "score": bad, "reason": "x", "improvement": "y"}'),
+    ).toThrow("malformed JSON");
   });
 
   it("throws on invalid schema (score out of range)", () => {
-    expect(() => extractJudgeJson('{"pass": true, "score": 5.0, "reason": "too high"}')).toThrow();
+    expect(() =>
+      extractJudgeJson('{"pass": true, "score": 5.0, "reason": "too high", "improvement": "none"}'),
+    ).toThrow();
   });
 
   it("throws on missing required field", () => {

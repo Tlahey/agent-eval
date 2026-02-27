@@ -49,6 +49,7 @@ describe("expect", () => {
       pass: true,
       score: 0.9,
       reason: "looks good",
+      improvement: "none",
     });
 
     const result = await agentExpect(ctx).toPassJudge({
@@ -67,6 +68,7 @@ describe("expect", () => {
       pass: true,
       score: 0.85,
       reason: "well done",
+      improvement: "none",
     });
 
     await agentExpect(ctx).toPassJudge({
@@ -91,6 +93,7 @@ describe("expect", () => {
       pass: true,
       score: 0.9,
       reason: "files ok",
+      improvement: "none",
     });
 
     await agentExpect(ctx).toPassJudge({
@@ -112,12 +115,18 @@ describe("expect", () => {
       pass: true,
       score: 0.95,
       reason: "perfect",
+      improvement: "No improvement needed.",
     });
 
     await agentExpect(ctx).toPassJudge({ criteria: "test" });
 
     const stored = getLastJudgeResult();
-    vitestExpect(stored).toEqual({ pass: true, score: 0.95, reason: "perfect" });
+    vitestExpect(stored).toEqual({
+      pass: true,
+      score: 0.95,
+      reason: "perfect",
+      improvement: "No improvement needed.",
+    });
   });
 
   it("throws JudgeFailure when judge returns pass=false", async () => {
@@ -128,6 +137,7 @@ describe("expect", () => {
       pass: false,
       score: 0.3,
       reason: "missing close button",
+      improvement: "add a close button",
     });
 
     await vitestExpect(
@@ -143,6 +153,7 @@ describe("expect", () => {
       pass: false,
       score: 0.2,
       reason: "no tests pass",
+      improvement: "fix the tests",
     });
 
     try {

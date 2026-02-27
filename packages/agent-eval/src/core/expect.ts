@@ -43,7 +43,7 @@ export function expect(ctx: TestContext): ExpectChain {
 
       if (!result.pass) {
         const error = new Error(
-          `Judge evaluation failed (score: ${result.score.toFixed(2)})\n\n${result.reason}`,
+          `Judge evaluation failed (score: ${result.score.toFixed(2)})\n\n${result.reason}\n\n💡 Improvement suggestions:\n${result.improvement}`,
         );
         error.name = "JudgeFailure";
         throw error;

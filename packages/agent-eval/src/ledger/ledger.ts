@@ -27,6 +27,7 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
       score        REAL    NOT NULL,
       pass         INTEGER NOT NULL,
       reason       TEXT    NOT NULL,
+      improvement  TEXT    NOT NULL DEFAULT '',
       diff         TEXT,
       commands     TEXT,
       duration_ms  INTEGER NOT NULL
@@ -34,6 +35,13 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
     CREATE INDEX IF NOT EXISTS idx_runs_test_id   ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp  ON runs(timestamp);
   `);
+
+  // Migrate: add improvement column if missing (backward compat with older DBs)
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN improvement TEXT NOT NULL DEFAULT ''`);
+  } catch {
+    // Column already exists — ignore
+  }
 
   return db;
 }
@@ -49,6 +57,7 @@ interface RunRow {
   score: number;
   pass: number;
   reason: string;
+  improvement: string;
   diff: string | null;
   commands: string | null;
   duration_ms: number;
@@ -63,6 +72,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
     score: row.score,
     pass: row.pass === 1,
     reason: row.reason,
+    improvement: row.improvement ?? "",
     context: {
       diff: row.diff,
       commands: row.commands ? (JSON.parse(row.commands) as CommandResult[]) : [],
@@ -78,8 +88,8 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
   const db = openDb(outputDir);
   try {
     const stmt = db.prepare(`
-      INSERT INTO runs (test_id, timestamp, agent_runner, judge_model, score, pass, reason, diff, commands, duration_ms)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO runs (test_id, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
@@ -89,6 +99,7 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.score,
       entry.pass ? 1 : 0,
       entry.reason,
+      entry.improvement,
       entry.context.diff,
       JSON.stringify(entry.context.commands),
       entry.durationMs,

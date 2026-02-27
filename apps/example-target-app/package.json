@@ -26,6 +26,7 @@
     "@testing-library/jest-dom": "^6.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "agent-eval": "workspace:*",
     "jsdom": "^25.0.0",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0"

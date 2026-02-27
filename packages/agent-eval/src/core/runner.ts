@@ -200,6 +200,7 @@ export async function runTest(
         score: 0,
         pass: false,
         reason: "Test completed without judge evaluation",
+        improvement: "",
         context: {
           diff: ctx.diff,
           commands: ctx.commands,
@@ -214,6 +215,7 @@ export async function runTest(
         entry.score = judgeResult.score;
         entry.pass = judgeResult.pass;
         entry.reason = judgeResult.reason;
+        entry.improvement = judgeResult.improvement;
         clearLastJudgeResult();
       }
 
@@ -242,6 +244,7 @@ export async function runTest(
         score: 0,
         pass: false,
         reason: `Execution error: ${errorMsg}`,
+        improvement: "",
         context: {
           diff: ctx.diff,
           commands: ctx.commands,
@@ -264,9 +267,19 @@ export async function runTest(
 
 // ─── Global judge result store (set by expect().toPassJudge) ───
 
-let _lastJudgeResult: { pass: boolean; score: number; reason: string } | null = null;
+let _lastJudgeResult: {
+  pass: boolean;
+  score: number;
+  reason: string;
+  improvement: string;
+} | null = null;
 
-export function setLastJudgeResult(result: { pass: boolean; score: number; reason: string }): void {
+export function setLastJudgeResult(result: {
+  pass: boolean;
+  score: number;
+  reason: string;
+  improvement: string;
+}): void {
   _lastJudgeResult = result;
 }
 

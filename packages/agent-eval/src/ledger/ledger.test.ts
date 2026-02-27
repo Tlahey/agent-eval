@@ -27,6 +27,7 @@ function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     score: 0.85,
     pass: true,
     reason: "Looks good",
+    improvement: "No improvement needed.",
     context: { diff: null, commands: [] },
     durationMs: 1000,
     ...overrides,

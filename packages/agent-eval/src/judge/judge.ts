@@ -10,6 +10,9 @@ const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),
   score: z.number().min(0).max(1).describe("Score from 0.0 (total failure) to 1.0 (perfect)"),
   reason: z.string().describe("Markdown-formatted explanation of the evaluation"),
+  improvement: z
+    .string()
+    .describe("Markdown-formatted actionable suggestions to improve the score"),
 });
 
 /**
@@ -117,8 +120,9 @@ ${fileScopeSection}
 - Score from 0.0 (complete failure) to 1.0 (perfect execution).
 - Set pass=true if score >= 0.7.
 - Provide a detailed Markdown explanation in "reason".
+- Provide actionable Markdown suggestions in "improvement" to help the agent achieve a higher score. If the score is 1.0, write "No improvement needed.".
 - Be strict but fair. Partial credit is encouraged.
-- Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string }`;
+- Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string, "improvement": string }`;
 }
 
 /**
@@ -131,11 +135,11 @@ export function extractJudgeJson(stdout: string): JudgeResult {
 
   // Try to find a JSON object containing our required fields
   const jsonMatch = stripped.match(
-    /\{[\s\S]*?"pass"\s*:[\s\S]*?"score"\s*:[\s\S]*?"reason"\s*:[\s\S]*?\}/,
+    /\{[\s\S]*?"pass"\s*:[\s\S]*?"score"\s*:[\s\S]*?"reason"\s*:[\s\S]*?"improvement"\s*:[\s\S]*?\}/,
   );
   if (!jsonMatch) {
     throw new Error(
-      `CLI judge output does not contain valid JSON with { pass, score, reason }.\nOutput: ${stdout.slice(0, 500)}`,
+      `CLI judge output does not contain valid JSON with { pass, score, reason, improvement }.\nOutput: ${stdout.slice(0, 500)}`,
     );
   }
 

@@ -1,21 +1,14 @@
-// E2E eval scenario: exercises the full AgentEval pipeline
 import { test, expect } from "agent-eval";
 
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
-  // 1. Trigger the agent with a prompt
   await agent.run(
     "Add a Close button to the Banner component. Use a button with aria-label Close.",
   );
 
-  // 2. Capture what the agent changed
-  ctx.storeDiff();
+  // storeDiff + afterEach commands (pnpm test, pnpm build) run automatically
 
-  // 3. Run validation commands
-  await ctx.runCommand("test", "pnpm test");
-  await ctx.runCommand("typecheck", "pnpm build");
-
-  // 4. Let the LLM judge evaluate the result
   await expect(ctx).toPassJudge({
+    expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
     criteria: `
       - The Banner component now accepts an onClose prop
       - A close button with aria-label="Close" is rendered when onClose is provided

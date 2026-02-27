@@ -38,6 +38,13 @@ export default defineConfig({
     model: "claude-sonnet-4-20250514",
   },
 
+  // Commands run automatically after each agent.run() call.
+  // storeDiff() is always called first (built-in).
+  afterEach: [
+    { name: "test", command: "pnpm test" },
+    { name: "typecheck", command: "pnpm build" },
+  ],
+
   testFiles: "evals/cli-aider/**/*.eval.ts",
   outputDir: ".agenteval",
   timeout: 180_000,

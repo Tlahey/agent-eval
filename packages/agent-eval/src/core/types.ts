@@ -108,6 +108,8 @@ export interface JudgeResult {
   score: number;
   /** Markdown-formatted reason / explanation */
   reason: string;
+  /** Markdown-formatted suggestions to improve the score */
+  improvement: string;
 }
 
 export interface JudgeOptions {
@@ -140,6 +142,8 @@ export interface LedgerEntry {
   pass: boolean;
   /** Judge's markdown reason */
   reason: string;
+  /** Judge's markdown improvement suggestions */
+  improvement: string;
   /** Raw context: diff + command logs */
   context: {
     diff: string | null;

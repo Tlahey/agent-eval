@@ -59,13 +59,13 @@ describe("runner - judge result store", () => {
   });
 
   it("stores and retrieves a judge result", () => {
-    const result: JudgeResult = { pass: true, score: 0.9, reason: "good" };
+    const result: JudgeResult = { pass: true, score: 0.9, reason: "good", improvement: "none" };
     setLastJudgeResult(result);
     expect(getLastJudgeResult()).toEqual(result);
   });
 
   it("clears the stored result", () => {
-    setLastJudgeResult({ pass: false, score: 0.3, reason: "bad" });
+    setLastJudgeResult({ pass: false, score: 0.3, reason: "bad", improvement: "fix it" });
     clearLastJudgeResult();
     expect(getLastJudgeResult()).toBeNull();
   });
@@ -101,7 +101,7 @@ describe("runner - runTest", () => {
     const testDef: TestDefinition = {
       title: "test-judge",
       fn: vi.fn().mockImplementation(() => {
-        setLastJudgeResult({ pass: true, score: 0.95, reason: "excellent" });
+        setLastJudgeResult({ pass: true, score: 0.95, reason: "excellent", improvement: "none" });
       }),
     };
 
