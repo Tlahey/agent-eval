@@ -27,9 +27,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
   const spinner = ora("Loading config...").start();
 
   try {
-    const config = await loadConfig(cwd);
-
-    // Override outputDir if --output is provided
+    const config = await loadConfig(cwd, opts.config);
     if (opts.output) {
       config.outputDir = opts.output;
     }

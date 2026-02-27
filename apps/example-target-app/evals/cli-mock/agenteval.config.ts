@@ -1,16 +1,17 @@
 import { defineConfig } from "agent-eval";
 
 /**
- * Default config — runs ALL eval scenarios across all example directories.
- * For running a single implementation, use --config:
+ * CLI Runner Example — Mock Agent
  *
+ * Uses a local script that simulates an AI agent by writing
+ * predictable file changes. Great for testing the pipeline
+ * without any API keys.
+ *
+ * Usage:
  *   agenteval run --config evals/cli-mock/agenteval.config.ts
- *   agenteval run --config evals/api-openai/agenteval.config.ts
- *   agenteval run --config evals/api-anthropic/agenteval.config.ts
- *   agenteval run --config evals/api-ollama/agenteval.config.ts
  */
 export default defineConfig({
-  rootDir: ".",
+  rootDir: "../..",
 
   runners: [
     {
@@ -25,7 +26,7 @@ export default defineConfig({
     model: "claude-sonnet-4-20250514",
   },
 
-  testFiles: "evals/**/*.eval.ts",
+  testFiles: "evals/cli-mock/**/*.eval.ts",
   outputDir: ".agenteval",
   timeout: 60_000,
 });

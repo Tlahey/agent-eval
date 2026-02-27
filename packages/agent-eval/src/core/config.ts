@@ -13,21 +13,27 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
 
 /**
  * Resolve and load the agenteval config file from the given directory.
+ * If an explicit configPath is provided, it is used directly.
  * If no config file is found, returns sensible defaults.
  */
-export async function loadConfig(cwd: string = process.cwd()): Promise<AgentEvalConfig> {
-  let configPath: string | null = null;
+export async function loadConfig(
+  cwd: string = process.cwd(),
+  configPath?: string,
+): Promise<AgentEvalConfig> {
+  let resolved: string | null = configPath ? resolve(cwd, configPath) : null;
 
-  for (const filename of CONFIG_FILENAMES) {
-    const candidate = resolve(cwd, filename);
-    if (existsSync(candidate)) {
-      configPath = candidate;
-      break;
+  if (!resolved) {
+    for (const filename of CONFIG_FILENAMES) {
+      const candidate = resolve(cwd, filename);
+      if (existsSync(candidate)) {
+        resolved = candidate;
+        break;
+      }
     }
   }
 
   // No config file → return defaults (don't throw)
-  if (!configPath) {
+  if (!resolved) {
     return {
       ...DEFAULT_CONFIG,
       rootDir: cwd,
@@ -37,7 +43,7 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<AgentEval
   }
 
   const jiti = createJiti(cwd, { interopDefault: true });
-  const mod = await jiti.import(configPath);
+  const mod = await jiti.import(resolved);
   const raw = (mod as Record<string, unknown>).default ?? mod;
 
   return {

@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval": "agenteval run",
+    "eval:mock": "agenteval run --config evals/cli-mock/agenteval.config.ts",
+    "eval:openai": "agenteval run --config evals/api-openai/agenteval.config.ts",
+    "eval:anthropic": "agenteval run --config evals/api-anthropic/agenteval.config.ts",
+    "eval:ollama": "agenteval run --config evals/api-ollama/agenteval.config.ts",
+    "eval:view": "agenteval view"
   },
   "dependencies": {
     "react": "^19.0.0",
