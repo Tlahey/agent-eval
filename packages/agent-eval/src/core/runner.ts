@@ -1,4 +1,6 @@
 import { execSync } from "node:child_process";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import chalk from "chalk";
 import { EvalContext } from "./context.js";
 import { gitResetHard } from "../git/git.js";
@@ -10,6 +12,51 @@ import type {
   LedgerEntry,
   TestDefinition,
 } from "./types.js";
+
+// ─── File operation types for API runner structured output ───
+
+interface FileOperation {
+  path: string;
+  content: string;
+}
+
+interface ApiAgentResponse {
+  files: FileOperation[];
+}
+
+/**
+ * Resolve the AI SDK model for an API runner.
+ */
+async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
+  switch (api.provider) {
+    case "anthropic": {
+      const { createAnthropic } = await import("@ai-sdk/anthropic");
+      const provider = createAnthropic({
+        apiKey: api.apiKey ?? process.env.ANTHROPIC_API_KEY,
+        ...(api.baseURL ? { baseURL: api.baseURL } : {}),
+      });
+      return provider(api.model);
+    }
+    case "openai": {
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      const provider = createOpenAI({
+        apiKey: api.apiKey ?? process.env.OPENAI_API_KEY,
+        ...(api.baseURL ? { baseURL: api.baseURL } : {}),
+      });
+      return provider(api.model);
+    }
+    case "ollama": {
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      const provider = createOpenAI({
+        baseURL: api.baseURL ?? "http://localhost:11434/v1",
+        apiKey: "ollama",
+      });
+      return provider(api.model);
+    }
+    default:
+      throw new Error(`Unsupported API runner provider: ${api.provider}`);
+  }
+}
 
 /**
  * Create an AgentHandle for a given runner config.
@@ -31,11 +78,45 @@ function createAgent(runner: AgentRunnerConfig, cwd: string): AgentHandle {
           timeout: 600_000,
         });
       } else if (runner.type === "api") {
-        // API-based agent: we send the prompt to the model and let it modify files
-        // This will be extended later for full API agent support
-        throw new Error(
-          `API-based runners are not yet implemented. Use type: "cli" for now.`
-        );
+        if (!runner.api) {
+          throw new Error(`Runner "${runner.name}" has type "api" but no api config defined`);
+        }
+
+        const { generateObject } = await import("ai");
+        const { z } = await import("zod");
+
+        const model = await resolveRunnerModel(runner.api);
+
+        const FileOperationSchema = z.object({
+          files: z.array(
+            z.object({
+              path: z.string().describe("Relative file path from project root"),
+              content: z.string().describe("Full file content to write"),
+            })
+          ).describe("Files to create or modify"),
+        });
+
+        const { object } = await generateObject({
+          model,
+          schema: FileOperationSchema,
+          prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
+
+Task: ${prompt}
+
+Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
+        });
+
+        const response = object as ApiAgentResponse;
+
+        // Write files to disk
+        for (const file of response.files) {
+          const fullPath = resolve(cwd, file.path);
+          mkdirSync(dirname(fullPath), { recursive: true });
+          writeFileSync(fullPath, file.content, "utf-8");
+          console.log(chalk.dim(`  📝 wrote ${file.path}`));
+        }
+      } else {
+        throw new Error(`Unknown runner type: ${(runner as AgentRunnerConfig).type}`);
       }
     },
   };
