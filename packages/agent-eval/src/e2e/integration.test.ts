@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { tmpdir } from "node:os";
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -6,7 +6,7 @@ import { execSync } from "node:child_process";
 import { EvalContext } from "../core/context.js";
 import { appendLedgerEntry, readLedger } from "../ledger/ledger.js";
 import { gitResetHard, gitDiff } from "../git/git.js";
-import type { LedgerEntry, AgentEvalConfig, TestDefinition } from "../core/types.js";
+import type { LedgerEntry } from "../core/types.js";
 
 /**
  * E2E Integration Test
@@ -31,12 +31,9 @@ function createTempRepo(): string {
   mkdirSync(join(dir, "src"), { recursive: true });
   writeFileSync(
     join(dir, "src", "hello.ts"),
-    'export function hello() {\n  return "Hello World";\n}\n'
+    'export function hello() {\n  return "Hello World";\n}\n',
   );
-  writeFileSync(
-    join(dir, "package.json"),
-    '{ "name": "test-app", "version": "1.0.0" }\n'
-  );
+  writeFileSync(join(dir, "package.json"), '{ "name": "test-app", "version": "1.0.0" }\n');
 
   execSync("git add -A && git commit -m 'initial'", { cwd: dir, stdio: "ignore" });
   return dir;
@@ -55,7 +52,7 @@ describe("E2E Integration", () => {
     // ── Step 1: Simulate agent mutating files ──
     writeFileSync(
       join(repoDir, "src", "hello.ts"),
-      'export function hello() {\n  return "Hello World";\n}\n\nexport function goodbye() {\n  return "Goodbye";\n}\n'
+      'export function hello() {\n  return "Hello World";\n}\n\nexport function goodbye() {\n  return "Goodbye";\n}\n',
     );
 
     // ── Step 2: Capture diff via EvalContext ──
@@ -143,7 +140,7 @@ describe("E2E Integration", () => {
   it("context.logs formats diff + commands together", async () => {
     writeFileSync(
       join(repoDir, "src", "hello.ts"),
-      'export function hello() {\n  return "Changed";\n}\n'
+      'export function hello() {\n  return "Changed";\n}\n',
     );
 
     const ctx = new EvalContext(repoDir);

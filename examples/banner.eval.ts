@@ -4,7 +4,7 @@ import { test, expect } from "agent-eval";
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   // 1. Trigger the agent with a prompt
   await agent.run(
-    "Add a Close button to the Banner component. Use an IconButton with an X icon and aria-label 'Close'."
+    "Add a Close button to the Banner component. Use an IconButton with an X icon and aria-label 'Close'.",
   );
 
   // 2. Capture what the agent changed
@@ -28,7 +28,7 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
 
 test.tagged(["ui", "responsive"], "Make Banner responsive", async ({ agent, ctx }) => {
   await agent.run(
-    "Make the Banner component responsive. On mobile (<768px), stack content vertically."
+    "Make the Banner component responsive. On mobile (<768px), stack content vertically.",
   );
 
   ctx.storeDiff();

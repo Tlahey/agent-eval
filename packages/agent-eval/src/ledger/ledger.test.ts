@@ -93,9 +93,18 @@ describe("ledger (SQLite)", () => {
   });
 
   it("returns latest entry per test ID", () => {
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "a", score: 0.5, timestamp: "2025-01-01T00:00:00Z" }));
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "a", score: 0.9, timestamp: "2025-01-02T00:00:00Z" }));
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "b", score: 0.7, timestamp: "2025-01-01T00:00:00Z" }));
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "a", score: 0.5, timestamp: "2025-01-01T00:00:00Z" }),
+    );
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "a", score: 0.9, timestamp: "2025-01-02T00:00:00Z" }),
+    );
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "b", score: 0.7, timestamp: "2025-01-01T00:00:00Z" }),
+    );
 
     const latest = getLatestEntries(tmpDir);
     expect(latest.size).toBe(2);
@@ -129,9 +138,18 @@ describe("ledger (SQLite)", () => {
   });
 
   it("computes runner stats with aggregates", () => {
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.8, pass: true }));
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.6, pass: false }));
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "cursor", score: 0.9, pass: true }));
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.8, pass: true }),
+    );
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.6, pass: false }),
+    );
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "x", agentRunner: "cursor", score: 0.9, pass: true }),
+    );
 
     const stats = getRunnerStats(tmpDir, "x");
     expect(stats).toHaveLength(2);

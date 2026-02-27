@@ -11,12 +11,14 @@ Use an **LLM-as-a-Judge** pattern with the **Vercel AI SDK** and **Zod schema va
 ## Rationale
 
 ### Why LLM-as-a-Judge?
+
 - Agent output (code changes) is **non-deterministic** — the same prompt can produce different but equally valid solutions
 - Traditional assertions (`expect(file).toContain("onClick")`) are too **brittle** and miss creative solutions
 - An LLM can evaluate **intent**, **code quality**, **completeness**, and **best practices** holistically
 - Scores provide a **continuous metric** (0.0–1.0) instead of binary pass/fail
 
 ### Why Vercel AI SDK?
+
 - **Provider-agnostic**: swap between Anthropic, OpenAI, Ollama with a single config change
 - **`generateObject()`** with Zod schema: guarantees the judge returns `{ pass, score, reason }`
 - No manual JSON parsing, no regex extraction, no prompt engineering for format compliance
@@ -28,7 +30,7 @@ Use an **LLM-as-a-Judge** pattern with the **Vercel AI SDK** and **Zod schema va
 const JudgeResultSchema = z.object({
   pass: z.boolean(),
   score: z.number().min(0).max(1),
-  reason: z.string(),  // Markdown explanation
+  reason: z.string(), // Markdown explanation
 });
 ```
 
@@ -36,14 +38,16 @@ The judge **always** returns this shape. No ambiguity, no parsing errors.
 
 ### Provider Support
 
-| Provider | Package | Use Case |
-|----------|---------|----------|
-| Anthropic | `@ai-sdk/anthropic` | Claude models (recommended) |
-| OpenAI | `@ai-sdk/openai` | GPT-4o, o1 models |
-| Ollama | `@ai-sdk/openai` (compat) | Local models (privacy-first) |
+| Provider  | Package                   | Use Case                     |
+| --------- | ------------------------- | ---------------------------- |
+| Anthropic | `@ai-sdk/anthropic`       | Claude models (recommended)  |
+| OpenAI    | `@ai-sdk/openai`          | GPT-4o, o1 models            |
+| Ollama    | `@ai-sdk/openai` (compat) | Local models (privacy-first) |
 
 ### The Judge Prompt
+
 The system prompt includes:
+
 1. The evaluation **criteria** (written by the test author)
 2. The **Git diff** (what the agent changed)
 3. All **command outputs** (build logs, test results, linter output)

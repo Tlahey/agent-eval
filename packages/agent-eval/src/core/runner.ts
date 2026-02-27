@@ -88,12 +88,14 @@ function createAgent(runner: AgentRunnerConfig, cwd: string): AgentHandle {
         const model = await resolveRunnerModel(runner.api);
 
         const FileOperationSchema = z.object({
-          files: z.array(
-            z.object({
-              path: z.string().describe("Relative file path from project root"),
-              content: z.string().describe("Full file content to write"),
-            })
-          ).describe("Files to create or modify"),
+          files: z
+            .array(
+              z.object({
+                path: z.string().describe("Relative file path from project root"),
+                content: z.string().describe("Full file content to write"),
+              }),
+            )
+            .describe("Files to create or modify"),
         });
 
         const { object } = await generateObject({
@@ -134,7 +136,7 @@ export interface RunResult {
  */
 export async function runTest(
   testDef: TestDefinition,
-  config: AgentEvalConfig
+  config: AgentEvalConfig,
 ): Promise<RunResult[]> {
   const cwd = config.rootDir ?? process.cwd();
   const outputDir = config.outputDir ?? ".agenteval";
@@ -145,10 +147,7 @@ export async function runTest(
   const results: RunResult[] = [];
 
   for (const runner of runners) {
-    console.log(
-      chalk.blue(`\n▶ ${testDef.title}`) +
-        chalk.gray(` [${runner.name}]`)
-    );
+    console.log(chalk.blue(`\n▶ ${testDef.title}`) + chalk.gray(` [${runner.name}]`));
 
     // Reset git state before each runner
     console.log(chalk.dim("  ↺ git reset --hard && git clean -fd"));
@@ -190,9 +189,7 @@ export async function runTest(
 
       const icon = entry.pass ? chalk.green("✓") : chalk.red("✗");
       const scoreStr = chalk.yellow(`${entry.score.toFixed(2)}`);
-      console.log(
-        `  ${icon} Score: ${scoreStr} – ${entry.pass ? "PASS" : "FAIL"}`
-      );
+      console.log(`  ${icon} Score: ${scoreStr} – ${entry.pass ? "PASS" : "FAIL"}`);
 
       results.push({
         testId: testDef.title,
@@ -201,8 +198,7 @@ export async function runTest(
         passed: entry.pass,
       });
     } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error ? err.message : String(err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
 
       console.log(chalk.red(`  ✗ Error: ${errorMsg}`));
 
@@ -236,14 +232,9 @@ export async function runTest(
 
 // ─── Global judge result store (set by expect().toPassJudge) ───
 
-let _lastJudgeResult: { pass: boolean; score: number; reason: string } | null =
-  null;
+let _lastJudgeResult: { pass: boolean; score: number; reason: string } | null = null;
 
-export function setLastJudgeResult(result: {
-  pass: boolean;
-  score: number;
-  reason: string;
-}): void {
+export function setLastJudgeResult(result: { pass: boolean; score: number; reason: string }): void {
   _lastJudgeResult = result;
 }
 

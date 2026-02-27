@@ -11,10 +11,7 @@ import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.
 import { runTest } from "../core/runner.js";
 import { readLedger, getTestIds } from "../ledger/ledger.js";
 
-program
-  .name("agenteval")
-  .description("AI coding agent evaluation framework")
-  .version("0.1.0");
+program.name("agenteval").description("AI coding agent evaluation framework").version("0.1.0");
 
 // ─── Run command ───
 
@@ -37,7 +34,7 @@ program
       const patterns =
         typeof config.testFiles === "string"
           ? [config.testFiles]
-          : config.testFiles ?? ["**/*.eval.{ts,js,mts,mjs}"];
+          : (config.testFiles ?? ["**/*.eval.{ts,js,mts,mjs}"]);
 
       const files = await glob(patterns, {
         cwd,
@@ -66,9 +63,7 @@ program
 
         // Apply filters
         if (opts.filter) {
-          tests = tests.filter((t) =>
-            t.title.toLowerCase().includes(opts.filter.toLowerCase())
-          );
+          tests = tests.filter((t) => t.title.toLowerCase().includes(opts.filter.toLowerCase()));
         }
         if (opts.tag) {
           tests = tests.filter((t) => t.tags?.includes(opts.tag));
@@ -100,9 +95,7 @@ program
       process.exit(totalFailed > 0 ? 1 : 0);
     } catch (err: unknown) {
       spinner.fail("Failed");
-      console.error(
-        chalk.red(err instanceof Error ? err.message : String(err))
-      );
+      console.error(chalk.red(err instanceof Error ? err.message : String(err)));
       process.exit(1);
     }
   });
@@ -137,12 +130,14 @@ program
       const score = chalk.yellow(entry.score.toFixed(2));
       const date = new Date(entry.timestamp).toLocaleString();
       console.log(
-        `${icon} ${score} ${chalk.bold(entry.testId)} [${entry.agentRunner}] ${chalk.dim(date)}`
+        `${icon} ${score} ${chalk.bold(entry.testId)} [${entry.agentRunner}] ${chalk.dim(date)}`,
       );
     }
 
     if (entries.length > 20) {
-      console.log(chalk.dim(`\n  ... and ${entries.length - 20} more. Use --json for full output.`));
+      console.log(
+        chalk.dim(`\n  ... and ${entries.length - 20} more. Use --json for full output.`),
+      );
     }
   });
 
@@ -154,8 +149,8 @@ program
   .action(() => {
     console.log(
       chalk.yellow(
-        "The visual dashboard is planned for Phase 2. Use `agenteval ledger` to view results."
-      )
+        "The visual dashboard is planned for Phase 2. Use `agenteval ledger` to view results.",
+      ),
     );
   });
 

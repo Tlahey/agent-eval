@@ -1,6 +1,6 @@
 # Ledger
 
-The ledger stores all evaluation results in `.agenteval/ledger.jsonl`.
+The ledger stores all evaluation results in `.agenteval/ledger.db` (SQLite via Node 22's `node:sqlite`).
 
 ## Format
 
@@ -44,14 +44,14 @@ const latest = getLatestEntries(".agenteval");
 
 ## Schema
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `testId` | `string` | Test title |
-| `timestamp` | `string` | ISO 8601 timestamp |
-| `agentRunner` | `string` | Runner name |
-| `judgeModel` | `string` | Judge model used |
-| `score` | `number` | 0.0 to 1.0 |
-| `pass` | `boolean` | Whether it passed |
-| `reason` | `string` | Judge's markdown explanation |
-| `context` | `object` | Raw diff + command outputs |
-| `durationMs` | `number` | Total duration in ms |
+| Field         | Type      | Description                  |
+| ------------- | --------- | ---------------------------- |
+| `testId`      | `string`  | Test title                   |
+| `timestamp`   | `string`  | ISO 8601 timestamp           |
+| `agentRunner` | `string`  | Runner name                  |
+| `judgeModel`  | `string`  | Judge model used             |
+| `score`       | `number`  | 0.0 to 1.0                   |
+| `pass`        | `boolean` | Whether it passed            |
+| `reason`      | `string`  | Judge's markdown explanation |
+| `context`     | `object`  | Raw diff + command outputs   |
+| `durationMs`  | `number`  | Total duration in ms         |

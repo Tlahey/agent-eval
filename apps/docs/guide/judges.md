@@ -63,12 +63,12 @@ await expect(ctx).toPassJudge({
 
 ## Scoring
 
-| Score | Meaning |
-|-------|---------|
-| 1.0 | Perfect execution |
+| Score   | Meaning            |
+| ------- | ------------------ |
+| 1.0     | Perfect execution  |
 | 0.7–0.9 | Good, minor issues |
-| 0.4–0.6 | Partial success |
-| 0.1–0.3 | Major issues |
-| 0.0 | Complete failure |
+| 0.4–0.6 | Partial success    |
+| 0.1–0.3 | Major issues       |
+| 0.0     | Complete failure   |
 
 The judge is instructed to be "strict but fair" and award partial credit.

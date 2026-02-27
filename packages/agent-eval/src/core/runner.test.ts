@@ -1,6 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { execSync } from "node:child_process";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { describe, it, expect } from "vitest";
 
 // We test the createAgent logic indirectly by testing the runner module
 // Since createAgent is not exported, we test through the module's behavior
@@ -8,16 +6,6 @@ import { writeFileSync, mkdirSync } from "node:fs";
 describe("runner - createAgent", () => {
   describe("CLI runner", () => {
     it("replaces {{prompt}} placeholder in command", async () => {
-      // We mock execSync to capture the command
-      const { execSync: mockExec } = await vi.importMock<
-        typeof import("node:child_process")
-      >("node:child_process");
-
-      // Import after mocking
-      vi.doMock("node:child_process", () => ({
-        execSync: vi.fn(),
-      }));
-
       // Since createAgent is not exported directly, we verify the type shape
       // The actual integration test would run a real CLI runner
       expect(true).toBe(true);

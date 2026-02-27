@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  test as evalTest,
-  getRegisteredTests,
-  clearRegisteredTests,
-} from "../index.js";
+import { test as evalTest, getRegisteredTests, clearRegisteredTests } from "../index.js";
 
 describe("test registration", () => {
   beforeEach(() => {

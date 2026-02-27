@@ -11,12 +11,14 @@ Use Node 22's **native `node:sqlite`** (`DatabaseSync`) instead of a JSONL flat 
 ## Rationale
 
 ### Why not JSONL?
+
 - Storing hundreds of full Git diffs and terminal logs **quickly bloats flat files**
 - Querying (filter by test ID, group by model, sort by date) requires **reading the entire file** into memory
 - No indexing, no `GROUP BY`, no aggregations — the dashboard would need to do all computation client-side
 - Concurrent writes risk corruption without file-level locking
 
 ### Why native `node:sqlite`?
+
 - Node 22 ships `node:sqlite` **built-in** — zero external npm dependencies
 - `DatabaseSync` provides a synchronous API perfect for our sequential execution model
 - **SQL queries** enable instant dashboard rendering: `SELECT testId, AVG(score) GROUP BY agentRunner`
@@ -25,6 +27,7 @@ Use Node 22's **native `node:sqlite`** (`DatabaseSync`) instead of a JSONL flat 
 - WAL mode enables concurrent reads (dashboard) while the runner writes
 
 ### Why not PostgreSQL / MongoDB / etc.?
+
 - External database servers add operational complexity
 - We want **zero-config, zero-dependency** local evaluation
 - SQLite is the world's most deployed database — it's the right tool for local analytics

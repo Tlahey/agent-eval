@@ -1,0 +1,7 @@
+dist
+node_modules
+.agenteval
+pnpm-lock.yaml
+coverage
+apps/docs/.vitepress/cache
+apps/docs/.vitepress/dist

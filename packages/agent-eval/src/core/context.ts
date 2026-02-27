@@ -17,7 +17,7 @@ export class EvalContext implements TestContext {
 
   async runCommand(name: string, command: string): Promise<CommandResult> {
     const start = Date.now();
-    let stdout = "";
+    let stdout: string;
     let stderr = "";
     let exitCode = 0;
 
@@ -69,7 +69,7 @@ export class EvalContext implements TestContext {
 
     for (const cmd of this._commands) {
       parts.push(
-        `── ${cmd.name} (exit ${cmd.exitCode}, ${cmd.durationMs}ms) ──\n$ ${cmd.command}\n${cmd.stdout}${cmd.stderr ? `\nSTDERR:\n${cmd.stderr}` : ""}`
+        `── ${cmd.name} (exit ${cmd.exitCode}, ${cmd.durationMs}ms) ──\n$ ${cmd.command}\n${cmd.stdout}${cmd.stderr ? `\nSTDERR:\n${cmd.stderr}` : ""}`,
       );
     }
 

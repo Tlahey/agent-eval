@@ -109,14 +109,8 @@ describe("Banner", () => {
 });
 `;
 
-  writeFileSync(
-    resolve(projectRoot, "src/components/Banner.tsx"),
-    bannerCode
-  );
-  writeFileSync(
-    resolve(projectRoot, "src/components/Banner.test.tsx"),
-    bannerTestCode
-  );
+  writeFileSync(resolve(projectRoot, "src/components/Banner.tsx"), bannerCode);
+  writeFileSync(resolve(projectRoot, "src/components/Banner.test.tsx"), bannerTestCode);
 
   console.log("✅ Mock agent: Added Close button to Banner component");
 } else {

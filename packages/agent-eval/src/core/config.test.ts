@@ -44,7 +44,7 @@ describe("config", () => {
         `module.exports = {
           runners: [{ name: "test-runner", type: "cli", command: "echo test" }],
           judge: { provider: "openai", model: "gpt-4o" },
-        };`
+        };`,
       );
 
       const config = await loadConfig(tmpDir);
@@ -58,7 +58,7 @@ describe("config", () => {
         `module.exports = {
           runners: [{ name: "r", type: "cli", command: "echo" }],
           judge: { provider: "anthropic", model: "m" },
-        };`
+        };`,
       );
 
       const config = await loadConfig(tmpDir);

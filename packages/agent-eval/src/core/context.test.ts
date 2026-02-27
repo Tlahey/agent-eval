@@ -62,7 +62,10 @@ describe("EvalContext", () => {
 
   it("runCommand captures stderr and exit code for failing commands", async () => {
     const ctx = new EvalContext(tmpDir);
-    const result = await ctx.runCommand("fail", "node -e \"process.stderr.write('oops'); process.exit(2)\"");
+    const result = await ctx.runCommand(
+      "fail",
+      "node -e \"process.stderr.write('oops'); process.exit(2)\"",
+    );
 
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain("oops");

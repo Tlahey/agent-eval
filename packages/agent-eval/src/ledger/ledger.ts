@@ -75,10 +75,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
 /**
  * Append a single entry to the SQLite ledger.
  */
-export function appendLedgerEntry(
-  outputDir: string,
-  entry: LedgerEntry
-): void {
+export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
   const db = openDb(outputDir);
   try {
     const stmt = db.prepare(`
@@ -95,7 +92,7 @@ export function appendLedgerEntry(
       entry.reason,
       entry.context.diff,
       JSON.stringify(entry.context.commands),
-      entry.durationMs
+      entry.durationMs,
     );
   } finally {
     db.close();
@@ -118,10 +115,7 @@ export function readLedger(outputDir: string): LedgerEntry[] {
 /**
  * Read ledger entries for a specific test ID.
  */
-export function readLedgerByTestId(
-  outputDir: string,
-  testId: string
-): LedgerEntry[] {
+export function readLedgerByTestId(outputDir: string, testId: string): LedgerEntry[] {
   const db = openDb(outputDir);
   try {
     const rows = db
@@ -139,9 +133,9 @@ export function readLedgerByTestId(
 export function getTestIds(outputDir: string): string[] {
   const db = openDb(outputDir);
   try {
-    const rows = db
-      .prepare("SELECT DISTINCT test_id FROM runs ORDER BY test_id")
-      .all() as Array<{ test_id: string }>;
+    const rows = db.prepare("SELECT DISTINCT test_id FROM runs ORDER BY test_id").all() as Array<{
+      test_id: string;
+    }>;
     return rows.map((r) => r.test_id);
   } finally {
     db.close();
@@ -151,14 +145,13 @@ export function getTestIds(outputDir: string): string[] {
 /**
  * Get the latest entry for each test ID.
  */
-export function getLatestEntries(
-  outputDir: string
-): Map<string, LedgerEntry> {
+export function getLatestEntries(outputDir: string): Map<string, LedgerEntry> {
   const db = openDb(outputDir);
   try {
     // Use a subquery to find the max timestamp per test_id, then join back
     const rows = db
-      .prepare(`
+      .prepare(
+        `
         SELECT r.* FROM runs r
         INNER JOIN (
           SELECT test_id, MAX(timestamp) AS max_ts
@@ -166,7 +159,8 @@ export function getLatestEntries(
           GROUP BY test_id
         ) latest ON r.test_id = latest.test_id AND r.timestamp = latest.max_ts
         ORDER BY r.test_id
-      `)
+      `,
+      )
       .all() as RunRow[];
 
     const result = new Map<string, LedgerEntry>();
@@ -185,12 +179,13 @@ export function getLatestEntries(
  */
 export function getRunnerStats(
   outputDir: string,
-  testId: string
+  testId: string,
 ): Array<{ agentRunner: string; avgScore: number; totalRuns: number; passRate: number }> {
   const db = openDb(outputDir);
   try {
     const rows = db
-      .prepare(`
+      .prepare(
+        `
         SELECT
           agent_runner,
           AVG(score) AS avg_score,
@@ -200,13 +195,14 @@ export function getRunnerStats(
         WHERE test_id = ?
         GROUP BY agent_runner
         ORDER BY avg_score DESC
-      `)
+      `,
+      )
       .all(testId) as Array<{
-        agent_runner: string;
-        avg_score: number;
-        total_runs: number;
-        pass_rate: number;
-      }>;
+      agent_runner: string;
+      avg_score: number;
+      total_runs: number;
+      pass_rate: number;
+    }>;
     return rows.map((r) => ({
       agentRunner: r.agent_runner,
       avgScore: r.avg_score,

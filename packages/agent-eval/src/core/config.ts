@@ -3,11 +3,7 @@ import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import type { AgentEvalConfig } from "./types.js";
 
-const CONFIG_FILENAMES = [
-  "agenteval.config.ts",
-  "agenteval.config.js",
-  "agenteval.config.mjs",
-];
+const CONFIG_FILENAMES = ["agenteval.config.ts", "agenteval.config.js", "agenteval.config.mjs"];
 
 const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
   testFiles: "**/*.eval.{ts,js,mts,mjs}",
@@ -18,9 +14,7 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
 /**
  * Resolve and load the agenteval config file from the given directory.
  */
-export async function loadConfig(
-  cwd: string = process.cwd()
-): Promise<AgentEvalConfig> {
+export async function loadConfig(cwd: string = process.cwd()): Promise<AgentEvalConfig> {
   let configPath: string | null = null;
 
   for (const filename of CONFIG_FILENAMES) {
@@ -32,9 +26,7 @@ export async function loadConfig(
   }
 
   if (!configPath) {
-    throw new Error(
-      `No agenteval config found. Create one of: ${CONFIG_FILENAMES.join(", ")}`
-    );
+    throw new Error(`No agenteval config found. Create one of: ${CONFIG_FILENAMES.join(", ")}`);
   }
 
   const jiti = createJiti(cwd, { interopDefault: true });

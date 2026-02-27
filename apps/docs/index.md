@@ -19,5 +19,5 @@ features:
   - title: ⚖️ LLM-as-a-Judge
     details: Structured evaluation via Anthropic, OpenAI, or local Ollama models.
   - title: 📊 Data Ledger
-    details: JSONL-based historical tracking of all evaluation results.
+    details: SQLite-backed historical tracking of all evaluation results.
 ---

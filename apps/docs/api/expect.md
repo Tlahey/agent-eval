@@ -5,7 +5,7 @@ Create a fluent assertion chain for LLM-as-a-Judge evaluation.
 ## Signature
 
 ```ts
-function expect(ctx: TestContext): ExpectChain
+function expect(ctx: TestContext): ExpectChain;
 ```
 
 ## Methods
@@ -14,8 +14,8 @@ function expect(ctx: TestContext): ExpectChain
 
 ```ts
 interface JudgeOptions {
-  criteria: string;   // Markdown evaluation criteria
-  model?: string;     // Optional model override
+  criteria: string; // Markdown evaluation criteria
+  model?: string; // Optional model override
 }
 ```
 
@@ -23,9 +23,9 @@ Returns a `Promise<JudgeResult>`:
 
 ```ts
 interface JudgeResult {
-  pass: boolean;     // true if score >= 0.7
-  score: number;     // 0.0 to 1.0
-  reason: string;    // Markdown explanation
+  pass: boolean; // true if score >= 0.7
+  score: number; // 0.0 to 1.0
+  reason: string; // Markdown explanation
 }
 ```
 

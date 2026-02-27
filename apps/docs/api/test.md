@@ -5,15 +5,15 @@ Register an evaluation test.
 ## Signature
 
 ```ts
-function test(title: string, fn: TestFn): void
+function test(title: string, fn: TestFn): void;
 ```
 
 ## Parameters
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `title` | `string` | Test title (used as the test ID in the ledger) |
-| `fn` | `TestFn` | Async function receiving `{ agent, ctx, judge }` |
+| Param   | Type     | Description                                      |
+| ------- | -------- | ------------------------------------------------ |
+| `title` | `string` | Test title (used as the test ID in the ledger)   |
+| `fn`    | `TestFn` | Async function receiving `{ agent, ctx, judge }` |
 
 ## Usage
 

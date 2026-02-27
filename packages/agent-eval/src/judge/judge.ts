@@ -4,14 +4,8 @@ import type { JudgeConfig, JudgeResult, TestContext } from "../core/types.js";
 
 const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),
-  score: z
-    .number()
-    .min(0)
-    .max(1)
-    .describe("Score from 0.0 (total failure) to 1.0 (perfect)"),
-  reason: z
-    .string()
-    .describe("Markdown-formatted explanation of the evaluation"),
+  score: z.number().min(0).max(1).describe("Score from 0.0 (total failure) to 1.0 (perfect)"),
+  reason: z.string().describe("Markdown-formatted explanation of the evaluation"),
 });
 
 /**
@@ -79,7 +73,7 @@ export async function judge(
   ctx: TestContext,
   criteria: string,
   config: JudgeConfig,
-  modelOverride?: string
+  modelOverride?: string,
 ): Promise<JudgeResult> {
   const model = await resolveModel(config, modelOverride);
 

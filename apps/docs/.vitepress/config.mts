@@ -17,6 +17,7 @@ export default defineConfig({
           { text: "Writing Tests", link: "/guide/writing-tests" },
           { text: "Judges", link: "/guide/judges" },
           { text: "CLI", link: "/guide/cli" },
+          { text: "Contributing", link: "/guide/contributing" },
         ],
       },
       {
@@ -30,8 +31,6 @@ export default defineConfig({
         ],
       },
     ],
-    socialLinks: [
-      { icon: "github", link: "https://github.com/dkt/agent-eval" },
-    ],
+    socialLinks: [{ icon: "github", link: "https://github.com/dkt/agent-eval" }],
   },
 });

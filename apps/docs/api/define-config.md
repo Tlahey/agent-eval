@@ -5,7 +5,7 @@ Type-safe helper for creating `agenteval.config.ts`.
 ## Signature
 
 ```ts
-function defineConfig(config: AgentEvalConfig): AgentEvalConfig
+function defineConfig(config: AgentEvalConfig): AgentEvalConfig;
 ```
 
 ## Usage

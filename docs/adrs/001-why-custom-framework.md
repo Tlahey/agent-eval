@@ -11,6 +11,7 @@ Build a custom evaluation framework (AgentEval) instead of adapting existing too
 ## Alternatives Considered
 
 ### Vitest / Jest
+
 - Built for **extreme speed and parallel execution** in memory
 - AI agents mutate the **actual file system** and commit to Git
 - Running agent tests concurrently **corrupts the local repository state**
@@ -18,12 +19,14 @@ Build a custom evaluation framework (AgentEval) instead of adapting existing too
 - **Verdict:** Wrong execution model — needs sequential, side-effect-aware orchestration
 
 ### Promptfoo
+
 - Excellent for **Text-in/Text-out** evaluation (RAGs, Chatbots)
 - Evaluating code-generating agents requires **running CLI commands, capturing Git diffs, reading build logs**
 - Forcing Promptfoo to handle heavy side-effects required **fragile workarounds** (Bash escaping, JSON parsing hacks)
 - **Verdict:** Wrong abstraction level — designed for prompt evaluation, not file-system operations
 
 ### Langfuse / Cloud LLMOps
+
 - Perfect for **production observability**, not a local test runner
 - Sending **proprietary enterprise code, Git diffs, and build logs** to a third-party cloud raises **data privacy and security concerns**
 - **Verdict:** Wrong deployment model — we need 100% local, privacy-first evaluation

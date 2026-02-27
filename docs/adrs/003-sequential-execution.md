@@ -11,6 +11,7 @@ All evaluation tests run **strictly sequentially** — one test at a time, one r
 ## Rationale
 
 ### The Problem with Parallelism
+
 - Standard test runners (Vitest, Jest) run tests in parallel for speed
 - AI agents **write real files**, **stage changes**, and **commit to Git**
 - Two agents running concurrently in the same repo will:
@@ -20,6 +21,7 @@ All evaluation tests run **strictly sequentially** — one test at a time, one r
   - Make evaluation results meaningless
 
 ### The Sequential Contract
+
 1. Before each test: `git reset --hard HEAD && git clean -fd` (guaranteed pristine state)
 2. Run the agent (may take 1-5 minutes)
 3. Capture the diff and run validation commands
@@ -28,21 +30,22 @@ All evaluation tests run **strictly sequentially** — one test at a time, one r
 6. Repeat for the next runner/test
 
 ### Implementation
+
 - The runner uses `for...of` loops (no `Promise.all`, no worker threads)
 - Each test gets its own `EvalContext` instance
 - Git isolation is **mandatory** and cannot be skipped
 
 ## Trade-offs
 
-| Aspect | Sequential | Parallel |
-|--------|-----------|----------|
-| Correctness | ✅ Guaranteed | ❌ Race conditions |
-| Speed | Slower (minutes per test) | Faster wall-clock |
-| Simplicity | ✅ Simple `for` loop | Complex isolation needed |
-| Git safety | ✅ Clean state per test | ❌ Corrupted state |
+| Aspect      | Sequential                | Parallel                 |
+| ----------- | ------------------------- | ------------------------ |
+| Correctness | ✅ Guaranteed             | ❌ Race conditions       |
+| Speed       | Slower (minutes per test) | Faster wall-clock        |
+| Simplicity  | ✅ Simple `for` loop      | Complex isolation needed |
+| Git safety  | ✅ Clean state per test   | ❌ Corrupted state       |
 
 ## Consequences
 
 - A suite of 10 tests × 3 runners = 30 sequential executions (potentially 30-150 minutes)
 - This is acceptable: agent evaluations are inherently slow (they generate code, not text)
-- Future optimization: run independent test *suites* in separate Git worktrees (not in scope for Phase 2)
+- Future optimization: run independent test _suites_ in separate Git worktrees (not in scope for Phase 2)

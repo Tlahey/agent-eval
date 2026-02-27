@@ -69,4 +69,4 @@ npx agenteval run
 3. **Agent executes** – Your configured agent runs the prompt
 4. **Context captured** – Git diff and command outputs are stored
 5. **Judge evaluates** – An LLM scores the agent's output (0.0–1.0)
-6. **Ledger updated** – Results are appended to `.agenteval/ledger.jsonl`
+6. **Ledger updated** – Results are stored in `.agenteval/ledger.db` (SQLite)

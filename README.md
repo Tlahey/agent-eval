@@ -18,7 +18,7 @@ Test, judge, and track AI coding agents — locally, sequentially, and model-agn
 - **Git Isolation** — automatic `git reset --hard` between runs for pristine environments
 - **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, or local Ollama
 - **Model Matrix** — compare multiple agents/models on the same test suite
-- **Data Ledger** — JSONL-based historical tracking of all evaluation results
+- **Data Ledger** — SQLite-backed historical tracking of all evaluation results
 - **CLI** — `agenteval run`, `agenteval ledger`, and more
 
 ## Why We Built This
@@ -50,7 +50,7 @@ We built AgentEval to hit the perfect sweet spot:
 - **Familiar, Vitest-like syntax** — great Developer Experience with `test()` / `expect()` you already know.
 - **Strict, sequential execution** — automated Git state isolation (`git reset --hard`) between every test. No concurrency corruption.
 - **Provider-agnostic architecture** — easily switch between local CLIs, OpenAI, or Anthropic for both agents and LLM-as-a-Judge.
-- **Local, privacy-first ledger** — track historical performance in a JSONL file without sending your source code to the cloud.
+- **Local, privacy-first ledger** — track historical performance in a local SQLite database without sending your source code to the cloud.
 
 ---
 
@@ -128,7 +128,7 @@ agent-eval/
 │           ├── core/       # Types, config, context, runner, expect
 │           ├── git/        # Git isolation (reset, diff)
 │           ├── judge/      # LLM-as-a-Judge
-│           ├── ledger/     # JSONL ledger
+│           ├── ledger/     # SQLite ledger (node:sqlite)
 │           └── cli/        # CLI binary
 ├── examples/               # Example config + test files
 ├── AGENTS.md               # AI agent development guide
@@ -152,13 +152,13 @@ pnpm install
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `pnpm build` | Build the core package |
-| `pnpm test` | Run unit tests (vitest) |
-| `pnpm dev` | Start docs dev server |
-| `pnpm docs:build` | Build docs for production |
-| `pnpm --filter agent-eval typecheck` | Type-check the framework |
+| Command                              | Description               |
+| ------------------------------------ | ------------------------- |
+| `pnpm build`                         | Build the core package    |
+| `pnpm test`                          | Run unit tests (vitest)   |
+| `pnpm dev`                           | Start docs dev server     |
+| `pnpm docs:build`                    | Build docs for production |
+| `pnpm --filter agent-eval typecheck` | Type-check the framework  |
 
 ### Workflow
 

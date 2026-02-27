@@ -37,8 +37,8 @@ interface CommandResult {
 
 ## Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `diff` | `string \| null` | Captured git diff |
-| `commands` | `CommandResult[]` | All command results |
-| `logs` | `string` | Formatted log string (diff + all commands) |
+| Property   | Type              | Description                                |
+| ---------- | ----------------- | ------------------------------------------ |
+| `diff`     | `string \| null`  | Captured git diff                          |
+| `commands` | `CommandResult[]` | All command results                        |
+| `logs`     | `string`          | Formatted log string (diff + all commands) |

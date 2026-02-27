@@ -4,7 +4,7 @@ import { test, expect } from "agent-eval";
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   // 1. Trigger the agent with a prompt
   await agent.run(
-    "Add a Close button to the Banner component. Use a button with aria-label Close."
+    "Add a Close button to the Banner component. Use a button with aria-label Close.",
   );
 
   // 2. Capture what the agent changed

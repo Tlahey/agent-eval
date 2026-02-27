@@ -10,11 +10,11 @@ agenteval run [options]
 
 ### Options
 
-| Flag | Description |
-|------|-------------|
-| `-c, --config <path>` | Path to config file |
+| Flag                     | Description                             |
+| ------------------------ | --------------------------------------- |
+| `-c, --config <path>`    | Path to config file                     |
 | `-f, --filter <pattern>` | Filter tests by title (substring match) |
-| `-t, --tag <tag>` | Filter tests by tag |
+| `-t, --tag <tag>`        | Filter tests by tag                     |
 
 ### Examples
 
@@ -39,8 +39,8 @@ agenteval ledger [options]
 
 ### Options
 
-| Flag | Description |
-|------|-------------|
+| Flag     | Description      |
+| -------- | ---------------- |
 | `--json` | Output full JSON |
 
 ### Examples
