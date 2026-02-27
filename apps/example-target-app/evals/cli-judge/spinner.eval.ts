@@ -9,7 +9,11 @@ test("add loading spinner component", async ({ agent, ctx }) => {
 
   await expect(ctx).toPassJudge({
     expectedFiles: ["src/components/LoadingSpinner.tsx"],
-    criteria:
-      "The LoadingSpinner component must: 1) Accept size and color props, 2) Render an SVG-based animation, 3) Be centered, 4) TypeScript types must be correct, 5) Build must pass.",
+    criteria: `The LoadingSpinner component must: 
+        1) Accept size and color props, 
+        2) Render an SVG-based animation, 
+        3) Be centered, 
+        4) TypeScript types must be correct, 
+        5) Build must pass.`,
   });
 });
