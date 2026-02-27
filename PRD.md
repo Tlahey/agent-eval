@@ -1,111 +1,130 @@
-# 📄 PRD: AgentEval Framework (Phase 2 & Go-To-Market)
+# 📄 PRD: AgentEval Framework - Phase 3 (The Last Mile)
 
-**Status:** Phase 1 (Core) Complete. Transitioning to Phase 2 (UI, E2E, Distribution).
-**Objective:** Finalize a local, zero-dependency testing framework for AI coding agents, featuring guaranteed Git isolation, LLM-as-a-judge evaluation, and a native SQLite-powered analytical dashboard.
-
----
-
-## 💡 1. Genesis & Rationale: Why build AgentEval?
-
-Testing an AI coding agent represents a completely new engineering paradigm that standard testing tools cannot handle. We built AgentEval after a strict "Build vs. Buy / Adapt" analysis:
-
-* **Why not Vitest or Jest?**
-Standard frameworks are built for extreme speed and parallel execution in memory. AI agents, however, mutate the actual file system and commit to Git. Running agent tests concurrently in Vitest instantly corrupts the local repository state. Furthermore, agent tasks take minutes to run, conflicting with the millisecond timeouts of unit test runners.
-* **Why not Promptfoo?**
-Promptfoo is excellent for Text-in/Text-out evaluation (RAGs, Chatbots). However, evaluating code-generating agents requires running heavy side-effects (CLI commands, capturing Git diffs, reading Next.js build logs). Forcing a text-evaluator to handle file-system operations required fragile workarounds. We needed a tool natively designed for monorepo execution and file-state management.
-* **Why not Langfuse or Cloud LLMOps?**
-Sending proprietary enterprise source code, Git diffs, and build logs to a third-party cloud service for evaluation raises significant data privacy and security concerns. We needed a 100% local, privacy-first ledger.
-* **Why SQLite over JSONL?**
-Storing hundreds of full Git diffs and terminal logs quickly bloats flat files. By leveraging Node 22's native `node:sqlite`, we gain the power, compression, and querying speed of a relational database for our UI dashboard, **without adding a single external npm dependency**.
-
-**The AgentEval Promise:** A familiar Vitest-like syntax, strict sequential execution, guaranteed Git isolation (`git reset --hard`), and a high-performance local SQLite analytics engine.
+**Status:** Core Engine (Phase 1) and SQLite/API integrations (Phase 2) are complete. Transitioning to End-to-End Validation, UI Dashboard, and Open-Source/Internal Distribution.
+**Objective:** Prove the framework works in real-world conditions, deliver a highly themeable analytical UI, and finalize the distribution pipeline.
 
 ---
 
-## 🎯 2. Executive Summary & Current State
+## 🎯 1. Epic 1: The "Proof of Value" (Real E2E Test)
 
-**What is already achieved (Phase 1 Foundation):**
+**Priority: 🔴 HIGH (Must be done first to validate the entire architecture)**
 
-* A robust **Monorepo** setup (`apps/` and `packages/`).
-* The **Core Engine** (`types`, `git`, `config`, `context`, `judge`, `expect`, `runner`, `cli`).
-* **100% Git Isolation:** Automated `git reset --hard` between runs.
-* **LLM-as-a-Judge:** Integration with Vercel AI SDK enforcing structured JSON outputs.
-* **Testing & Docs:** 32 Vitest suites passing and 10 pages of VitePress documentation.
+Before building a UI, we must generate real data by running a true E2E evaluation against a tangible codebase.
+
+* **Requirements:**
+1. **Dummy Application (`apps/dummy-react-app`):** Scaffold a minimal React application (using Vite) within the monorepo. It should contain at least one component (e.g., `Banner.tsx`) and a basic Vitest setup.
+2. **Scenario Creation:** Write a real evaluation script (`apps/dummy-react-app/evals/button.eval.ts`) using the `@dkt/agent-eval` API.
+* *Goal:* Ask the agent to "Add a close button to the Banner component".
+* *Assertions:* Verify the file was modified, run `pnpm test`, and use `expect(ctx).toPassJudge()`.
+
+
+3. **Real Agent Execution:** Run the test using an actual LLM (via the newly created `api` runner or a local CLI like Copilot/Aider).
+4. **Verification:** Confirm that `.agenteval/ledger.sqlite` is successfully populated with a real Git Diff, terminal logs, and a structured JSON evaluation from the LLM Judge.
+
+
 
 ---
 
-## 🚀 3. Roadmap: What Needs to be Built (The "Delta")
+## 📊 2. Epic 4: The Visual Dashboard (`apps/eval-ui`)
 
-### Epic 1: The "Proof of Value" (Real E2E Integration)
+**Priority: 🟡 MEDIUM**
 
-Before releasing the tool, we must prove it works in real-world conditions.
+A standalone, lightweight web application served locally by the `agenteval ui` CLI command to visualize the SQLite ledger data.
 
-* **Requirement:** Create a dummy target application and run a real agent (e.g., GitHub Copilot CLI or Aider) against it using an actual `.eval.ts` scenario.
-* **Goal:** Validate the end-to-end flow: Trigger Agent -> Capture Git Diff -> Run Vitest in Context -> Evaluate via LLM -> Write to SQLite Ledger.
+* **Tech Stack:** React, Vite, Recharts (for graphs), Tailwind CSS.
+* **Architecture:**
+* **Local API:** The `@dkt/agent-eval` CLI will spin up a small server (e.g., Express or Hono) that reads `.agenteval/ledger.sqlite` and exposes JSON endpoints (e.g., `GET /api/runs`).
+* **Static Serving:** The UI will be pre-built and served as static files by this local CLI server.
 
-### Epic 2: The SQLite Ledger Migration
 
-* **Requirement:** Refactor the current `ledger.ts` to use Node 22's native `import { DatabaseSync } from 'node:sqlite'`.
-* **Goal:** Create a local `.agenteval/ledger.sqlite` database. Create a `runs` table to safely and efficiently store test IDs, timestamps, models, scores, raw diffs, and LLM reasoning.
-
-### Epic 3: API-Based Runners
-
-Many enterprise agents operate as HTTP APIs rather than CLI tools.
-
-* **Requirement:** Implement the `type: "api"` runner in the configuration.
-* **Goal:** Allow users to define custom fetch calls or SDK invocations to trigger the agent, passing the prompt as a payload and awaiting the response.
-
-### Epic 4: The Visual Dashboard (Phase 2 UI)
-
-The CLI currently holds a placeholder for `agenteval ui`.
-
-* **Requirement:** A lightweight React application (served via a local Node server) that queries the local `.agenteval/ledger.sqlite` database.
-* **Features:**
-* **Trend Graphs:** Line charts plotting Score over Time per Model. SQL `GROUP BY` will make rendering this instantaneous.
-* **Execution Logs:** Clickable tables to view the LLM Judge's Markdown reasoning, the Git Diff, and the CI logs stored in the DB.
+* **Key Views:**
+1. **Dashboard:** A data table summarizing all unique tests and their latest scores/status.
+2. **Analytics:** A line chart (Recharts) showing Score (Y-axis) over Time (X-axis), grouped by Agent Model (to compare GPT-4 vs. Claude 3.5 on the same test).
+3. **Drill-down Modal:** A detailed view of a specific run containing:
+* The LLM Judge's Markdown reasoning.
+* A syntax-highlighted Git Diff block.
+* The raw CI execution logs.
 
 
 
-### Epic 5: Infrastructure & Distribution
 
-* **Requirement 1 (Publishing):** Setup build steps (`tsup` or `tsc`) to compile the package for npm publishing (or internal company registry).
-* **Requirement 2 (CI/CD):** Create a GitHub Actions workflow demonstrating how to run `pnpm run eval` on pull requests, passing the AI API keys securely.
+* **🎨 Crucial Design Constraint: Theming & Tailwind Extraction**
+* The UI **must** be built with a centralized, abstract color palette.
+* **No hardcoded colors** (e.g., never use `text-blue-500` or `bg-gray-100`).
+* Instead, CSS variables must be defined at the root (e.g., `--color-primary`, `--color-surface`, `--color-text-base`) and mapped in `tailwind.config.js`.
+* *Why?* This allows any enterprise adopting this tool to instantly swap the CSS variables to match their brand identity (e.g., changing it to Decathlon blue/green) without touching the React components.
+
+
 
 ---
 
-## ✅ 4. The Execution Checklist
+## 📦 3. Epic 5: Distribution & CI/CD
 
-Here is the exact task breakdown to clear the remaining backlog.
+**Priority: 🟢 LOW**
 
-### 🗄️ 1. SQLite Migration (Do this first)
+Finalizing the package so it can be consumed seamlessly by end-users in their own repositories.
 
-* [ ] **Import Native SQLite:** Refactor `packages/agent-eval/src/ledger.ts` to use `node:sqlite`.
-* [ ] **DB Initialization:** Write the `CREATE TABLE IF NOT EXISTS runs (...)` logic.
-* [ ] **Insert Logic:** Update the `recordTestRun` function to execute SQL `INSERT` statements with parameterized queries.
+* **Requirements:**
+1. **NPM Publishing Prep:** * Configure the `files` array in `package.json` to include only the `dist/` folder and necessary assets.
+* Run `npm pack` to inspect the generated tarball and ensure no bloated source files or local SQLite DBs are accidentally included.
+* Add a `prepublishOnly` script to ensure tests pass and `tsup` builds cleanly before publishing.
 
-### 🧪 2. Real E2E Test Implementation
 
-* [ ] **Setup Target App:** Create `apps/dummy-react-app` with a basic React component and Vitest.
-* [ ] **Configure Agent:** Authenticate a real CLI agent locally (Copilot/Aider).
-* [ ] **Write Scenario:** Create `apps/dummy-react-app/evals/button.eval.ts`.
-* [ ] **Execute & Verify:** Run the test. Verify the code mutates, the LLM evaluates, and data is correctly written to `.agenteval/ledger.sqlite`.
+2. **User CI/CD Example:** Create a template file (`docs/examples/github-actions.yml`) demonstrating how a user integrates this into their PR workflow. It must show:
+* How to checkout code.
+* How to install dependencies.
+* How to securely pass `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+* How to run `npx agenteval run`.
 
-### 🔌 3. API-Based Runners
 
-* [ ] **Update Config Schema:** Allow `agenteval.config.ts` to accept an API runner definition (URL, headers, method).
-* [ ] **Implement Runner Logic:** Write the HTTP request handling logic for `runner.type === 'api'`.
 
-### 📊 4. Phase 2 Dashboard (UI)
 
-* [ ] **Scaffold UI App:** Create `apps/eval-ui` using Vite + React + Tailwind + Recharts.
-* [ ] **Create Local API:** Update `agenteval ui` CLI command to spin up an Express/Hono server that queries the SQLite DB (e.g., `GET /api/runs?testId=wnf-001`).
-* [ ] **Build Dashboard View:** Create the main data table listing tests and latest scores.
-* [ ] **Build Analytics View:** Integrate Recharts to draw the "Score over Time" line graph.
-* [ ] **Build Drill-down Modal:** Create a modal to display the Markdown Reason, syntax-highlighted Diff, and terminal Logs.
 
-### 📦 5. Infrastructure & Distribution
+---
 
-* [ ] **Build Step:** Configure `tsup` or `tsc` in `package.json` to compile to CommonJS/ESM.
-* [ ] **NPM Config:** Ensure `main`, `module`, `types`, and `bin` fields are set correctly.
-* [ ] **CI Pipeline (Framework):** Add `.github/workflows/ci.yml` to run the 32 Vitest suites on every commit.
-* [ ] **CI Pipeline (Agent Evals):** Create a sample GitHub Actions workflow showing users how to run agent evaluations in CI.
+## 🤖 4. Required Updates to `AGENTS.md`
+
+To ensure future AI coding assistants respect the new UI constraints, the following rules **MUST** be explicitly added to the `AGENTS.md` file at the root of the project:
+
+```markdown
+### UI Dashboard Development (`apps/eval-ui`)
+
+When modifying or creating components for the Visual Dashboard, you MUST adhere to the following styling rules:
+
+1. **Strict Semantic Theming:** We use a centralized CSS variable system mapped to Tailwind CSS. 
+2. **NO Hardcoded Tailwind Colors:** Do NOT use utility classes like `text-blue-600`, `bg-slate-100`, or `border-red-500`.
+3. **Use Semantic Classes:** You must ONLY use the semantic classes defined in `tailwind.config.js`. For example:
+   - Backgrounds: `bg-background`, `bg-surface`, `bg-surface-hover`
+   - Text: `text-primary`, `text-secondary`, `text-muted`
+   - States: `text-success`, `bg-error`, `border-warning`
+4. **Changing Colors:** If a new shade is needed, add it as a CSS variable in `index.css` and map it in `tailwind.config.js`. Do not apply hex codes directly in the JSX.
+
+```
+
+---
+
+## ✅ 5. Execution Checklist
+
+### Epic 1: E2E Test (Start Here)
+
+* [ ] Initialize `apps/dummy-react-app` using Vite.
+* [ ] Create `Banner.tsx` and `Banner.test.tsx`.
+* [ ] Write `evals/button.eval.ts` mapping to the dummy app.
+* [ ] Execute `agenteval run` using a real model.
+* [ ] Verify `.agenteval/ledger.sqlite` contains the generated diff and evaluation.
+
+### Epic 4: Visual Dashboard & Theming
+
+* [ ] Scaffold `apps/eval-ui` with Vite + Tailwind.
+* [ ] Create `index.css` with CSS variables for the color palette.
+* [ ] Update `tailwind.config.js` to map colors to CSS variables.
+* [ ] Update `AGENTS.md` with the new UI styling rules.
+* [ ] Build the Express/Hono API server inside `@dkt/agent-eval` CLI to serve SQLite data.
+* [ ] Build the React Views (Table, Recharts Graph, Diff Modal).
+* [ ] Connect the `agenteval ui` command to serve the built React static files and start the API.
+
+### Epic 5: Distribution
+
+* [ ] Verify `package.json` exports, `bin`, and `files` fields.
+* [ ] Run `npm pack` and verify tarball contents.
+* [ ] Create `.github/workflows/user-example.yml` template in the docs.
