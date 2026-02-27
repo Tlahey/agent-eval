@@ -11,6 +11,7 @@
     "eval:copilot": "agenteval run --config evals/cli-copilot/agenteval.config.ts",
     "eval:claude": "agenteval run --config evals/cli-claude/agenteval.config.ts",
     "eval:aider": "agenteval run --config evals/cli-aider/agenteval.config.ts",
+    "eval:cli-judge": "agenteval run --config evals/cli-judge/agenteval.config.ts",
     "eval:openai": "agenteval run --config evals/api-openai/agenteval.config.ts",
     "eval:anthropic": "agenteval run --config evals/api-anthropic/agenteval.config.ts",
     "eval:ollama": "agenteval run --config evals/api-ollama/agenteval.config.ts",

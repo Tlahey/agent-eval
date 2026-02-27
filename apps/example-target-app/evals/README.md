@@ -10,6 +10,7 @@ evals/
 ├── cli-copilot/        ← GitHub Copilot CLI (`gh copilot suggest`)
 ├── cli-claude/         ← Claude Code CLI (`claude -p`)
 ├── cli-aider/          ← Aider (`aider --message`)
+├── cli-judge/          ← CLI judge example (Claude CLI as judge)
 ├── api-openai/         ← OpenAI GPT-4o via API
 ├── api-anthropic/      ← Anthropic Claude via API
 └── api-ollama/         ← Ollama local model via API
@@ -27,6 +28,7 @@ pnpm eval:mock
 pnpm eval:copilot      # GitHub Copilot
 pnpm eval:claude        # Claude Code
 pnpm eval:aider         # Aider
+pnpm eval:cli-judge     # CLI judge (Claude as judge)
 
 # API agents (direct LLM calls)
 pnpm eval:openai        # OpenAI GPT-4o

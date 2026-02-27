@@ -14,9 +14,20 @@ vi.mock("@ai-sdk/openai", () => ({
   createOpenAI: vi.fn(() => (model: string) => ({ modelId: model, provider: "openai" })),
 }));
 
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(),
+}));
+
+vi.mock("node:fs", () => ({
+  writeFileSync: vi.fn(),
+  mkdtempSync: vi.fn(() => "/tmp/agenteval-judge-mock"),
+  rmSync: vi.fn(),
+}));
+
 import { generateObject } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { execSync } from "node:child_process";
 import { judge } from "./judge.js";
 
 function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
@@ -164,6 +175,89 @@ describe("judge", () => {
         apiKey: "sk-custom",
         baseURL: "https://custom.api.com/v1",
       }),
+    );
+  });
+
+  it("throws when API judge missing provider or model", async () => {
+    const config: JudgeConfig = { type: "api" };
+
+    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
+      'API judge requires "provider" and "model"',
+    );
+  });
+});
+
+describe("judge - CLI mode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("executes CLI command and parses JSON result", async () => {
+    const mockResult = JSON.stringify({ pass: true, score: 0.85, reason: "looks good" });
+    vi.mocked(execSync).mockReturnValue(mockResult);
+
+    const config: JudgeConfig = {
+      type: "cli",
+      command: 'claude -p "{{prompt}}" --output-format json',
+    };
+
+    const result = await judge(createMockContext(), "has unit tests", config);
+
+    expect(result).toEqual({ pass: true, score: 0.85, reason: "looks good" });
+    expect(execSync).toHaveBeenCalledOnce();
+  });
+
+  it("extracts JSON from mixed CLI output", async () => {
+    const output = `Thinking...\n{"pass": false, "score": 0.3, "reason": "missing tests"}\nDone.`;
+    vi.mocked(execSync).mockReturnValue(output);
+
+    const config: JudgeConfig = {
+      type: "cli",
+      command: "some-cli evaluate",
+    };
+
+    const result = await judge(createMockContext(), "criteria", config);
+
+    expect(result.pass).toBe(false);
+    expect(result.score).toBe(0.3);
+    expect(result.reason).toBe("missing tests");
+  });
+
+  it("replaces {{prompt_file}} with temp file path", async () => {
+    vi.mocked(execSync).mockReturnValue(
+      JSON.stringify({ pass: true, score: 1, reason: "perfect" }),
+    );
+
+    const config: JudgeConfig = {
+      type: "cli",
+      command: "judge-cli --input {{prompt_file}}",
+    };
+
+    await judge(createMockContext(), "criteria", config);
+
+    const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
+    expect(calledCmd).toContain("/tmp/agenteval-judge-mock/prompt.txt");
+    expect(calledCmd).not.toContain("{{prompt_file}}");
+  });
+
+  it("throws when CLI judge has no command", async () => {
+    const config: JudgeConfig = { type: "cli" };
+
+    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
+      'CLI judge requires a "command" field',
+    );
+  });
+
+  it("throws when CLI output has no valid JSON", async () => {
+    vi.mocked(execSync).mockReturnValue("I could not evaluate this code.");
+
+    const config: JudgeConfig = {
+      type: "cli",
+      command: "bad-cli evaluate",
+    };
+
+    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
+      "CLI judge did not return valid JSON",
     );
   });
 });

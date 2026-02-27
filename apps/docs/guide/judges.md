@@ -99,6 +99,53 @@ judge: {
 
 This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible chat completions API.
 
+### CLI Judge
+
+You can use **any CLI tool** as a judge — including `claude`, `gh copilot`, or a custom script. The CLI must output JSON with `{ pass, score, reason }`.
+
+```ts
+judge: {
+  type: "cli",
+  command: 'claude -p "Evaluate this code change: {{prompt}}" --output-format json',
+}
+```
+
+::: tip Use `{{prompt_file}}` for long prompts
+Git diffs can be thousands of lines. To avoid shell escaping issues, use `{{prompt_file}}` — AgentEval writes the full prompt to a temp file and replaces the placeholder with the file path:
+
+```ts
+judge: {
+  type: "cli",
+  command: "cat {{prompt_file}} | claude -p --output-format json",
+}
+```
+
+:::
+
+**Example — Claude CLI as judge:**
+
+```ts
+import { defineConfig } from "@anthropic-ai/agent-eval";
+
+export default defineConfig({
+  runner: {
+    command: 'gh copilot suggest "{{prompt}}"',
+  },
+  judge: {
+    type: "cli",
+    command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
+  },
+});
+```
+
+**The CLI must return valid JSON:**
+
+```json
+{ "pass": true, "score": 0.85, "reason": "The implementation is correct..." }
+```
+
+AgentEval extracts the first JSON object containing `pass`, `score`, and `reason` from stdout, so preamble text is ignored.
+
 ## Per-Test Model Override
 
 You can override the judge model for specific evaluations:
@@ -133,4 +180,4 @@ The system prompt sent to the judge includes:
 3. **Git Diff**: The full diff captured by `ctx.storeDiff()`
 4. **Command Outputs**: All `ctx.runCommand()` results (stdout, stderr, exit codes)
 
-The response is enforced via Zod structured output (`generateObject`), guaranteeing `{ pass, score, reason }` — no prompt injection or malformed JSON.
+The response is enforced via Zod structured output (`generateObject`) for API judges, guaranteeing `{ pass, score, reason }` — no prompt injection or malformed JSON. For CLI judges, the JSON is parsed from stdout and validated against the same Zod schema.

@@ -19,12 +19,20 @@ export interface AgentRunnerConfig {
 // ─── Judge Configuration ───
 
 export interface JudgeConfig {
-  /** Default provider for judging */
-  provider: "anthropic" | "openai" | "ollama";
-  /** Default model for judging */
-  model: string;
+  /** Type of judge: API call (default) or CLI command */
+  type?: "api" | "cli";
+  /** Provider for API judges */
+  provider?: "anthropic" | "openai" | "ollama";
+  /** Model name for API judges */
+  model?: string;
   baseURL?: string;
   apiKey?: string;
+  /**
+   * CLI command template for CLI judges.
+   * Use {{prompt}} as placeholder for the judge prompt.
+   * The command must output JSON: { "pass": boolean, "score": number, "reason": string }
+   */
+  command?: string;
 }
 
 // ─── Main Configuration ───

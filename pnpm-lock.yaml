@@ -42,37 +42,6 @@ importers:
         specifier: ^3.5.0
         version: 3.5.29(typescript@5.9.3)
 
-  apps/dummy-react-app:
-    dependencies:
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
-    devDependencies:
-      '@testing-library/jest-dom':
-        specifier: ^6.0.0
-        version: 6.9.1
-      '@testing-library/react':
-        specifier: ^16.0.0
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.14)
-      jsdom:
-        specifier: ^25.0.0
-        version: 25.0.1
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.3.2)(jiti@2.6.1)(jsdom@25.0.1)(yaml@2.8.2)
-
   apps/eval-ui:
     dependencies:
       react:
