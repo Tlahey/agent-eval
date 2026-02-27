@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -8,6 +8,7 @@ import {
   readLedgerByTestId,
   getTestIds,
   getLatestEntries,
+  getRunnerStats,
 } from "./ledger.js";
 import type { LedgerEntry } from "../core/types.js";
 
@@ -32,7 +33,7 @@ function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   };
 }
 
-describe("ledger", () => {
+describe("ledger (SQLite)", () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -43,7 +44,7 @@ describe("ledger", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty array when ledger file does not exist", () => {
+  it("returns empty array when database does not exist yet", () => {
     const entries = readLedger(tmpDir);
     expect(entries).toEqual([]);
   });
@@ -58,7 +59,7 @@ describe("ledger", () => {
     expect(entries[0].score).toBe(0.85);
   });
 
-  it("appends multiple entries as separate lines", () => {
+  it("appends multiple entries as separate rows", () => {
     appendLedgerEntry(tmpDir, makeEntry({ testId: "a" }));
     appendLedgerEntry(tmpDir, makeEntry({ testId: "b" }));
     appendLedgerEntry(tmpDir, makeEntry({ testId: "c" }));
@@ -66,10 +67,8 @@ describe("ledger", () => {
     const entries = readLedger(tmpDir);
     expect(entries).toHaveLength(3);
 
-    // Verify JSONL format (one JSON per line)
-    const raw = readFileSync(join(tmpDir, "ledger.jsonl"), "utf-8");
-    const lines = raw.split("\n").filter((l) => l.trim());
-    expect(lines).toHaveLength(3);
+    // Verify SQLite file exists
+    expect(existsSync(join(tmpDir, "ledger.sqlite"))).toBe(true);
   });
 
   it("filters entries by test ID", () => {
@@ -84,7 +83,7 @@ describe("ledger", () => {
     expect(searchEntries).toHaveLength(1);
   });
 
-  it("returns unique test IDs", () => {
+  it("returns unique test IDs sorted alphabetically", () => {
     appendLedgerEntry(tmpDir, makeEntry({ testId: "a" }));
     appendLedgerEntry(tmpDir, makeEntry({ testId: "b" }));
     appendLedgerEntry(tmpDir, makeEntry({ testId: "a" }));
@@ -104,12 +103,47 @@ describe("ledger", () => {
     expect(latest.get("b")!.score).toBe(0.7);
   });
 
-  it("handles empty lines in JSONL gracefully", () => {
-    const filePath = join(tmpDir, "ledger.jsonl");
-    mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(filePath, '{"testId":"x","timestamp":"","agentRunner":"r","judgeModel":"m","score":1,"pass":true,"reason":"","context":{"diff":null,"commands":[]},"durationMs":0}\n\n\n', "utf-8");
+  it("preserves command results through JSON serialization", () => {
+    const entry = makeEntry({
+      context: {
+        diff: "--- a/file.ts\n+++ b/file.ts",
+        commands: [
+          {
+            name: "vitest",
+            command: "npx vitest run",
+            stdout: "Tests: 5 passed",
+            stderr: "",
+            exitCode: 0,
+            durationMs: 2000,
+          },
+        ],
+      },
+    });
+    appendLedgerEntry(tmpDir, entry);
 
     const entries = readLedger(tmpDir);
-    expect(entries).toHaveLength(1);
+    expect(entries[0].context.diff).toBe("--- a/file.ts\n+++ b/file.ts");
+    expect(entries[0].context.commands).toHaveLength(1);
+    expect(entries[0].context.commands[0].name).toBe("vitest");
+    expect(entries[0].context.commands[0].stdout).toBe("Tests: 5 passed");
+  });
+
+  it("computes runner stats with aggregates", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.8, pass: true }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.6, pass: false }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "cursor", score: 0.9, pass: true }));
+
+    const stats = getRunnerStats(tmpDir, "x");
+    expect(stats).toHaveLength(2);
+
+    const cursor = stats.find((s) => s.agentRunner === "cursor")!;
+    expect(cursor.avgScore).toBe(0.9);
+    expect(cursor.totalRuns).toBe(1);
+    expect(cursor.passRate).toBe(1.0);
+
+    const copilot = stats.find((s) => s.agentRunner === "copilot")!;
+    expect(copilot.avgScore).toBeCloseTo(0.7);
+    expect(copilot.totalRuns).toBe(2);
+    expect(copilot.passRate).toBe(0.5);
   });
 });
