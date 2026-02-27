@@ -87,6 +87,10 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - Mock external dependencies — no real API calls in unit tests
 - The E2E integration tests in `src/e2e/` validate the full pipeline using temp git repos
 
+## Architecture
+
+The framework follows [SOLID principles](/guide/architecture) for modularity and extensibility. Each module has a single responsibility, providers are dynamically imported, and all runners implement the `AgentHandle` interface.
+
 ## Architecture Decisions
 
 All major technical decisions are documented as ADRs in [`docs/adrs/`](https://github.com/dkt/agent-eval/tree/main/docs/adrs):
@@ -99,3 +103,4 @@ All major technical decisions are documented as ADRs in [`docs/adrs/`](https://g
 | [004](https://github.com/dkt/agent-eval/tree/main/docs/adrs/004-llm-as-judge.md)         | LLM-as-a-Judge with Vercel AI SDK                      |
 | [005](https://github.com/dkt/agent-eval/tree/main/docs/adrs/005-monorepo-layout.md)      | Monorepo layout (apps/ + packages/)                    |
 | [006](https://github.com/dkt/agent-eval/tree/main/docs/adrs/006-code-quality-gates.md)   | Code quality gates (ESLint + Prettier + Husky)         |
+| [007](https://github.com/dkt/agent-eval/tree/main/docs/adrs/007-solid-architecture.md)   | SOLID architecture principles                          |

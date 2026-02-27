@@ -9,7 +9,7 @@ import { defineConfig } from "agent-eval";
 
 export default defineConfig({
   // Where test files are located
-  testFiles: "**/*.eval.{ts,js}",
+  testFiles: "**/*.{eval,agent-eval}.{ts,js}",
 
   // Agent runners to evaluate
   runners: [
@@ -51,15 +51,15 @@ export default defineConfig({
 
 ## Options Reference
 
-| Option      | Type                     | Default                     | Description                        |
-| ----------- | ------------------------ | --------------------------- | ---------------------------------- |
-| `rootDir`   | `string`                 | `process.cwd()`             | Project root directory             |
-| `testFiles` | `string \| string[]`     | `**/*.eval.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery |
-| `runners`   | `AgentRunnerConfig[]`    | _required_                  | Agent runners to evaluate          |
-| `judge`     | `JudgeConfig`            | _required_                  | LLM judge configuration            |
-| `matrix`    | `{ runners?: string[] }` | —                           | Filter which runners to execute    |
-| `outputDir` | `string`                 | `.agenteval`                | Ledger output directory            |
-| `timeout`   | `number`                 | `300000`                    | Agent run timeout (ms)             |
+| Option      | Type                     | Default                                  | Description                        |
+| ----------- | ------------------------ | ---------------------------------------- | ---------------------------------- |
+| `rootDir`   | `string`                 | `process.cwd()`                          | Project root directory             |
+| `testFiles` | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery |
+| `runners`   | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate          |
+| `judge`     | `JudgeConfig`            | _required_                               | LLM judge configuration            |
+| `matrix`    | `{ runners?: string[] }` | —                                        | Filter which runners to execute    |
+| `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory            |
+| `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)             |
 
 ## Runner Configuration
 

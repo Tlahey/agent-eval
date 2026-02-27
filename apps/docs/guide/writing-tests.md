@@ -1,5 +1,14 @@
 # Writing Tests
 
+## File Naming
+
+Test files are discovered automatically using these patterns:
+
+- `*.eval.ts` / `*.eval.js` / `*.eval.mts` / `*.eval.mjs`
+- `*.agent-eval.ts` / `*.agent-eval.js` / `*.agent-eval.mts` / `*.agent-eval.mjs`
+
+Place them anywhere in your project (except `node_modules/` and `dist/`).
+
 ## Basic Structure
 
 Every eval test follows this pattern:
