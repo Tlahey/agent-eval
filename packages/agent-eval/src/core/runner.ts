@@ -59,9 +59,9 @@ async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
 }
 
 /**
- * Create an AgentHandle for a given runner config.
+ * Create the raw AgentHandle for a given runner config.
  */
-function createAgent(runner: AgentRunnerConfig, cwd: string): AgentHandle {
+function createRawAgent(runner: AgentRunnerConfig, cwd: string): AgentHandle {
   return {
     name: runner.name,
     model: runner.api?.model ?? runner.command ?? "unknown",
@@ -124,6 +124,38 @@ Respond with the list of files to create or modify. Each file must include the f
   };
 }
 
+/**
+ * Wrap an AgentHandle to auto-run storeDiff + afterEach commands after agent.run().
+ */
+function createAgent(
+  runner: AgentRunnerConfig,
+  cwd: string,
+  ctx: EvalContext,
+  config: AgentEvalConfig,
+): AgentHandle {
+  const raw = createRawAgent(runner, cwd);
+
+  return {
+    name: raw.name,
+    model: raw.model,
+
+    async run(prompt: string) {
+      // Execute the agent
+      await raw.run(prompt);
+
+      // Auto storeDiff after agent execution
+      ctx.storeDiff();
+
+      // Run afterEach commands from config
+      if (config.afterEach) {
+        for (const cmd of config.afterEach) {
+          await ctx.runCommand(cmd.name, cmd.command);
+        }
+      }
+    },
+  };
+}
+
 export interface RunResult {
   testId: string;
   runner: string;
@@ -154,7 +186,7 @@ export async function runTest(
     gitResetHard(cwd);
 
     const ctx = new EvalContext(cwd);
-    const agent = createAgent(runner, cwd);
+    const agent = createAgent(runner, cwd, ctx, config);
     const start = Date.now();
 
     try {
@@ -164,7 +196,7 @@ export async function runTest(
         testId: testDef.title,
         timestamp: new Date().toISOString(),
         agentRunner: runner.name,
-        judgeModel: config.judge.model,
+        judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
         score: 0,
         pass: false,
         reason: "Test completed without judge evaluation",
@@ -206,7 +238,7 @@ export async function runTest(
         testId: testDef.title,
         timestamp: new Date().toISOString(),
         agentRunner: runner.name,
-        judgeModel: config.judge.model,
+        judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
         score: 0,
         pass: false,
         reason: `Execution error: ${errorMsg}`,

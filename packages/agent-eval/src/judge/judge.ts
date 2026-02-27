@@ -49,9 +49,58 @@ async function resolveModel(config: JudgeConfig, modelOverride?: string) {
 }
 
 /**
+ * Extract changed file paths from a git diff string.
+ */
+export function extractChangedFiles(diff: string | null): string[] {
+  if (!diff) return [];
+  const matches = diff.matchAll(/^diff --git a\/(.+?) b\//gm);
+  return [...matches].map((m) => m[1]);
+}
+
+/**
+ * Build the file scope analysis section for the judge prompt.
+ */
+function buildFileScopeSection(changedFiles: string[], expectedFiles?: string[]): string {
+  if (!expectedFiles || expectedFiles.length === 0) return "";
+
+  const expected = new Set(expectedFiles);
+  const missing = expectedFiles.filter((f) => !changedFiles.includes(f));
+  const unexpected = changedFiles.filter((f) => !expected.has(f));
+
+  const parts: string[] = ["\n## File Scope Analysis"];
+  parts.push(`\n**Expected files:** ${expectedFiles.join(", ")}`);
+  parts.push(
+    `**Actually changed:** ${changedFiles.length > 0 ? changedFiles.join(", ") : "(none)"}`,
+  );
+
+  if (missing.length > 0) {
+    parts.push(`\n⚠️ **Missing expected files:** ${missing.join(", ")}`);
+  }
+  if (unexpected.length > 0) {
+    parts.push(`\n⚠️ **Unexpected file changes:** ${unexpected.join(", ")}`);
+  }
+
+  parts.push(
+    "\n**Instructions for file scope:**",
+    "- All expected files MUST be modified. Missing expected files should significantly reduce the score.",
+    "- Unexpected file changes are acceptable ONLY if they are directly necessary for the task (e.g., updating imports, adding new test files).",
+    "- If many unexpected files are changed, this may indicate scope creep — lower the score and explain why.",
+  );
+
+  return parts.join("\n");
+}
+
+/**
  * Build the system prompt for the judge LLM.
  */
-export function buildJudgePrompt(criteria: string, ctx: TestContext): string {
+export function buildJudgePrompt(
+  criteria: string,
+  ctx: TestContext,
+  expectedFiles?: string[],
+): string {
+  const changedFiles = extractChangedFiles(ctx.diff);
+  const fileScopeSection = buildFileScopeSection(changedFiles, expectedFiles);
+
   return `You are an expert code reviewer acting as a Judge for an AI coding agent evaluation.
 
 Your task: evaluate whether the agent's output meets the given criteria.
@@ -61,6 +110,7 @@ ${criteria}
 
 ## Agent Output Context
 ${ctx.logs || "(no logs captured)"}
+${fileScopeSection}
 
 ## Instructions
 - Analyze the git diff and command outputs above.
@@ -113,13 +163,14 @@ async function judgeCli(
   ctx: TestContext,
   criteria: string,
   config: JudgeConfig,
+  expectedFiles?: string[],
 ): Promise<JudgeResult> {
   if (!config.command) {
     throw new Error('CLI judge requires a "command" field in judge config.');
   }
 
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
-  const prompt = buildJudgePrompt(criteria, ctx);
+  const prompt = buildJudgePrompt(criteria, ctx, expectedFiles);
 
   // Write prompt to a temp file to avoid shell escaping issues
   const tmpDir = mkdtempSync(join(tmpdir(), "agenteval-judge-"));
@@ -175,10 +226,11 @@ export async function judge(
   criteria: string,
   config: JudgeConfig,
   modelOverride?: string,
+  expectedFiles?: string[],
 ): Promise<JudgeResult> {
   // CLI judge path
   if (config.type === "cli") {
-    return judgeCli(ctx, criteria, config);
+    return judgeCli(ctx, criteria, config, expectedFiles);
   }
 
   // API judge path (default)
@@ -191,7 +243,7 @@ export async function judge(
   const { object } = await generateObject({
     model,
     schema: JudgeResultSchema,
-    prompt: buildJudgePrompt(criteria, ctx),
+    prompt: buildJudgePrompt(criteria, ctx, expectedFiles),
   });
 
   return object;

@@ -8,9 +8,7 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
       "Also update the test file src/components/Banner.test.tsx with tests for the close button.",
   );
 
-  ctx.storeDiff();
-  await ctx.runCommand("test", "pnpm test");
-  await ctx.runCommand("typecheck", "pnpm build");
+  // storeDiff + afterEach commands (pnpm test, pnpm build) run automatically
 
   await expect(ctx).toPassJudge({
     criteria: `

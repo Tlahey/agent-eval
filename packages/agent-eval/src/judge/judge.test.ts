@@ -28,7 +28,7 @@ import { generateObject } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { execSync } from "node:child_process";
-import { judge, extractJudgeJson } from "./judge.js";
+import { judge, extractJudgeJson, buildJudgePrompt, extractChangedFiles } from "./judge.js";
 
 function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
   return {
@@ -352,5 +352,72 @@ describe("extractJudgeJson", () => {
 
   it("throws on missing required field", () => {
     expect(() => extractJudgeJson('{"pass": true, "score": 0.5}')).toThrow();
+  });
+});
+
+describe("extractChangedFiles", () => {
+  it("extracts file paths from a git diff", () => {
+    const diff = `diff --git a/src/Banner.tsx b/src/Banner.tsx
+index abc..def 100644
+--- a/src/Banner.tsx
++++ b/src/Banner.tsx
+@@ -1,3 +1,5 @@
++import React from 'react';
+diff --git a/src/Banner.test.tsx b/src/Banner.test.tsx
+index 123..456 100644`;
+    const files = extractChangedFiles(diff);
+    expect(files).toEqual(["src/Banner.tsx", "src/Banner.test.tsx"]);
+  });
+
+  it("returns empty array for null diff", () => {
+    expect(extractChangedFiles(null)).toEqual([]);
+  });
+
+  it("returns empty array for empty diff", () => {
+    expect(extractChangedFiles("")).toEqual([]);
+  });
+});
+
+describe("buildJudgePrompt - expectedFiles", () => {
+  it("includes file scope section when expectedFiles are provided", () => {
+    const ctx = createMockContext({
+      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code",
+    });
+
+    const prompt = buildJudgePrompt("criteria", ctx, ["src/Banner.tsx", "src/Banner.test.tsx"]);
+
+    expect(prompt).toContain("File Scope Analysis");
+    expect(prompt).toContain("src/Banner.tsx");
+    expect(prompt).toContain("Missing expected files");
+    expect(prompt).toContain("src/Banner.test.tsx");
+  });
+
+  it("does not include file scope when no expectedFiles", () => {
+    const ctx = createMockContext();
+    const prompt = buildJudgePrompt("criteria", ctx);
+    expect(prompt).not.toContain("File Scope Analysis");
+  });
+
+  it("flags unexpected file changes", () => {
+    const ctx = createMockContext({
+      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep",
+    });
+
+    const prompt = buildJudgePrompt("criteria", ctx, ["src/Banner.tsx"]);
+
+    expect(prompt).toContain("Unexpected file changes");
+    expect(prompt).toContain("package.json");
+  });
+
+  it("shows no warnings when all expected files match", () => {
+    const ctx = createMockContext({
+      diff: "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code",
+    });
+
+    const prompt = buildJudgePrompt("criteria", ctx, ["src/A.tsx", "src/B.tsx"]);
+
+    expect(prompt).toContain("File Scope Analysis");
+    expect(prompt).not.toContain("⚠️ **Missing expected files:**");
+    expect(prompt).not.toContain("⚠️ **Unexpected file changes:**");
   });
 });

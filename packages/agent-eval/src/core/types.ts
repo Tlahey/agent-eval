@@ -60,6 +60,19 @@ export interface AgentEvalConfig {
   outputDir?: string;
   /** Timeout in ms for each agent run (defaults to 300_000 = 5 min) */
   timeout?: number;
+  /**
+   * Commands to run automatically after each agent execution.
+   * These run before the expect/judge phase, after storeDiff.
+   * Example: [{ name: "test", command: "pnpm test" }, { name: "typecheck", command: "pnpm build" }]
+   */
+  afterEach?: AfterEachCommand[];
+}
+
+export interface AfterEachCommand {
+  /** Human-readable name for the command (used in logs and judge prompt) */
+  name: string;
+  /** Shell command to execute */
+  command: string;
 }
 
 // ─── Test Context ───
@@ -102,6 +115,12 @@ export interface JudgeOptions {
   criteria: string;
   /** Optional model override for this specific judgment */
   model?: string;
+  /**
+   * Expected files that should be modified by the agent.
+   * The judge will verify these files were changed and flag
+   * unexpected modifications as potential scope creep.
+   */
+  expectedFiles?: string[];
 }
 
 // ─── Ledger Entry ───

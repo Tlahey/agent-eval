@@ -12,9 +12,9 @@ const _tests: TestDefinition[] = [];
  * ```ts
  * import { test, expect } from "agent-eval";
  *
- * test("Add a Close button to the Banner", async ({ agent, ctx, judge }) => {
+ * test("Add a Close button to the Banner", async ({ agent, ctx }) => {
  *   await agent.run("Add a Close button inside the banner");
- *   ctx.storeDiff();
+ *   // storeDiff() + afterEach commands run automatically after agent.run()
  *   await expect(ctx).toPassJudge({ criteria: "..." });
  * });
  * ```
@@ -65,6 +65,7 @@ export { defineConfig } from "./core/config.js";
 export type {
   AgentEvalConfig,
   AgentRunnerConfig,
+  AfterEachCommand,
   JudgeConfig,
   JudgeOptions,
   JudgeResult,

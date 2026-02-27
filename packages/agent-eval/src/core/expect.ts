@@ -30,7 +30,13 @@ export function expect(ctx: TestContext): ExpectChain {
         );
       }
 
-      const result = await runJudge(ctx, options.criteria, _judgeConfig, options.model);
+      const result = await runJudge(
+        ctx,
+        options.criteria,
+        _judgeConfig,
+        options.model,
+        options.expectedFiles,
+      );
 
       // Store result so the runner can capture it
       setLastJudgeResult(result);

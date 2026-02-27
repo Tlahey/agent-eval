@@ -79,7 +79,29 @@ describe("expect", () => {
       "must have close button",
       judgeConfig,
       "gpt-4o-mini",
+      undefined,
     );
+  });
+
+  it("passes expectedFiles to judge", async () => {
+    setJudgeConfig(judgeConfig);
+    const ctx = createMockContext();
+
+    vi.mocked(mockJudge).mockResolvedValue({
+      pass: true,
+      score: 0.9,
+      reason: "files ok",
+    });
+
+    await agentExpect(ctx).toPassJudge({
+      criteria: "test",
+      expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
+    });
+
+    vitestExpect(mockJudge).toHaveBeenCalledWith(ctx, "test", judgeConfig, undefined, [
+      "src/Banner.tsx",
+      "src/Banner.test.tsx",
+    ]);
   });
 
   it("stores the judge result in the global store", async () => {

@@ -54,6 +54,13 @@ export default defineConfig({
   //   command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
   // },
 
+  // Commands to run automatically after each agent execution.
+  // storeDiff() is always called automatically — no need to add it here.
+  afterEach: [
+    { name: "test", command: "pnpm test" },
+    { name: "typecheck", command: "pnpm build" },
+  ],
+
   // Model matrix (optional): only run specific runners
   matrix: {
     runners: ["copilot", "claude-code"],
@@ -69,15 +76,46 @@ export default defineConfig({
 
 ## Options Reference
 
-| Option      | Type                     | Default                                  | Description                        |
-| ----------- | ------------------------ | ---------------------------------------- | ---------------------------------- |
-| `rootDir`   | `string`                 | `process.cwd()`                          | Project root directory             |
-| `testFiles` | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery |
-| `runners`   | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate          |
-| `judge`     | `JudgeConfig`            | _required_                               | LLM judge configuration            |
-| `matrix`    | `{ runners?: string[] }` | —                                        | Filter which runners to execute    |
-| `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory            |
-| `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)             |
+| Option      | Type                     | Default                                  | Description                                             |
+| ----------- | ------------------------ | ---------------------------------------- | ------------------------------------------------------- |
+| `rootDir`   | `string`                 | `process.cwd()`                          | Project root directory                                  |
+| `testFiles` | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                      |
+| `runners`   | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate                               |
+| `judge`     | `JudgeConfig`            | _required_                               | LLM judge configuration                                 |
+| `afterEach` | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first) |
+| `matrix`    | `{ runners?: string[] }` | —                                        | Filter which runners to execute                         |
+| `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory                                 |
+| `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)                                  |
+
+## Automatic Post-Agent Hooks
+
+After each `agent.run()` call, AgentEval automatically:
+
+1. **Captures the git diff** — `storeDiff()` is called automatically, no need to call it manually
+2. **Runs `afterEach` commands** — any commands defined in config are executed sequentially
+
+This means your test files stay clean and focused on the prompt + criteria:
+
+```ts
+// agenteval.config.ts
+export default defineConfig({
+  runners: [{ name: "claude", type: "cli", command: 'claude -p "{{prompt}}"' }],
+  judge: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+  afterEach: [
+    { name: "test", command: "pnpm test" },
+    { name: "typecheck", command: "pnpm build" },
+  ],
+});
+
+// my-feature.eval.ts — no boilerplate needed
+test("Add close button", async ({ agent, ctx }) => {
+  await agent.run("Add a close button to Banner.tsx");
+  // ✅ storeDiff + pnpm test + pnpm build already ran automatically
+  await expect(ctx).toPassJudge({ criteria: "Close button works..." });
+});
+```
+
+You can still call `ctx.runCommand()` manually for test-specific commands that aren't in the global config.
 
 ## Runner Configuration
 

@@ -5,6 +5,7 @@ import type { AgentEvalConfig, TestDefinition, JudgeResult } from "./types.js";
 // Mock external deps
 vi.mock("../git/git.js", () => ({
   gitResetHard: vi.fn(),
+  gitDiff: vi.fn(() => "mock diff content"),
 }));
 
 vi.mock("../ledger/ledger.js", () => ({
@@ -371,5 +372,105 @@ describe("runner - createAgent via runTest", () => {
     const results = await runTest(testDef, config);
     expect(results[0].passed).toBe(false);
     expect(results[0].entries[0].reason).toContain("Unsupported API runner provider");
+  });
+});
+
+describe("runner - auto storeDiff and afterEach", () => {
+  beforeEach(() => {
+    clearLastJudgeResult();
+    vi.clearAllMocks();
+  });
+
+  it("auto-calls storeDiff after agent.run()", async () => {
+    const config: AgentEvalConfig = {
+      rootDir: "/tmp/test",
+      outputDir: "/tmp/test/.agenteval",
+      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
+      judge: { provider: "openai", model: "gpt-4o" },
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-auto-diff",
+      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
+        expect(ctx.diff).toBeNull();
+        await agent.run("task");
+        // storeDiff should have been called automatically
+        expect(ctx.diff).toBe("mock diff content");
+      }),
+    };
+
+    const results = await runTest(testDef, config);
+    expect(results[0].entries[0].context.diff).toBe("mock diff content");
+  });
+
+  it("runs afterEach commands from config after agent.run()", async () => {
+    const config: AgentEvalConfig = {
+      rootDir: "/tmp/test",
+      outputDir: "/tmp/test/.agenteval",
+      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
+      judge: { provider: "openai", model: "gpt-4o" },
+      afterEach: [
+        { name: "test", command: "pnpm test" },
+        { name: "build", command: "pnpm build" },
+      ],
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-after-each",
+      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
+        await agent.run("task");
+        // afterEach commands should have run
+        expect(ctx.commands).toHaveLength(2);
+        expect(ctx.commands[0].name).toBe("test");
+        expect(ctx.commands[1].name).toBe("build");
+      }),
+    };
+
+    await runTest(testDef, config);
+  });
+
+  it("does not run afterEach commands when not configured", async () => {
+    const config: AgentEvalConfig = {
+      rootDir: "/tmp/test",
+      outputDir: "/tmp/test/.agenteval",
+      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
+      judge: { provider: "openai", model: "gpt-4o" },
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-no-after-each",
+      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
+        await agent.run("task");
+        expect(ctx.commands).toHaveLength(0);
+      }),
+    };
+
+    const results = await runTest(testDef, config);
+    expect(results[0].passed).toBe(false); // no judge = fail
+  });
+
+  it("still allows manual storeDiff and runCommand alongside auto", async () => {
+    const config: AgentEvalConfig = {
+      rootDir: "/tmp/test",
+      outputDir: "/tmp/test/.agenteval",
+      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
+      judge: { provider: "openai", model: "gpt-4o" },
+      afterEach: [{ name: "build", command: "pnpm build" }],
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-manual-plus-auto",
+      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
+        await agent.run("task");
+        // Auto: storeDiff + build already ran
+        // Manual additional command
+        await ctx.runCommand("lint", "pnpm lint");
+        expect(ctx.commands).toHaveLength(2); // build (auto) + lint (manual)
+        expect(ctx.commands[0].name).toBe("build");
+        expect(ctx.commands[1].name).toBe("lint");
+      }),
+    };
+
+    await runTest(testDef, config);
   });
 });
