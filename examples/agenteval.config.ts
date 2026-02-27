@@ -1,5 +1,5 @@
 // Example: agenteval.config.ts
-import { defineConfig } from "@dkt/agent-eval";
+import { defineConfig } from "agent-eval";
 
 export default defineConfig({
   // Define the AI agents you want to evaluate

@@ -8,8 +8,8 @@ import {
   readLedgerByTestId,
   getTestIds,
   getLatestEntries,
-} from "../ledger.js";
-import type { LedgerEntry } from "../types.js";
+} from "./ledger.js";
+import type { LedgerEntry } from "../core/types.js";
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `agenteval-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);

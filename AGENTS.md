@@ -18,7 +18,7 @@ agent-eval/
 ├── apps/
 │   └── docs/              ← VitePress documentation site
 ├── packages/
-│   └── agent-eval/        ← Core framework (@dkt/agent-eval)
+│   └── agent-eval/        ← Core framework (agent-eval)
 │       ├── src/
 │       │   ├── index.ts   ← Public API (test, expect, defineConfig)
 │       │   ├── cli.ts     ← CLI binary (agenteval run|ledger|ui)
@@ -53,7 +53,7 @@ pnpm test
 pnpm dev
 
 # Type-check the core package
-pnpm --filter @dkt/agent-eval typecheck
+pnpm --filter agent-eval typecheck
 ```
 
 ---
@@ -109,8 +109,9 @@ git commit -m "docs(readme): add quick start guide"
 - **If you're unsure whether to commit, commit.** You can always amend or squash later.
 
 ### Testing Guidelines
-- Tests use **Vitest** and live in `packages/agent-eval/src/__tests__/`
-- Name test files `<module>.test.ts` (e.g., `ledger.test.ts`, `context.test.ts`)
+- Tests use **Vitest** and are **colocated** next to the source file they test
+- Name test files `<module>.test.ts` (e.g., `ledger/ledger.test.ts`, `core/context.test.ts`)
+- Colocated means: `src/git/git.ts` → `src/git/git.test.ts` (same folder)
 - Use `describe` / `it` blocks with clear descriptions
 - Mock external dependencies (git commands, LLM APIs) — don't make real API calls in tests
 - Test edge cases: empty inputs, missing files, malformed data
@@ -141,7 +142,7 @@ All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-conta
 ### TypeScript
 - **Strict mode** enabled. No `any` types.
 - Use **explicit return types** on exported functions.
-- All types live in `types.ts` – import from there.
+- All types live in `core/types.ts` – import from there.
 - Use `.js` extensions in imports (ESM resolution).
 
 ### Naming
@@ -165,24 +166,26 @@ All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-conta
 ## 🧪 Adding a New Feature
 
 ### Adding a new Judge provider
-1. Add the provider type to `JudgeConfig.provider` in `types.ts`
-2. Add a new `case` in `resolveModel()` in `judge.ts`
+1. Add the provider type to `JudgeConfig.provider` in `core/types.ts`
+2. Add a new `case` in `resolveModel()` in `judge/judge.ts`
 3. Install the AI SDK provider package if needed
 4. Add docs in `docs/guide/judges.md`
 
 ### Adding a new CLI command
-1. Add the command in `cli.ts` using `program.command()`
+1. Add the command in `cli/cli.ts` using `program.command()`
 2. Update the docs in `docs/guide/cli.md`
 
 ### Adding a new Context utility
-1. Add the method signature to `TestContext` interface in `types.ts`
-2. Implement in `EvalContext` class in `context.ts`
-3. Update docs in `docs/api/context.md`
+1. Add the method signature to `TestContext` interface in `core/types.ts`
+2. Implement in `EvalContext` class in `core/context.ts`
+3. Add tests in `core/context.test.ts`
+4. Update docs in `docs/api/context.md`
 
 ### Modifying the Ledger schema
-1. Update `LedgerEntry` in `types.ts`
+1. Update `LedgerEntry` in `core/types.ts`
 2. Ensure backward compatibility (new fields should be optional)
-3. Update `appendLedgerEntry` and `readLedger` in `ledger.ts`
+3. Update `appendLedgerEntry` and `readLedger` in `ledger/ledger.ts`
+4. Update tests in `ledger/ledger.test.ts`
 
 ---
 
@@ -192,7 +195,7 @@ All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-conta
 2. **Don't run tests in parallel** – Git state will be corrupted.
 3. **Always use `encoding: "utf-8"`** when capturing exec output.
 4. **Don't forget `.js` extensions** in ESM imports.
-5. **The judge prompt is critical** – changes to `buildJudgePrompt()` affect all evaluations.
+5. **The judge prompt is critical** – changes to `buildJudgePrompt()` in `judge/judge.ts` affect all evaluations.
 
 ---
 

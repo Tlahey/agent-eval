@@ -12,7 +12,7 @@ function defineConfig(config: AgentEvalConfig): AgentEvalConfig
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "@dkt/agent-eval";
+import { defineConfig } from "agent-eval";
 
 export default defineConfig({
   runners: [

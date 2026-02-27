@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { gitDiff } from "./git.js";
+import { gitDiff } from "../git/git.js";
 import type { CommandResult, TestContext } from "./types.js";
 
 export class EvalContext implements TestContext {

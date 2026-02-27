@@ -1,6 +1,6 @@
 import { mkdirSync, appendFileSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
-import type { LedgerEntry } from "./types.js";
+import type { LedgerEntry } from "../core/types.js";
 
 /**
  * Resolve the ledger file path.

@@ -6,10 +6,10 @@ import chalk from "chalk";
 import ora from "ora";
 import { glob } from "glob";
 import { createJiti } from "jiti";
-import { loadConfig } from "./config.js";
-import { getRegisteredTests, clearRegisteredTests, initSession } from "./index.js";
-import { runTest } from "./runner.js";
-import { readLedger, getTestIds } from "./ledger.js";
+import { loadConfig } from "../core/config.js";
+import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
+import { runTest } from "../core/runner.js";
+import { readLedger, getTestIds } from "../ledger/ledger.js";
 
 program
   .name("agenteval")

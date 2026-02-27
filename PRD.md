@@ -1,117 +1,86 @@
-# 📄 PRD: AgentEval Framework (Codename)
+# 📄 PRD: AgentEval Framework (Phase 2 & Go-To-Market)
 
-**Status:** Initial Draft / Concept
-**Objective:** Create a local, agnostic, and sequential testing framework to evaluate AI coding agents, complete with an integrated analytical dashboard for tracking historical performance.
+**Status:** Phase 1 (Core) Complete. Transitioning to Phase 2 (UI, E2E, Distribution).
+**Objective:** Finalize the local, agnostic testing framework for AI coding agents by proving its end-to-end capabilities, enabling API-based agent execution, setting up CI/CD, and delivering the analytical UI dashboard.
 
-## 🎯 1. Vision & Goals
+## 🎯 1. Executive Summary & Current State
 
-Currently, standard testing frameworks (like Vitest or Jest) are ill-suited for testing AI agents because they mutate the file system concurrently and handle long execution times poorly. The goal of **AgentEval** is to provide a Developer Experience (DX) similar to Vitest, but specifically engineered to orchestrate, isolate (via Git), evaluate (via LLM-as-a-Judge), and historically track the performance of AI coding agents.
+The `@dkt/agent-eval` framework aims to solve the problem of testing AI coding agents that mutate the file system and require subjective evaluation.
 
----
+**What is already achieved (The Foundation):**
 
-## 🛠️ PHASE 1: The Execution Engine (Core Runner)
-
-This phase focuses on creating a local npm CLI package (`@dkt/agent-eval`) to be installed directly in the project repository.
-
-### 1.1 Configuration File (`agenteval.config.ts`)
-
-A single entry point to define the "Runners" (the agents being tested) and the "Judges" (the LLM evaluators).
-
-* **Agnosticism:** Ability to configure CLI commands (e.g., local Copilot CLI) or direct API calls (OpenAI, Anthropic, local Ollama).
-* **Model Matrix:** Ability to define globally or per-test which models to compare (e.g., run every test against both `gpt-4.5` AND `claude-3.7-sonnet`).
-
-### 1.2 Test Syntax (Developer Experience)
-
-A fluid and familiar API. The framework exposes a `test` method that injects a `context` object (`ctx`).
-
-* The `ctx` acts as a temporal black box: it stores the logs, diffs, and results of commands executed during the test.
-* **Guaranteed Isolation:** The engine automatically executes a `git reset --hard && git clean -fd` *before* each iteration.
-
-**Target API Example:**
-
-```typescript
-import { test, expect } from "@dkt/agent-eval";
-
-test("Add a Close button to the Banner", async ({ agent, ctx, judge }) => {
-  // 1. Trigger the agent
-  await agent.run("Add a Close button inside the banner");
-
-  // 2. Utility functions to enrich the context
-  ctx.storeDiff(); // Captures the current git diff
-  await ctx.runCommand("vitest", "pnpm test -- libs/ui/Banner"); 
-  await ctx.runCommand("build", "pnpm run build");
-
-  // 3. Validation via LLM-as-a-Judge
-  await expect(ctx).toPassJudge({
-    criteria: "- Use VpIconButton\n- Have aria-label 'Close'",
-    model: "claude-3.5-sonnet" // Optional override
-  });
-});
-
-```
-
-### 1.3 Matrix Testing (Multi-Model Execution)
-
-If the configuration specifies multiple models, the Runner will loop through the entire test sequence for each model, resetting the Git state in between each run to ensure pristine environments.
-
-### 1.4 The Data Ledger
-
-At the end of the execution, the framework generates and appends to a local file (e.g., `.agenteval/ledger.jsonl`).
-
-* **Record Structure:** `Test ID`, `Timestamp`, `Agent Model`, `Judge Model`, `Score (0.0 to 1.0)`, `Reason (Markdown)`, `Raw Context (Diff, Logs)`.
+* A robust **Monorepo** setup (`apps/` and `packages/`).
+* The **Core Engine** (`types`, `git`, `config`, `context`, `judge`, `expect`, `runner`, `ledger`, `cli`).
+* **100% Git Isolation:** Automated `git reset --hard` between runs.
+* **LLM-as-a-Judge:** Integration with Vercel AI SDK (Anthropic, OpenAI, Ollama) enforcing structured JSON outputs.
+* **Testing & Docs:** 32 Vitest suites passing (testing the framework itself) and 10 pages of VitePress documentation.
 
 ---
 
-## 📊 PHASE 2: The Visual Interface (Local Dashboard)
+## 🚀 2. Roadmap: What Needs to be Built (The "Delta")
 
-A CLI command (`pnpm agenteval ui`) that launches a local server (e.g., Vite + React or Next.js) to read and visualize the `ledger.jsonl` file.
+### Epic 1: The "Proof of Value" (Real E2E Integration)
 
-### 2.1 Home Screen: Overview Dashboard
+Before releasing the tool, we must prove it works in real-world conditions, not just in isolated unit tests.
 
-* **Scenario List:** A data table listing all executed test IDs.
-* **Health Status:** The most recent score obtained for each scenario.
-* **Search/Filter:** Filter by tags, date, or status (Pass/Fail).
+* **Requirement:** Create a dummy target application and run a real agent (e.g., GitHub Copilot CLI, Aider, or a custom local CLI) against it using an actual `.eval.ts` scenario.
+* **Goal:** Validate the end-to-end flow: Trigger Agent -> Capture Git Diff -> Run Vitest in Context -> Evaluate via Anthropic/OpenAI -> Write to Ledger.
 
-### 2.2 Test Detail Screen (Analytics Graph)
+### Epic 2: API-Based Runners
 
-Clicking on a test ID navigates to a dedicated analytics view:
+Currently, the framework only triggers agents via CLI commands. Many enterprise agents operate as HTTP APIs or SDKs.
 
-* **Evolution Graph (Line Chart):**
-* X-Axis: Time (Execution Dates).
-* Y-Axis: Score (0.0 to 1.0).
-* Series: A differently colored line for **each agent model** tested (e.g., Blue line for Copilot, Red line for Cursor). This allows instant visualization of which model performs best on this specific scenario over time.
+* **Requirement:** Implement the `type: "api"` runner.
+* **Goal:** Allow the configuration file to define custom fetch/axios calls or SDK invocations to trigger the agent, passing the prompt as a payload and awaiting the response before continuing the test.
 
+### Epic 3: The Visual Dashboard (Phase 2 UI)
 
+The CLI currently holds a placeholder for `agenteval ui`. This needs to be a fully functional local web application.
 
-### 2.3 Execution History (Data Table & Drill-down)
-
-Below the graph, a chronological table of all runs for this specific test:
-
-* **Columns:** Date, Agent Model, Score, Reason (Preview).
-* **Detailed View (Modal/Drawer):** Clicking a row opens a side panel containing:
-1. **Judge's Verdict:** The fully formatted Markdown text explaining the evaluation.
-2. **"Diff" Tab:** A visual Git Diff component showing exactly what the agent coded.
-3. **"Logs" Tab:** The raw outputs of the background commands (Vitest, TSC, Build) stored in the `ctx`.
+* **Requirement:** A lightweight React application (served via a local Node server like Express or directly via Vite dev server) that reads `.agenteval/ledger.jsonl`.
+* **Features:**
+* **Trend Graphs:** Line charts plotting Score over Time per Model.
+* **Execution Logs:** Clickable tables to view the LLM Judge's Markdown reasoning, the Git Diff, and the CI logs (Vitest/TSC) stored in the context.
 
 
 
----
+### Epic 4: Infrastructure & Distribution
 
-## 🏗️ Recommended Technical Architecture
+To be adopted by other teams, the package needs to be easily installable and runnable in standard CI environments.
 
-* **Core Runner:** Pure Node.js (TypeScript), utilizing sequential `for...of` loops with `execFileSync` to guarantee Git state stability and prevent concurrency issues.
-* **Storage:** Local JSONL (JSON Lines) file. Highly performant for appending and streaming, easily versionable in Git (or ignored via `.gitignore` if it grows too large).
-* **UI Interface:** React application (Vite / Tailwind / Recharts), statically served by the Node CLI (using `express` or `hono` for a lightweight local API to read the JSONL).
-* **Judge Communication:** Integration with the `@ai-sdk/anthropic` or `openai` SDK, utilizing `response_format: { type: "json_schema" }` to strongly force the judge to return the exact `{pass, score, reason}` structure.
+* **Requirement 1 (Publishing):** Setup build steps (`tsup` or `tsc`) and package configuration for npm publishing (or internal company registry).
+* **Requirement 2 (CI/CD):** Create a standard GitHub Actions (or GitLab CI) workflow demonstrating how to run `pnpm run eval` on pull requests, passing the necessary AI API keys securely.
 
 ---
 
-## 🚀 Next Steps
+## ✅ 3. The Execution Checklist
 
-1. **Package Init:** Create a `packages/agent-eval` folder within the monorepo.
-2. **Runner PoC (Phase 1):** Code the core `test()` execution loop, the Git reset mechanism, and the basic JSON appending logic.
-3. **Migration:** Translate the existing `wnf-001` scenario into the new `test()` syntax to validate the Developer Experience.
+Here is the exact data and task breakdown needed to clear the remaining backlog.
 
----
+### 🧪 1. Real E2E Test Implementation
 
-Would you like me to generate the foundational `eval-framework.ts` code (the core runner from Phase 1) to get the package started right away?
+* [ ] **Setup Target App:** Create a simple dummy project (e.g., `apps/dummy-react-app`) inside the monorepo with a basic React component and a Vitest setup.
+* [ ] **Configure Agent:** Ensure a real CLI agent (like Copilot CLI or Aider) is installed and authenticated locally.
+* [ ] **Write Scenario:** Create `apps/dummy-react-app/evals/button.eval.ts` using the `@dkt/agent-eval` syntax.
+* [ ] **Execute & Verify:** Run the CLI command. Verify that the agent mutates the code, the framework catches the diff, the LLM evaluates it, and `.agenteval/ledger.jsonl` is successfully appended.
+
+### 🔌 2. API-Based Runners
+
+* [ ] **Update Config Schema:** Ensure `agenteval.config.ts` accepts an API runner definition (URL, headers, method, payload mapping).
+* [ ] **Implement Runner Logic:** In `runner.ts` (or a dedicated `api-runner.ts`), write the logic to handle the HTTP request when `runner.type === 'api'`.
+* [ ] **Timeout & Polling:** Add logic to handle long-running API requests (agents can take minutes to reply). Support basic polling or generous timeout configurations.
+
+### 📊 3. Phase 2 Dashboard (UI)
+
+* [ ] **Scaffold UI App:** Create `apps/eval-ui` using Vite + React + Tailwind + Recharts.
+* [ ] **Create Local API:** Update the CLI (`agenteval ui`) to spin up a tiny local server that parses `ledger.jsonl` and serves it as a JSON endpoint (e.g., `GET /api/ledger`).
+* [ ] **Build Dashboard View:** Create the main table listing all tests and their latest scores.
+* [ ] **Build Analytics View:** Integrate Recharts to draw the "Score over Time" line graph, grouped by agent model.
+* [ ] **Build Drill-down Modal:** Create a modal/drawer that displays the Markdown `<Reason>`, the syntax-highlighted `<FINAL_DIFF>`, and the terminal logs.
+
+### 📦 4. Infrastructure & Distribution (CI/CD & NPM)
+
+* [ ] **Build Step:** Configure `tsup` or `tsc` in `packages/agent-eval/package.json` to compile TypeScript to CommonJS and ESM before publishing.
+* [ ] **NPM Config:** Ensure `main`, `module`, `types`, and `bin` fields are correctly mapped in `package.json`. Add a `prepublishOnly` script.
+* [ ] **CI Pipeline (Framework):** Add `.github/workflows/ci.yml` to automatically run the 32 Vitest suites on every commit to the framework repository.
+* [ ] **CI Pipeline (Agent Evals):** Add a sample GitHub Actions workflow showing users how to run the actual agent evaluations in CI (handling `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` secrets).

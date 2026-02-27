@@ -53,14 +53,14 @@ We built AgentEval to hit the perfect sweet spot:
 ### Install
 
 ```bash
-pnpm add -D @dkt/agent-eval
+pnpm add -D agent-eval
 ```
 
 ### Configure
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "@dkt/agent-eval";
+import { defineConfig } from "agent-eval";
 
 export default defineConfig({
   runners: [
@@ -81,7 +81,7 @@ export default defineConfig({
 
 ```ts
 // tests/banner.eval.ts
-import { test, expect } from "@dkt/agent-eval";
+import { test, expect } from "agent-eval";
 
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   await agent.run("Add a Close button inside the banner component");
@@ -116,18 +116,14 @@ agent-eval/
 ├── apps/
 │   └── docs/               # VitePress documentation
 ├── packages/
-│   └── agent-eval/         # @dkt/agent-eval (core framework)
+│   └── agent-eval/         # agent-eval (core framework)
 │       └── src/
 │           ├── index.ts    # Public API (test, expect, defineConfig)
-│           ├── cli.ts      # CLI (agenteval run|ledger|ui)
-│           ├── runner.ts   # Sequential test runner
-│           ├── context.ts  # TestContext (storeDiff, runCommand)
-│           ├── judge.ts    # LLM-as-a-Judge
-│           ├── git.ts      # Git isolation
-│           ├── ledger.ts   # JSONL ledger
-│           ├── config.ts   # Config loader
-│           ├── expect.ts   # Fluent assertion API
-│           └── types.ts    # TypeScript interfaces
+│           ├── core/       # Types, config, context, runner, expect
+│           ├── git/        # Git isolation (reset, diff)
+│           ├── judge/      # LLM-as-a-Judge
+│           ├── ledger/     # JSONL ledger
+│           └── cli/        # CLI binary
 ├── examples/               # Example config + test files
 ├── AGENTS.md               # AI agent development guide
 └── PRD.md                  # Product requirements
@@ -156,7 +152,7 @@ pnpm install
 | `pnpm test` | Run unit tests (vitest) |
 | `pnpm dev` | Start docs dev server |
 | `pnpm docs:build` | Build docs for production |
-| `pnpm --filter @dkt/agent-eval typecheck` | Type-check the framework |
+| `pnpm --filter agent-eval typecheck` | Type-check the framework |
 
 ### Workflow
 

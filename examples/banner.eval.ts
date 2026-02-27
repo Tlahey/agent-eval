@@ -1,5 +1,5 @@
 // Example evaluation test
-import { test, expect } from "@dkt/agent-eval";
+import { test, expect } from "agent-eval";
 
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   // 1. Trigger the agent with a prompt

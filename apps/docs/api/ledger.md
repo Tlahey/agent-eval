@@ -35,7 +35,7 @@ agenteval ledger --json # Full JSON export
 ### Programmatic
 
 ```ts
-import { readLedger, readLedgerByTestId, getLatestEntries } from "@dkt/agent-eval/ledger";
+import { readLedger, readLedgerByTestId, getLatestEntries } from "agent-eval/ledger";
 
 const allEntries = readLedger(".agenteval");
 const bannerEntries = readLedgerByTestId(".agenteval", "Add Close button");

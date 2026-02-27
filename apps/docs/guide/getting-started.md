@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pnpm add -D @dkt/agent-eval
+pnpm add -D agent-eval
 ```
 
 ## Quick Setup
@@ -12,7 +12,7 @@ pnpm add -D @dkt/agent-eval
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "@dkt/agent-eval";
+import { defineConfig } from "agent-eval";
 
 export default defineConfig({
   runners: [
@@ -33,7 +33,7 @@ export default defineConfig({
 
 ```ts
 // tests/banner.eval.ts
-import { test, expect } from "@dkt/agent-eval";
+import { test, expect } from "agent-eval";
 
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   // 1. Trigger the agent

@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { EvalContext } from "../context.js";
+import { EvalContext } from "../core/context.js";
 
 function makeTmpGitRepo(): string {
   const dir = join(tmpdir(), `agenteval-ctx-${Date.now()}-${Math.random().toString(36).slice(2)}`);

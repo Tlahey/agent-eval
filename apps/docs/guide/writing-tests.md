@@ -5,7 +5,7 @@
 Every eval test follows this pattern:
 
 ```ts
-import { test, expect } from "@dkt/agent-eval";
+import { test, expect } from "agent-eval";
 
 test("Test title", async ({ agent, ctx }) => {
   // 1. Run the agent

@@ -1,8 +1,8 @@
 import { execSync } from "node:child_process";
 import chalk from "chalk";
 import { EvalContext } from "./context.js";
-import { gitResetHard } from "./git.js";
-import { appendLedgerEntry } from "./ledger.js";
+import { gitResetHard } from "../git/git.js";
+import { appendLedgerEntry } from "../ledger/ledger.js";
 import type {
   AgentEvalConfig,
   AgentHandle,

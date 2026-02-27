@@ -1,6 +1,6 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import type { JudgeConfig, JudgeResult, TestContext } from "./types.js";
+import type { JudgeConfig, JudgeResult, TestContext } from "../core/types.js";
 
 const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),

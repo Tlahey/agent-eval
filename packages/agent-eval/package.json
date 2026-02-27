@@ -1,5 +1,5 @@
 {
-  "name": "@dkt/agent-eval",
+  "name": "agent-eval",
   "version": "0.1.0",
   "description": "AI coding agent evaluation framework with Vitest-like DX",
   "type": "module",

@@ -18,7 +18,7 @@ function test(title: string, fn: TestFn): void
 ## Usage
 
 ```ts
-import { test, expect } from "@dkt/agent-eval";
+import { test, expect } from "agent-eval";
 
 test("My evaluation", async ({ agent, ctx }) => {
   await agent.run("Do something");

@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { gitResetHard, gitDiff, gitCurrentBranch, gitHeadSha } from "../git.js";
+import { gitResetHard, gitDiff, gitCurrentBranch, gitHeadSha } from "./git.js";
 
 function makeTmpGitRepo(): string {
   const dir = join(tmpdir(), `agenteval-git-${Date.now()}-${Math.random().toString(36).slice(2)}`);

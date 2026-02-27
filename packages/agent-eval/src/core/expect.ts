@@ -1,4 +1,4 @@
-import { judge as runJudge } from "./judge.js";
+import { judge as runJudge } from "../judge/judge.js";
 import { setLastJudgeResult } from "./runner.js";
 import type {
   ExpectChain,

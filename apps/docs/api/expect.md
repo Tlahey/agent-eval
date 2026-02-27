@@ -32,7 +32,7 @@ interface JudgeResult {
 ## Usage
 
 ```ts
-import { test, expect } from "@dkt/agent-eval";
+import { test, expect } from "agent-eval";
 
 test("Example", async ({ agent, ctx }) => {
   await agent.run("Add feature X");

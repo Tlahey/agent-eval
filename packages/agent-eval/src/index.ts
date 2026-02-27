@@ -1,5 +1,5 @@
-import { setJudgeConfig } from "./expect.js";
-import type { AgentEvalConfig, TestDefinition, TestFn } from "./types.js";
+import { setJudgeConfig } from "./core/expect.js";
+import type { AgentEvalConfig, TestDefinition, TestFn } from "./core/types.js";
 
 // ─── Global test registry ───
 
@@ -10,7 +10,7 @@ const _tests: TestDefinition[] = [];
  *
  * @example
  * ```ts
- * import { test, expect } from "@dkt/agent-eval";
+ * import { test, expect } from "agent-eval";
  *
  * test("Add a Close button to the Banner", async ({ agent, ctx, judge }) => {
  *   await agent.run("Add a Close button inside the banner");
@@ -60,8 +60,8 @@ export function initSession(config: AgentEvalConfig): void {
 
 // ─── Re-exports ───
 
-export { expect } from "./expect.js";
-export { defineConfig } from "./config.js";
+export { expect } from "./core/expect.js";
+export { defineConfig } from "./core/config.js";
 export type {
   AgentEvalConfig,
   AgentRunnerConfig,
@@ -75,4 +75,4 @@ export type {
   TestDefinition,
   AgentHandle,
   ExpectChain,
-} from "./types.js";
+} from "./core/types.js";

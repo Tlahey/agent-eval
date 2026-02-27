@@ -5,7 +5,7 @@ AgentEval is configured via `agenteval.config.ts` at the root of your project.
 ## Full Example
 
 ```ts
-import { defineConfig } from "@dkt/agent-eval";
+import { defineConfig } from "agent-eval";
 
 export default defineConfig({
   // Where test files are located
