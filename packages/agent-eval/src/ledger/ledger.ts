@@ -1,6 +1,5 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-// @ts-expect-error -- node:sqlite is experimental in Node 22, no stable types yet
 import { DatabaseSync } from "node:sqlite";
 import type { LedgerEntry, CommandResult } from "../core/types.js";
 
@@ -105,7 +104,9 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
 export function readLedger(outputDir: string): LedgerEntry[] {
   const db = openDb(outputDir);
   try {
-    const rows = db.prepare("SELECT * FROM runs ORDER BY timestamp ASC").all() as RunRow[];
+    const rows = db
+      .prepare("SELECT * FROM runs ORDER BY timestamp ASC")
+      .all() as unknown as RunRow[];
     return rows.map(rowToEntry);
   } finally {
     db.close();
@@ -120,7 +121,7 @@ export function readLedgerByTestId(outputDir: string, testId: string): LedgerEnt
   try {
     const rows = db
       .prepare("SELECT * FROM runs WHERE test_id = ? ORDER BY timestamp ASC")
-      .all(testId) as RunRow[];
+      .all(testId) as unknown as RunRow[];
     return rows.map(rowToEntry);
   } finally {
     db.close();
@@ -133,7 +134,9 @@ export function readLedgerByTestId(outputDir: string, testId: string): LedgerEnt
 export function getTestIds(outputDir: string): string[] {
   const db = openDb(outputDir);
   try {
-    const rows = db.prepare("SELECT DISTINCT test_id FROM runs ORDER BY test_id").all() as Array<{
+    const rows = db
+      .prepare("SELECT DISTINCT test_id FROM runs ORDER BY test_id")
+      .all() as unknown as Array<{
       test_id: string;
     }>;
     return rows.map((r) => r.test_id);
@@ -161,7 +164,7 @@ export function getLatestEntries(outputDir: string): Map<string, LedgerEntry> {
         ORDER BY r.test_id
       `,
       )
-      .all() as RunRow[];
+      .all() as unknown as RunRow[];
 
     const result = new Map<string, LedgerEntry>();
     for (const row of rows) {
@@ -197,7 +200,7 @@ export function getRunnerStats(
         ORDER BY avg_score DESC
       `,
       )
-      .all(testId) as Array<{
+      .all(testId) as unknown as Array<{
       agent_runner: string;
       avg_score: number;
       total_runs: number;
