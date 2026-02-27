@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "seed": "npx tsx scripts/seed-ledger.ts",
     "prepare": "husky"
   },
   "lint-staged": {
