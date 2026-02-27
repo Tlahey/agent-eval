@@ -1,6 +1,12 @@
-# 🧪 AgentEval
+<p align="center">
+  <img src="assets/logo.png" alt="AgentEval" width="200" />
+</p>
 
-**AI coding agent evaluation framework with Vitest-like DX.**
+<h1 align="center">AgentEval</h1>
+
+<p align="center">
+  <strong>AI coding agent evaluation framework with Vitest-like DX.</strong>
+</p>
 
 Test, judge, and track AI coding agents — locally, sequentially, and model-agnostically.
 

@@ -15,22 +15,42 @@ agent-eval/
 ├── AGENTS.md              ← You are here
 ├── PRD.md                 ← Product requirements document
 ├── pnpm-workspace.yaml    ← Workspace config (apps/* + packages/*)
+├── .github/workflows/
+│   └── ci.yml             ← CI pipeline (test → build → typecheck)
+├── docs/
+│   └── adrs/              ← Architecture Decision Records
+│       ├── 001-why-custom-framework.md
+│       ├── 002-sqlite-over-jsonl.md
+│       ├── 003-sequential-execution.md
+│       ├── 004-llm-as-judge.md
+│       └── 005-monorepo-layout.md
 ├── apps/
 │   └── docs/              ← VitePress documentation site
 ├── packages/
 │   └── agent-eval/        ← Core framework (agent-eval)
 │       ├── src/
-│       │   ├── index.ts   ← Public API (test, expect, defineConfig)
-│       │   ├── cli.ts     ← CLI binary (agenteval run|ledger|ui)
-│       │   ├── runner.ts  ← Sequential test execution engine
-│       │   ├── context.ts ← TestContext (storeDiff, runCommand)
-│       │   ├── judge.ts   ← LLM-as-a-Judge (Anthropic/OpenAI/Ollama)
-│       │   ├── git.ts     ← Git isolation (reset --hard, clean -fd)
-│       │   ├── ledger.ts  ← JSONL ledger read/write
-│       │   ├── config.ts  ← Config file loader (jiti)
-│       │   ├── expect.ts  ← Fluent assertion API
-│       │   └── types.ts   ← All TypeScript interfaces
-│       ├── tsup.config.ts ← Build config
+│       │   ├── core/      ← Core modules
+│       │   │   ├── types.ts       ← All TypeScript interfaces
+│       │   │   ├── config.ts      ← Config file loader (jiti)
+│       │   │   ├── config.test.ts
+│       │   │   ├── context.ts     ← TestContext (storeDiff, runCommand)
+│       │   │   ├── context.test.ts
+│       │   │   ├── runner.ts      ← Sequential test execution engine
+│       │   │   ├── runner.test.ts
+│       │   │   ├── expect.ts      ← Fluent assertion API
+│       │   │   └── index.test.ts  ← test() registration tests
+│       │   ├── git/       ← Git isolation
+│       │   │   ├── git.ts         ← reset --hard, clean -fd, diff
+│       │   │   └── git.test.ts
+│       │   ├── judge/     ← LLM-as-a-Judge
+│       │   │   └── judge.ts       ← Vercel AI SDK + Zod structured output
+│       │   ├── ledger/    ← SQLite result storage
+│       │   │   ├── ledger.ts      ← node:sqlite DatabaseSync
+│       │   │   └── ledger.test.ts
+│       │   ├── cli/       ← CLI binary
+│       │   │   └── cli.ts         ← agenteval run|ledger|ui
+│       │   └── index.ts   ← Public API (test, expect, defineConfig)
+│       ├── tsup.config.ts ← Build config (ESM + CJS + DTS)
 │       └── tsconfig.json
 └── examples/              ← Example eval test files
 ```
@@ -96,7 +116,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 Examples:
 ```bash
 git commit -m "feat(runner): add timeout support for agent execution"
-git commit -m "fix(ledger): handle empty JSONL file gracefully"
+git commit -m "fix(ledger): handle corrupted SQLite database gracefully"
 git commit -m "test(context): add unit tests for storeDiff and runCommand"
 git commit -m "docs(readme): add quick start guide"
 ```
@@ -105,7 +125,7 @@ git commit -m "docs(readme): add quick start guide"
 - **NEVER leave working code uncommitted.** If it passes tests and builds, commit it.
 - **NEVER commit broken code.** Always run `pnpm test && pnpm build` first.
 - **Commit frequently.** Small, focused commits are better than large ones.
-- **Write tests for every new feature or bug fix.** Tests live in `packages/agent-eval/src/__tests__/`.
+- **Write tests for every new feature or bug fix.**
 - **If you're unsure whether to commit, commit.** You can always amend or squash later.
 
 ### Testing Guidelines
@@ -118,22 +138,32 @@ git commit -m "docs(readme): add quick start guide"
 
 ---
 
-## 🏗️ Architecture Principles
+## 🏗️ Architecture
 
-### Sequential Execution
+> **See `docs/adrs/` for full Architecture Decision Records explaining each choice.**
+
+### Sequential Execution ([ADR-003](docs/adrs/003-sequential-execution.md))
 All tests run **sequentially** (no concurrency). This is intentional – agents mutate the filesystem and Git state, so parallel execution would cause conflicts. The runner uses `for...of` loops.
 
 ### Git Isolation
 Before each test iteration, the runner executes `git reset --hard HEAD && git clean -fd`. This guarantees a pristine working directory. **Never** skip git reset between test runs.
 
-### LLM-as-a-Judge
+### LLM-as-a-Judge ([ADR-004](docs/adrs/004-llm-as-judge.md))
 The judge module uses the Vercel AI SDK (`ai` package) with structured output (`generateObject` + Zod schema) to guarantee the judge returns `{ pass, score, reason }`. The judge prompt includes the git diff and all command outputs from the test context.
 
-### JSONL Ledger
-All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-contained JSON object. This format is:
-- Append-only (no corruption risk)
-- Streamable for the dashboard
-- Git-friendly (line-based diffs)
+### SQLite Ledger ([ADR-002](docs/adrs/002-sqlite-over-jsonl.md))
+All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:sqlite` (DatabaseSync). This provides:
+- Zero external dependencies
+- SQL-powered aggregations (getRunnerStats, getLatestEntries)
+- Indexed queries on `test_id` and `timestamp`
+- **Note:** Requires Node.js 22+. The `node:sqlite` module is experimental and produces `ExperimentalWarning`.
+
+### API-Based Runners
+Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM directly). API runners:
+- Use Vercel AI SDK `generateObject()` with a Zod schema
+- Support providers: `anthropic`, `openai`, `ollama`
+- Output structured `files[]` array with `{ path, content }` written to disk
+- Dynamic provider import (unused providers are never bundled)
 
 ---
 
@@ -171,6 +201,12 @@ All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-conta
 3. Install the AI SDK provider package if needed
 4. Add docs in `docs/guide/judges.md`
 
+### Adding a new Agent runner provider
+1. Add the provider type to `AgentRunnerConfig.api.provider` in `core/types.ts`
+2. Add a new `case` in `resolveRunnerModel()` in `core/runner.ts`
+3. Install the AI SDK provider package if needed
+4. Add tests in `core/runner.test.ts`
+
 ### Adding a new CLI command
 1. Add the command in `cli/cli.ts` using `program.command()`
 2. Update the docs in `docs/guide/cli.md`
@@ -183,8 +219,8 @@ All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-conta
 
 ### Modifying the Ledger schema
 1. Update `LedgerEntry` in `core/types.ts`
-2. Ensure backward compatibility (new fields should be optional)
-3. Update `appendLedgerEntry` and `readLedger` in `ledger/ledger.ts`
+2. Update SQLite table schema in `ledger/ledger.ts` (add column with DEFAULT for backward compat)
+3. Update `appendLedgerEntry` and query functions
 4. Update tests in `ledger/ledger.test.ts`
 
 ---
@@ -196,11 +232,18 @@ All results are appended to `.agenteval/ledger.jsonl`. Each line is a self-conta
 3. **Always use `encoding: "utf-8"`** when capturing exec output.
 4. **Don't forget `.js` extensions** in ESM imports.
 5. **The judge prompt is critical** – changes to `buildJudgePrompt()` in `judge/judge.ts` affect all evaluations.
+6. **Node 22 required** – `node:sqlite` (DatabaseSync) is only available in Node 22+.
+7. **`@ts-expect-error`** is needed on `import { DatabaseSync } from "node:sqlite"` (no stable types yet).
+8. **API runner providers are dynamically imported** – ensure the SDK package is installed before using a provider.
 
 ---
 
 ## 🔮 Roadmap (from PRD)
 
-- **Phase 1** (current): Core runner, config, test/expect API, CLI, ledger
-- **Phase 2**: Visual dashboard (Vite + React + Recharts), served via `agenteval ui`
-- **Future**: API-based agent runners, CI/CD integration, benchmark suites
+- [x] **Phase 1**: Core runner, config, test/expect API, CLI, JSONL ledger
+- [x] **Phase 2a**: SQLite ledger migration (node:sqlite), ADRs
+- [x] **Phase 2b**: API-based agent runners (anthropic, openai, ollama)
+- [x] **Phase 2c**: CI/CD pipeline (GitHub Actions)
+- [ ] **Phase 3**: E2E integration test with dummy target app
+- [ ] **Phase 4**: Visual dashboard (`apps/eval-ui` with React + Recharts)
+- [ ] **Future**: Benchmark suites, plugin system, remote execution
