@@ -72,9 +72,42 @@ ${ctx.logs || "(no logs captured)"}
 }
 
 /**
- * Execute a CLI-based judge.
- * Writes the prompt to a temp file, passes it to the command via {{prompt}},
- * and parses the JSON output from stdout.
+ * Extract and validate a JudgeResult JSON from raw CLI output.
+ * Handles preamble text, markdown code fences, and nested JSON.
+ */
+export function extractJudgeJson(stdout: string): JudgeResult {
+  // Strip markdown code fences if present
+  const stripped = stdout.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "");
+
+  // Try to find a JSON object containing our required fields
+  const jsonMatch = stripped.match(
+    /\{[\s\S]*?"pass"\s*:[\s\S]*?"score"\s*:[\s\S]*?"reason"\s*:[\s\S]*?\}/,
+  );
+  if (!jsonMatch) {
+    throw new Error(
+      `CLI judge output does not contain valid JSON with { pass, score, reason }.\nOutput: ${stdout.slice(0, 500)}`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new Error(
+      `CLI judge output contains malformed JSON.\nExtracted: ${jsonMatch[0].slice(0, 300)}`,
+    );
+  }
+
+  // Validate with Zod — throws ZodError with detailed field info on failure
+  return JudgeResultSchema.parse(parsed);
+}
+
+const DEFAULT_MAX_RETRIES = 2;
+
+/**
+ * Execute a CLI-based judge with retry logic.
+ * Writes the prompt to a temp file, passes it to the command,
+ * parses the JSON output, and retries on validation failure.
  */
 async function judgeCli(
   ctx: TestContext,
@@ -85,6 +118,7 @@ async function judgeCli(
     throw new Error('CLI judge requires a "command" field in judge config.');
   }
 
+  const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   const prompt = buildJudgePrompt(criteria, ctx);
 
   // Write prompt to a temp file to avoid shell escaping issues
@@ -97,21 +131,37 @@ async function judgeCli(
       .replace("{{prompt}}", prompt.replace(/"/g, '\\"'))
       .replace("{{prompt_file}}", promptFile);
 
-    const stdout = execSync(cmd, {
-      encoding: "utf-8",
-      timeout: 300_000,
-    });
+    let lastError: Error | null = null;
 
-    // Parse JSON from stdout (may contain non-JSON preamble)
-    const jsonMatch = stdout.match(/\{[\s\S]*"pass"[\s\S]*"score"[\s\S]*"reason"[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error(
-        `CLI judge did not return valid JSON with { pass, score, reason }.\nOutput: ${stdout.slice(0, 500)}`,
-      );
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const stdout = execSync(cmd, {
+          encoding: "utf-8",
+          timeout: 300_000,
+        });
+
+        return extractJudgeJson(stdout);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+
+        // Only retry on JSON parsing/validation errors, not on command failures
+        const isValidationError =
+          lastError.message.includes("does not contain valid JSON") ||
+          lastError.message.includes("malformed JSON") ||
+          lastError.name === "ZodError";
+
+        if (!isValidationError || attempt >= maxRetries) {
+          break;
+        }
+
+        // Log retry for visibility
+        console.warn(
+          `⚠️ CLI judge attempt ${attempt + 1}/${maxRetries + 1} failed (invalid JSON), retrying...`,
+        );
+      }
     }
 
-    const parsed = JudgeResultSchema.parse(JSON.parse(jsonMatch[0]));
-    return parsed;
+    throw lastError!;
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }

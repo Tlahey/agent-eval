@@ -29,10 +29,16 @@ export interface JudgeConfig {
   apiKey?: string;
   /**
    * CLI command template for CLI judges.
-   * Use {{prompt}} as placeholder for the judge prompt.
+   * Use {{prompt}} as placeholder for the judge prompt,
+   * or {{prompt_file}} for a temp file containing the prompt.
    * The command must output JSON: { "pass": boolean, "score": number, "reason": string }
    */
   command?: string;
+  /**
+   * Number of retry attempts if the CLI judge returns invalid JSON.
+   * Each retry re-executes the command. Defaults to 2.
+   */
+  maxRetries?: number;
 }
 
 // ─── Main Configuration ───
