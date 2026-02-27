@@ -179,7 +179,7 @@ git commit -m "docs(readme): add quick start guide"
 - **Every source file MUST have a colocated test file** (e.g., `runner.ts` → `runner.test.ts`)
 - Coverage is measured with `@vitest/coverage-v8` (configured in `vitest.config.ts`)
 - **Minimum thresholds:** Statements ≥ 95%, Branches ≥ 85%, Functions ≥ 95%, Lines ≥ 95%
-- Excluded from coverage: `src/cli/**` (entry point), `src/core/types.ts` (pure types), `src/e2e/**` (integration tests)
+- Excluded from coverage: `src/cli/**` (entry point), `src/core/types.ts` (pure types)
 - Run coverage check: `npx vitest run --coverage` inside `packages/agent-eval/`
 - Coverage reports are generated in `text`, `text-summary`, and `lcov` formats
 
