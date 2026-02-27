@@ -128,6 +128,8 @@ export interface JudgeOptions {
 // ─── Ledger Entry ───
 
 export interface LedgerEntry {
+  /** Database row ID (set when reading from DB, absent when creating) */
+  id?: number;
   /** Unique test identifier */
   testId: string;
   /** ISO timestamp */

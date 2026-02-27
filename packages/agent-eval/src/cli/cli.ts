@@ -9,7 +9,13 @@ import { createJiti } from "jiti";
 import { loadConfig } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
 import { runTest } from "../core/runner.js";
-import { readLedger, readLedgerByTestId, getTestIds, getRunnerStats } from "../ledger/ledger.js";
+import {
+  readLedger,
+  readLedgerByTestId,
+  getTestIds,
+  getRunnerStats,
+  getAllRunnerStats,
+} from "../ledger/ledger.js";
 
 program.name("agenteval").description("AI coding agent evaluation framework").version("0.1.0");
 
@@ -206,9 +212,9 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
       } else if (url.pathname === "/api/tests") {
         res.end(JSON.stringify(getTestIds(outputDir)));
       } else if (url.pathname === "/api/stats") {
-        const testIds = getTestIds(outputDir);
-        const allStats = testIds.flatMap((id) => getRunnerStats(outputDir, id));
-        res.end(JSON.stringify(allStats));
+        const testId = url.searchParams.get("testId");
+        const stats = testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir);
+        res.end(JSON.stringify(stats));
       } else {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: "Not found" }));

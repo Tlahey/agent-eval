@@ -64,9 +64,9 @@ export function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {runs.map((run) => (
+              {runs.map((run, i) => (
                 <tr
-                  key={run.id}
+                  key={run.id ?? i}
                   onClick={() => setSelectedRun(run)}
                   className="cursor-pointer transition-colors hover:bg-surface-alt"
                 >

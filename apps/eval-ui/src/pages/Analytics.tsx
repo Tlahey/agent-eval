@@ -17,12 +17,27 @@ interface ChartDataPoint {
 }
 
 function buildChartData(runs: LedgerRun[]): ChartDataPoint[] {
-  return runs
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .map((run) => ({
-      timestamp: new Date(run.timestamp).toLocaleDateString(),
-      [run.agentRunner]: run.score,
-    }));
+  const sorted = [...runs].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+
+  // Group by date, then average score per runner per day
+  const grouped = new Map<string, Map<string, number[]>>();
+  for (const run of sorted) {
+    const date = new Date(run.timestamp).toLocaleDateString();
+    if (!grouped.has(date)) grouped.set(date, new Map());
+    const runners = grouped.get(date)!;
+    if (!runners.has(run.agentRunner)) runners.set(run.agentRunner, []);
+    runners.get(run.agentRunner)!.push(run.score);
+  }
+
+  return Array.from(grouped.entries()).map(([date, runners]) => {
+    const point: ChartDataPoint = { timestamp: date };
+    for (const [runner, scores] of runners) {
+      point[runner] = +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3);
+    }
+    return point;
+  });
 }
 
 const CHART_COLORS = [

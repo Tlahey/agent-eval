@@ -65,6 +65,7 @@ interface RunRow {
 
 function rowToEntry(row: RunRow): LedgerEntry {
   return {
+    id: row.id,
     testId: row.test_id,
     timestamp: row.timestamp,
     agentRunner: row.agent_runner,
@@ -212,6 +213,44 @@ export function getRunnerStats(
       `,
       )
       .all(testId) as unknown as Array<{
+      agent_runner: string;
+      avg_score: number;
+      total_runs: number;
+      pass_rate: number;
+    }>;
+    return rows.map((r) => ({
+      agentRunner: r.agent_runner,
+      avgScore: r.avg_score,
+      totalRuns: r.total_runs,
+      passRate: r.pass_rate,
+    }));
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Get aggregate stats per runner across ALL tests.
+ */
+export function getAllRunnerStats(
+  outputDir: string,
+): Array<{ agentRunner: string; avgScore: number; totalRuns: number; passRate: number }> {
+  const db = openDb(outputDir);
+  try {
+    const rows = db
+      .prepare(
+        `
+        SELECT
+          agent_runner,
+          AVG(score) AS avg_score,
+          COUNT(*) AS total_runs,
+          (SUM(pass) * 1.0 / COUNT(*)) AS pass_rate
+        FROM runs
+        GROUP BY agent_runner
+        ORDER BY avg_score DESC
+      `,
+      )
+      .all() as unknown as Array<{
       agent_runner: string;
       avg_score: number;
       total_runs: number;

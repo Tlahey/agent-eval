@@ -1,5 +1,14 @@
+export interface CommandResult {
+  name: string;
+  command: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+}
+
 export interface LedgerRun {
-  id: number;
+  id?: number;
   testId: string;
   timestamp: string;
   agentRunner: string;
@@ -7,8 +16,11 @@ export interface LedgerRun {
   score: number;
   pass: boolean;
   reason: string;
-  diff: string | null;
-  commands: string;
+  improvement: string;
+  context: {
+    diff: string | null;
+    commands: CommandResult[];
+  };
   durationMs: number;
 }
 
