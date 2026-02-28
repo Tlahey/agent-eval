@@ -5,6 +5,7 @@ export default withMermaid(
   defineConfig({
     title: "AgentEval",
     description: "AI coding agent evaluation framework",
+    base: "/agent-eval/",
     themeConfig: {
       nav: [
         { text: "Guide", link: "/guide/getting-started" },
@@ -36,7 +37,7 @@ export default withMermaid(
           ],
         },
       ],
-      socialLinks: [{ icon: "github", link: "https://github.com/dkt/agent-eval" }],
+      socialLinks: [{ icon: "github", link: "https://github.com/Tlahey/agent-eval" }],
     },
   }),
 );
