@@ -5,6 +5,9 @@
   "description": "AgentEval – AI coding agent evaluation framework",
   "scripts": {
     "build": "pnpm --filter agent-eval build",
+    "build:ui": "pnpm --filter eval-ui build",
+    "build:all": "pnpm build:ui && pnpm build && pnpm bundle-ui",
+    "bundle-ui": "cp -r apps/eval-ui/dist packages/agent-eval/dist/ui",
     "dev": "pnpm --filter docs dev",
     "docs:build": "pnpm --filter docs build",
     "test": "pnpm --filter agent-eval test && pnpm --filter eval-ui test",
@@ -13,6 +16,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "seed": "npx tsx scripts/seed-ledger.ts",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build:all && changeset publish",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -35,6 +41,8 @@
   "license": "ISC",
   "packageManager": "pnpm@10.30.1",
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",

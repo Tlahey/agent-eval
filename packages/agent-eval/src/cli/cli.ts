@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import { resolve } from "node:path";
+import { resolve, join, extname } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { program } from "commander";
 import chalk from "chalk";
 import ora from "ora";
@@ -211,10 +213,32 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
 
   const port = parseInt(opts.port, 10);
 
+  // Resolve the bundled UI static files directory
+  const __dirname = fileURLToPath(new URL(".", import.meta.url));
+  const uiDistDir = join(__dirname, "ui");
+  const hasUI = existsSync(join(uiDistDir, "index.html"));
+
   console.log(chalk.bold("🧪 AgentEval Dashboard\n"));
   console.log(chalk.dim(`  Ledger: ${outputDir}/ledger.sqlite`));
   console.log(chalk.dim(`  Port:   ${port}`));
+  if (hasUI) {
+    console.log(chalk.dim(`  UI:     bundled (serving static files)`));
+  } else {
+    console.log(chalk.dim(`  UI:     not bundled (API-only mode)`));
+  }
   console.log();
+
+  const MIME_TYPES: Record<string, string> = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+  };
 
   const { createServer } = await import("node:http");
 
@@ -276,6 +300,21 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
       } else if (req.method === "GET" && /^\/api\/runs\/\d+\/overrides$/.test(url.pathname)) {
         const runId = parseInt(url.pathname.split("/")[3], 10);
         res.end(JSON.stringify(getRunOverrides(outputDir, runId)));
+      } else if (hasUI && !url.pathname.startsWith("/api")) {
+        // Serve static UI files (SPA fallback)
+        let filePath = join(uiDistDir, url.pathname === "/" ? "index.html" : url.pathname);
+        if (!existsSync(filePath)) {
+          filePath = join(uiDistDir, "index.html"); // SPA fallback
+        }
+        try {
+          const content = readFileSync(filePath);
+          const ext = extname(filePath);
+          res.setHeader("Content-Type", MIME_TYPES[ext] ?? "application/octet-stream");
+          res.end(content);
+        } catch {
+          res.statusCode = 404;
+          res.end("Not found");
+        }
       } else {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: "Not found" }));
@@ -287,7 +326,7 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
   });
 
   server.listen(port, () => {
-    console.log(chalk.green(`  ✓ API server running at http://localhost:${port}`));
+    console.log(chalk.green(`  ✓ Dashboard running at http://localhost:${port}`));
     console.log(chalk.dim(`\n  Endpoints:`));
     console.log(chalk.dim(`    GET   /api/runs           All runs (or ?testId=...)`));
     console.log(chalk.dim(`    GET   /api/tests          List of test IDs`));
@@ -295,6 +334,9 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
     console.log(chalk.dim(`    GET   /api/stats          Aggregate stats per runner`));
     console.log(chalk.dim(`    PATCH /api/runs/:id/override  Override a run score`));
     console.log(chalk.dim(`    GET   /api/runs/:id/overrides Override audit trail`));
+    if (hasUI) {
+      console.log(chalk.dim(`    GET   /*                  Static UI (SPA)`));
+    }
     console.log(chalk.dim(`\n  Press Ctrl+C to stop.\n`));
   });
 }

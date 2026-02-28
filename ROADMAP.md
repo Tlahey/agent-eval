@@ -417,6 +417,22 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [ ] Write a comprehensive "Authoring Plugins" guide with boilerplate code to help the community build their own runners and judges
   - [ ] Document the lifecycle hooks available to plugin developers
 
+## Phase 18 — Automated Releases & Documentation Deployment
+
+- [x] **Versioning & NPM Publishing (`.github/workflows/release.yml`)**
+  - [x] Integrate a version management tool (e.g., `Changesets` or `Semantic Release`) to handle semantic versioning (semver) automatically based on commit messages or PR labels
+  - [x] Create a GitHub Action workflow to build the package (`pnpm build`) and securely publish to the npm registry (`npm publish --provenance`) on version tags
+  - [x] Automatically generate and update the `CHANGELOG.md` file and create GitHub Releases with attached release notes
+
+- [x] **Documentation Sync (GitHub Wiki & Pages)**
+  - [x] ~~GitHub Wiki Sync~~ — Skipped in favor of VitePress-only docs
+  - [x] **GitHub Pages (VitePress):** Set up a workflow (`.github/workflows/docs.yml`) to build the VitePress site and deploy the interactive HTML version to GitHub Pages for a premium reading experience
+  - [x] Ensure links between the core README, the NPM package page, the Wiki, and the VitePress site are always synchronized
+
+- [x] **Monorepo Scripts & Tooling**
+  - [x] Add `pnpm run release` scripts to the root `package.json` to streamline the local version bumping and tagging process
+  - [x] Ensure the `apps/eval-ui` static assets are properly bundled and distributed within the CLI package before the NPM release
+
 ---
 
 ## Future — Planned

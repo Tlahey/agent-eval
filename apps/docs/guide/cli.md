@@ -181,7 +181,9 @@ agenteval ledger -o ./my-results
 
 ## `agenteval ui` / `agenteval view`
 
-Launch the evaluation dashboard. Starts a local API server that reads the SQLite ledger and exposes JSON endpoints, and opens the React dashboard.
+Launch the evaluation dashboard. Starts a local server that serves both the bundled React dashboard and a JSON API reading the SQLite ledger.
+
+When the UI is bundled (production/npm install), the dashboard is served at the root URL. In development mode (UI not bundled), only the API endpoints are available — run the eval-ui dev server separately.
 
 ```bash
 agenteval ui [options]

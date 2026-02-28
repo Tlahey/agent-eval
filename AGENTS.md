@@ -16,7 +16,9 @@ agent-eval/
 ├── PRD.md                 ← Product requirements document
 ├── pnpm-workspace.yaml    ← Workspace config (apps/* + packages/*)
 ├── .github/workflows/
-│   └── ci.yml             ← CI pipeline (test → build → typecheck)
+│   ├── ci.yml             ← CI pipeline (lint → test → build → typecheck)
+│   ├── release.yml        ← Automated releases via Changesets
+│   └── docs.yml           ← VitePress docs deployment to GitHub Pages
 ├── docs/
 │   └── adrs/              ← Architecture Decision Records
 │       ├── 001-why-custom-framework.md
@@ -506,6 +508,74 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 1. Make changes in `apps/eval-ui/src/`
 2. Add or update component tests (Testing Library)
 3. **Update docs:** `guide/dashboard.md` (features, architecture, screenshots)
+
+---
+
+## 🚀 Release Workflow
+
+### Changesets
+
+We use [Changesets](https://github.com/changesets/changesets) for version management and npm publishing.
+
+```mermaid
+flowchart LR
+    A["Developer\nruns pnpm changeset"] --> B["Changeset file\ncreated in .changeset/"]
+    B --> C["PR merged\nto main"]
+    C --> D{"Changesets\nAction"}
+    D -->|"changesets exist"| E["Creates\nVersion PR"]
+    D -->|"versions bumped"| F["Publishes\nto npm"]
+
+    style A fill:#6366f1,color:#fff
+    style D fill:#f59e0b,color:#000
+    style E fill:#10b981,color:#fff
+    style F fill:#10b981,color:#fff
+```
+
+#### How to Create a Changeset
+
+```bash
+# Interactive prompt: select packages affected and semver bump type
+pnpm changeset
+
+# This creates a markdown file in .changeset/ — commit it with your PR
+git add .changeset/
+git commit -m "chore: add changeset for <feature>"
+```
+
+#### Versioning Rules
+
+| Change Type     | Semver Bump | Example       |
+| --------------- | ----------- | ------------- |
+| Bug fix         | `patch`     | 0.1.0 → 0.1.1 |
+| New feature     | `minor`     | 0.1.0 → 0.2.0 |
+| Breaking change | `major`     | 0.1.0 → 1.0.0 |
+
+- **Every PR with code changes SHOULD include a changeset** (unless purely internal/docs-only)
+- Changesets are consumed by the Release GitHub Action when merged to `main`
+- `CHANGELOG.md` is auto-updated by the changesets version command
+
+### CI/CD Pipelines
+
+Three GitHub Actions workflows:
+
+| Workflow    | File          | Trigger                       | Purpose                                    |
+| ----------- | ------------- | ----------------------------- | ------------------------------------------ |
+| **CI**      | `ci.yml`      | Push + PR                     | Lint, format check, test, build, typecheck |
+| **Release** | `release.yml` | Push to `main`                | Create version PR or publish to npm        |
+| **Docs**    | `docs.yml`    | Push to `main` (docs changed) | Build & deploy VitePress to GitHub Pages   |
+
+### UI Bundling
+
+The `agenteval ui` CLI command serves a bundled copy of the React dashboard:
+
+```bash
+# Build everything with UI bundled into the CLI package
+pnpm build:all    # builds eval-ui → builds agent-eval → copies UI dist to agent-eval/dist/ui
+
+# For development, run the UI dev server separately
+cd apps/eval-ui && pnpm dev   # Vite dev server on :5173, proxies API to :4747
+agenteval ui                   # API server on :4747
+```
 
 ---
 
