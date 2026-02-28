@@ -205,6 +205,95 @@ The `apps/eval-ui` dashboard uses **Vitest + Testing Library** for component tes
 
 ---
 
+## 📖 Mandatory Documentation Updates
+
+**Every code change MUST include corresponding documentation updates. No exceptions.**
+
+When you modify code, you MUST update all related documentation **in the same commit**. Documentation lives in `apps/docs/` (VitePress) and uses **Mermaid diagrams** for visual explanations.
+
+### Documentation Map
+
+Use this map to identify which docs to update when changing code:
+
+```mermaid
+flowchart TD
+    subgraph Code["Code Changes"]
+        TYPES["core/types.ts"]
+        CONFIG["core/config.ts"]
+        CONTEXT["core/context.ts"]
+        RUNNER["core/runner.ts"]
+        EXPECT["core/expect.ts"]
+        GIT["git/git.ts"]
+        JUDGE["judge/judge.ts"]
+        LEDGER["ledger/ledger.ts"]
+        CLI["cli/cli.ts"]
+        UI["apps/eval-ui/**"]
+    end
+
+    subgraph Docs["Documentation (apps/docs/)"]
+        D_TYPES["api/define-config.md\napi/test.md"]
+        D_CONFIG["guide/configuration.md\napi/define-config.md"]
+        D_CONTEXT["api/context.md\nguide/writing-tests.md"]
+        D_RUNNER["guide/runners.md\nguide/architecture.md"]
+        D_EXPECT["api/expect.md\nguide/writing-tests.md"]
+        D_GIT["guide/architecture.md"]
+        D_JUDGE["guide/judges.md\napi/expect.md"]
+        D_LEDGER["api/ledger.md\nguide/architecture.md"]
+        D_CLI["guide/cli.md"]
+        D_UI["guide/dashboard.md"]
+    end
+
+    TYPES --> D_TYPES
+    CONFIG --> D_CONFIG
+    CONTEXT --> D_CONTEXT
+    RUNNER --> D_RUNNER
+    EXPECT --> D_EXPECT
+    GIT --> D_GIT
+    JUDGE --> D_JUDGE
+    LEDGER --> D_LEDGER
+    CLI --> D_CLI
+    UI --> D_UI
+```
+
+### Code → Documentation Cross-Reference
+
+| Code file changed  | Documentation files to update                                                    |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `core/types.ts`    | `api/define-config.md`, `api/test.md`, `api/expect.md`, `api/context.md`         |
+| `core/config.ts`   | `guide/configuration.md`, `api/define-config.md`                                 |
+| `core/context.ts`  | `api/context.md`, `guide/writing-tests.md`                                       |
+| `core/runner.ts`   | `guide/runners.md`, `guide/architecture.md`                                      |
+| `core/expect.ts`   | `api/expect.md`, `guide/writing-tests.md`                                        |
+| `git/git.ts`       | `guide/architecture.md`                                                          |
+| `judge/judge.ts`   | `guide/judges.md`, `api/expect.md`                                               |
+| `ledger/ledger.ts` | `api/ledger.md`, `guide/architecture.md`                                         |
+| `cli/cli.ts`       | `guide/cli.md`                                                                   |
+| `apps/eval-ui/**`  | `guide/dashboard.md`                                                             |
+| Any new feature    | `guide/getting-started.md` (if user-facing), `README.md`, `AGENTS.md`            |
+| Any config option  | `guide/configuration.md`, `api/define-config.md`, examples in `guide/runners.md` |
+| Any new provider   | `guide/runners.md` or `guide/judges.md`, `guide/configuration.md`                |
+
+### Mermaid Diagram Guidelines
+
+Use Mermaid diagrams in documentation to visually explain:
+
+- **Flowcharts** (`flowchart TD/LR`) — for decision trees, execution flows, and pipelines
+- **Sequence diagrams** (`sequenceDiagram`) — for interactions between modules (runner ↔ agent ↔ judge)
+- **ER diagrams** (`erDiagram`) — for data models (ledger schema)
+- **Color coding**: Use `fill:#10b981,color:#fff` for success (green), `fill:#ef4444,color:#fff` for failure (red), `fill:#f59e0b,color:#000` for warnings/agent (amber), `fill:#6366f1,color:#fff` for system (indigo), `fill:#4f46e5,color:#fff` for CLI/entry points (dark indigo)
+
+When adding a new feature or modifying a flow, **update or add a Mermaid diagram** in the relevant doc page. VitePress has Mermaid support via `vitepress-plugin-mermaid` — use standard ` ```mermaid ` code blocks.
+
+### ⚠️ Documentation Rules
+
+- **NEVER merge a code change without updating the linked docs.** If you add `expectedFiles` to `JudgeOptions`, update `api/expect.md`, `guide/judges.md`, AND `guide/writing-tests.md`.
+- **Keep examples current.** If the API changes, update all code examples across all doc pages.
+- **Update AGENTS.md** if the change affects development workflows, project structure, or conventions.
+- **Update README.md** if the change affects user-facing features or the quick start guide.
+- **Add Mermaid diagrams** for any new flow, decision tree, or data model — text-only explanations are not sufficient for complex flows.
+
+---
+
 ## 🏗️ Architecture
 
 > **See `docs/adrs/` for full Architecture Decision Records explaining each choice.**
@@ -273,12 +362,15 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 
 ## 🧪 Adding a New Feature
 
+> **Remember:** Every code change requires a corresponding documentation update. See [📖 Mandatory Documentation Updates](#📖-mandatory-documentation-updates) above.
+
 ### Adding a new Judge provider
 
 1. Add the provider type to `JudgeConfig.provider` in `core/types.ts`
 2. Add a new `case` in `resolveModel()` in `judge/judge.ts`
 3. Install the AI SDK provider package if needed
-4. Add docs in `docs/guide/judges.md`
+4. Add tests in `judge/judge.test.ts`
+5. **Update docs:** `guide/judges.md` (provider section + table), `guide/configuration.md` (judge config table)
 
 ### Adding a new Agent runner provider
 
@@ -286,18 +378,19 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 2. Add a new `case` in `resolveRunnerModel()` in `core/runner.ts`
 3. Install the AI SDK provider package if needed
 4. Add tests in `core/runner.test.ts`
+5. **Update docs:** `guide/runners.md` (provider section + table), `guide/configuration.md` (runner config example)
 
 ### Adding a new CLI command
 
 1. Add the command in `cli/cli.ts` using `program.command()`
-2. Update the docs in `docs/guide/cli.md`
+2. **Update docs:** `guide/cli.md` (command + options + examples), `README.md` (CLI reference table)
 
 ### Adding a new Context utility
 
 1. Add the method signature to `TestContext` interface in `core/types.ts`
 2. Implement in `EvalContext` class in `core/context.ts`
 3. Add tests in `core/context.test.ts`
-4. Update docs in `docs/api/context.md`
+4. **Update docs:** `api/context.md`, `guide/writing-tests.md` (usage example)
 
 ### Modifying the Ledger schema
 
@@ -305,6 +398,13 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 2. Update SQLite table schema in `ledger/ledger.ts` (add column with DEFAULT for backward compat)
 3. Update `appendLedgerEntry` and query functions
 4. Update tests in `ledger/ledger.test.ts`
+5. **Update docs:** `api/ledger.md` (schema table + ER diagram), `guide/architecture.md` (ER diagram)
+
+### Modifying the Dashboard UI
+
+1. Make changes in `apps/eval-ui/src/`
+2. Add or update component tests (Testing Library)
+3. **Update docs:** `guide/dashboard.md` (features, architecture, screenshots)
 
 ---
 
@@ -327,6 +427,6 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 - [x] **Phase 2a**: SQLite ledger migration (node:sqlite), ADRs
 - [x] **Phase 2b**: API-based agent runners (anthropic, openai, ollama)
 - [x] **Phase 2c**: CI/CD pipeline (GitHub Actions)
-- [ ] **Phase 3**: E2E integration test with dummy target app
-- [ ] **Phase 4**: Visual dashboard (`apps/eval-ui` with React + Recharts)
+- [x] **Phase 3**: E2E integration test with dummy target app
+- [x] **Phase 4**: Visual dashboard (`apps/eval-ui` with React + Recharts)
 - [ ] **Future**: Benchmark suites, plugin system, remote execution
