@@ -1,18 +1,36 @@
 import { judge as runJudge } from "../judge/judge.js";
 import { setLastJudgeResult } from "./runner.js";
-import type { ExpectChain, JudgeConfig, JudgeOptions, JudgeResult, TestContext } from "./types.js";
+import type {
+  ExpectChain,
+  JudgeConfig,
+  JudgeOptions,
+  JudgeResult,
+  TestContext,
+  Thresholds,
+} from "./types.js";
+import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 
 // ─── Global judge config (set during test execution) ───
 
 let _judgeConfig: JudgeConfig | null = null;
+let _globalThresholds: Thresholds = DEFAULT_THRESHOLDS;
 
 export function setJudgeConfig(config: JudgeConfig): void {
   _judgeConfig = config;
 }
 
+export function setGlobalThresholds(thresholds: Thresholds): void {
+  _globalThresholds = thresholds;
+}
+
+export function getGlobalThresholds(): Thresholds {
+  return _globalThresholds;
+}
+
 /** @internal Reset judge config – used by tests only */
 export function clearJudgeConfig(): void {
   _judgeConfig = null;
+  _globalThresholds = DEFAULT_THRESHOLDS;
 }
 
 /**
@@ -20,6 +38,7 @@ export function clearJudgeConfig(): void {
  *
  * Usage:
  *   await expect(ctx).toPassJudge({ criteria: "..." });
+ *   await expect(ctx).toPassJudge({ criteria: "...", thresholds: { warn: 0.7, fail: 0.4 } });
  */
 export function expect(ctx: TestContext): ExpectChain {
   return {
@@ -38,10 +57,19 @@ export function expect(ctx: TestContext): ExpectChain {
         options.expectedFiles,
       );
 
-      // Store result so the runner can capture it
-      setLastJudgeResult(result);
+      // Compute status from thresholds (per-test > global > defaults)
+      const thresholds = options.thresholds ?? _globalThresholds;
+      const status = computeStatus(result.score, thresholds);
+      const enriched: JudgeResult = {
+        ...result,
+        pass: status !== "FAIL",
+        status,
+      };
 
-      if (!result.pass) {
+      // Store result so the runner can capture it
+      setLastJudgeResult(enriched);
+
+      if (status === "FAIL") {
         const error = new Error(
           `Judge evaluation failed (score: ${result.score.toFixed(2)})\n\n${result.reason}\n\n💡 Improvement suggestions:\n${result.improvement}`,
         );
@@ -49,7 +77,7 @@ export function expect(ctx: TestContext): ExpectChain {
         throw error;
       }
 
-      return result;
+      return enriched;
     },
   };
 }

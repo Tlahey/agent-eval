@@ -1,5 +1,6 @@
-import { setJudgeConfig } from "./core/expect.js";
+import { setJudgeConfig, setGlobalThresholds } from "./core/expect.js";
 import type { AgentEvalConfig, TestDefinition, TestFn } from "./core/types.js";
+import { DEFAULT_THRESHOLDS } from "./core/types.js";
 
 // ─── Global test registry ───
 
@@ -96,6 +97,7 @@ export function clearRegisteredTests(): void {
  */
 export function initSession(config: AgentEvalConfig): void {
   setJudgeConfig(config.judge);
+  setGlobalThresholds(config.thresholds ?? DEFAULT_THRESHOLDS);
 }
 
 // ─── Re-exports ───
@@ -119,4 +121,7 @@ export type {
   TestDefinition,
   AgentHandle,
   ExpectChain,
+  TestStatus,
+  Thresholds,
 } from "./core/types.js";
+export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";

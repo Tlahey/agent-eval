@@ -29,19 +29,22 @@ function initDb(): InstanceType<typeof DatabaseSync> {
   const db = new DatabaseSync(DB_PATH);
   db.exec(`
     CREATE TABLE IF NOT EXISTS runs (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      test_id      TEXT    NOT NULL,
-      suite_path   TEXT    NOT NULL DEFAULT '[]',
-      timestamp    TEXT    NOT NULL,
-      agent_runner TEXT    NOT NULL,
-      judge_model  TEXT    NOT NULL,
-      score        REAL    NOT NULL,
-      pass         INTEGER NOT NULL,
-      reason       TEXT    NOT NULL,
-      improvement  TEXT    NOT NULL DEFAULT '',
-      diff         TEXT,
-      commands     TEXT,
-      duration_ms  INTEGER NOT NULL
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      test_id         TEXT    NOT NULL,
+      suite_path      TEXT    NOT NULL DEFAULT '[]',
+      timestamp       TEXT    NOT NULL,
+      agent_runner    TEXT    NOT NULL,
+      judge_model     TEXT    NOT NULL,
+      score           REAL    NOT NULL,
+      pass            INTEGER NOT NULL,
+      status          TEXT    NOT NULL DEFAULT 'FAIL',
+      reason          TEXT    NOT NULL,
+      improvement     TEXT    NOT NULL DEFAULT '',
+      diff            TEXT,
+      commands        TEXT,
+      duration_ms     INTEGER NOT NULL,
+      warn_threshold  REAL    NOT NULL DEFAULT 0.8,
+      fail_threshold  REAL    NOT NULL DEFAULT 0.5
     );
     CREATE INDEX IF NOT EXISTS idx_runs_test_id  ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs(timestamp);
@@ -51,6 +54,7 @@ function initDb(): InstanceType<typeof DatabaseSync> {
       run_id    INTEGER NOT NULL REFERENCES runs(id),
       score     REAL    NOT NULL,
       pass      INTEGER NOT NULL,
+      status    TEXT    NOT NULL DEFAULT 'FAIL',
       reason    TEXT    NOT NULL,
       timestamp TEXT    NOT NULL
     );
@@ -791,8 +795,8 @@ function seed(): void {
   const db = initDb();
 
   const stmt = db.prepare(`
-    INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, status, reason, improvement, diff, commands, duration_ms, warn_threshold, fail_threshold)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
@@ -818,7 +822,10 @@ function seed(): void {
         const ts = new Date(startTime + entryOffset + runnerOffset + jitter);
 
         const score = Math.round(rand(range.min, range.max) * 100) / 100;
-        const pass = score >= 0.7;
+        const warnThreshold = 0.8;
+        const failThreshold = 0.5;
+        const status = score >= warnThreshold ? "PASS" : score >= failThreshold ? "WARN" : "FAIL";
+        const pass = status !== "FAIL";
         const feedback = pick(FEEDBACK[testId]);
         const diff = pick(DIFF_TEMPLATES[testId]);
         const commands = generateCommands(score);
@@ -832,11 +839,14 @@ function seed(): void {
           pick(JUDGE_MODELS),
           score,
           pass ? 1 : 0,
+          status,
           feedback.reason,
           feedback.improvement,
           diff,
           JSON.stringify(commands),
           durationMs,
+          warnThreshold,
+          failThreshold,
         );
 
         totalEntries++;
@@ -854,8 +864,8 @@ function seed(): void {
   ];
 
   const overrideStmt = db.prepare(`
-    INSERT INTO score_overrides (run_id, score, pass, reason, timestamp)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO score_overrides (run_id, score, pass, status, reason, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
 
   // Pick ~15% of runs to have overrides
@@ -867,10 +877,11 @@ function seed(): void {
   for (const runId of allRunIds) {
     if (Math.random() > 0.15) continue;
     const newScore = Math.round(rand(0.2, 1.0) * 100) / 100;
-    const newPass = newScore >= 0.5 ? 1 : 0;
+    const newStatus = newScore >= 0.8 ? "PASS" : newScore >= 0.5 ? "WARN" : "FAIL";
+    const newPass = newStatus !== "FAIL" ? 1 : 0;
     const reason = pick(OVERRIDE_REASONS);
     const ts = new Date(Date.now() - randInt(0, 7 * 24 * 60 * 60 * 1000)).toISOString();
-    overrideStmt.run(runId, newScore, newPass, reason, ts);
+    overrideStmt.run(runId, newScore, newPass, newStatus, reason, ts);
     overrideCount++;
   }
 

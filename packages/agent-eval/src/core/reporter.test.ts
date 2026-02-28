@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LedgerEntry } from "./types.js";
+import { DEFAULT_THRESHOLDS, computeStatus } from "./types.js";
 import type { TestEvent, TestResultEvent } from "./reporter.js";
 import { DefaultReporter, SilentReporter, VerboseReporter } from "./reporter.js";
 
@@ -25,23 +26,29 @@ vi.mock("ora", () => {
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn().mockReturnThis(),
     fail: vi.fn().mockReturnThis(),
+    warn: vi.fn().mockReturnThis(),
   };
   return { default: vi.fn(() => spinner) };
 });
 
 function makeLedgerEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
+  const score = overrides.score ?? 0.85;
+  const thresholds = overrides.thresholds ?? DEFAULT_THRESHOLDS;
+  const status = overrides.status ?? computeStatus(score, thresholds);
   return {
     testId: "test-1",
     suitePath: [],
     timestamp: "2024-01-01T00:00:00.000Z",
     agentRunner: "runner-a",
     judgeModel: "gpt-4",
-    score: 0.85,
-    pass: true,
+    score,
+    pass: status !== "FAIL",
+    status,
     reason: "Good implementation",
     improvement: "Could add more tests",
     context: { diff: "diff content", commands: [] },
     durationMs: 1500,
+    thresholds,
     ...overrides,
   };
 }
@@ -77,7 +84,8 @@ describe("SilentReporter", () => {
     reporter.onGitReset(makeTestEvent());
     reporter.onFileWrite(makeTestEvent(), "src/file.ts");
     reporter.onTestPass(makeResultEvent());
-    reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ pass: false }) }));
+    reporter.onTestWarn(makeResultEvent({ entry: makeLedgerEntry({ score: 0.65 }) }));
+    reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
     reporter.onTestError(makeTestEvent(), "something broke");
     reporter.onRunEnd([], 5000);
 
@@ -121,12 +129,21 @@ describe("DefaultReporter", () => {
     expect(spinner.succeed).toHaveBeenCalled();
   });
 
+  it("calls spinner.warn on onTestWarn", async () => {
+    const ora = await import("ora");
+    const spinner = (ora.default as unknown as ReturnType<typeof vi.fn>)();
+    const reporter = new DefaultReporter();
+    reporter.onTestStart(makeTestEvent());
+    reporter.onTestWarn(makeResultEvent({ entry: makeLedgerEntry({ score: 0.65 }) }));
+    expect(spinner.warn).toHaveBeenCalled();
+  });
+
   it("calls spinner.fail on onTestFail", async () => {
     const ora = await import("ora");
     const spinner = (ora.default as unknown as ReturnType<typeof vi.fn>)();
     const reporter = new DefaultReporter();
     reporter.onTestStart(makeTestEvent());
-    reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ pass: false, score: 0.3 }) }));
+    reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
     expect(spinner.fail).toHaveBeenCalled();
   });
 
@@ -145,7 +162,7 @@ describe("DefaultReporter", () => {
       makeResultEvent(),
       makeResultEvent({
         testId: "test-2",
-        entry: makeLedgerEntry({ testId: "test-2", pass: false, score: 0.2 }),
+        entry: makeLedgerEntry({ testId: "test-2", score: 0.2 }),
       }),
     ];
     reporter.onRunEnd(results, 5000);
@@ -165,6 +182,22 @@ describe("DefaultReporter", () => {
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("1 passed");
     expect(output).not.toContain("failed");
+  });
+
+  it("prints warning count when WARN entries exist", () => {
+    const reporter = new DefaultReporter();
+    const results = [
+      makeResultEvent(),
+      makeResultEvent({
+        testId: "test-2",
+        entry: makeLedgerEntry({ testId: "test-2", score: 0.65 }),
+      }),
+    ];
+    reporter.onRunEnd(results, 3000);
+
+    const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("1 passed");
+    expect(output).toContain("1 warnings");
   });
 
   it("prints nothing for empty results", () => {
@@ -229,12 +262,28 @@ describe("VerboseReporter", () => {
     expect(output).toContain("Reason:");
   });
 
+  it("prints WARN with reason and improvement on onTestWarn", () => {
+    const reporter = new VerboseReporter();
+    reporter.onTestWarn(
+      makeResultEvent({
+        entry: makeLedgerEntry({
+          score: 0.65,
+          reason: "Partial implementation",
+          improvement: "Add edge cases",
+        }),
+      }),
+    );
+    const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("WARN");
+    expect(output).toContain("Reason:");
+    expect(output).toContain("Improve:");
+  });
+
   it("prints FAIL with reason and improvement on onTestFail", () => {
     const reporter = new VerboseReporter();
     reporter.onTestFail(
       makeResultEvent({
         entry: makeLedgerEntry({
-          pass: false,
           score: 0.2,
           reason: "Missing tests",
           improvement: "Add more tests",

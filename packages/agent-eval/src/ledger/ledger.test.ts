@@ -15,6 +15,7 @@ import {
   getAllRunnerStats,
 } from "./ledger.js";
 import type { LedgerEntry } from "../core/types.js";
+import { DEFAULT_THRESHOLDS, computeStatus } from "../core/types.js";
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `agenteval-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -23,18 +24,23 @@ function makeTmpDir(): string {
 }
 
 function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
+  const score = overrides.score ?? 0.85;
+  const thresholds = overrides.thresholds ?? DEFAULT_THRESHOLDS;
+  const status = overrides.status ?? computeStatus(score, thresholds);
   return {
     testId: "test-1",
     suitePath: [],
     timestamp: new Date().toISOString(),
     agentRunner: "mock-runner",
     judgeModel: "mock-model",
-    score: 0.85,
-    pass: true,
+    score,
+    pass: status !== "FAIL",
+    status,
     reason: "Looks good",
     improvement: "No improvement needed.",
     context: { diff: null, commands: [] },
     durationMs: 1000,
+    thresholds,
     ...overrides,
   };
 }
@@ -63,6 +69,30 @@ describe("ledger (SQLite)", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].testId).toBe("test-1");
     expect(entries[0].score).toBe(0.85);
+    expect(entries[0].status).toBe("PASS");
+    expect(entries[0].thresholds).toEqual({ warn: 0.8, fail: 0.5 });
+  });
+
+  it("stores WARN status for score between thresholds", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ score: 0.65 }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].status).toBe("WARN");
+    expect(entries[0].pass).toBe(true);
+  });
+
+  it("stores FAIL status for score below fail threshold", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ score: 0.3 }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].status).toBe("FAIL");
+    expect(entries[0].pass).toBe(false);
+  });
+
+  it("preserves custom thresholds", () => {
+    const custom = { warn: 0.9, fail: 0.7 };
+    appendLedgerEntry(tmpDir, makeEntry({ score: 0.75, thresholds: custom }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].status).toBe("WARN");
+    expect(entries[0].thresholds).toEqual(custom);
   });
 
   it("appends multiple entries as separate rows", () => {
@@ -144,18 +174,9 @@ describe("ledger (SQLite)", () => {
   });
 
   it("computes runner stats with aggregates", () => {
-    appendLedgerEntry(
-      tmpDir,
-      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.8, pass: true }),
-    );
-    appendLedgerEntry(
-      tmpDir,
-      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.6, pass: false }),
-    );
-    appendLedgerEntry(
-      tmpDir,
-      makeEntry({ testId: "x", agentRunner: "cursor", score: 0.9, pass: true }),
-    );
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.8 }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.6 }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "cursor", score: 0.9 }));
 
     const stats = getRunnerStats(tmpDir, "x");
     expect(stats).toHaveLength(2);
@@ -168,7 +189,8 @@ describe("ledger (SQLite)", () => {
     const copilot = stats.find((s) => s.agentRunner === "copilot")!;
     expect(copilot.avgScore).toBeCloseTo(0.7);
     expect(copilot.totalRuns).toBe(2);
-    expect(copilot.passRate).toBe(0.5);
+    // 0.8 → PASS, 0.6 → WARN (both pass=true with default thresholds)
+    expect(copilot.passRate).toBe(1.0);
   });
 
   it("stores and retrieves suitePath as JSON", () => {
@@ -229,13 +251,14 @@ describe("ledger (SQLite)", () => {
   // ─── Score Override Tests ───
 
   it("overrideRunScore inserts an override and returns it", () => {
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3, pass: false }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3 }));
     const entries = readLedger(tmpDir);
     const runId = entries[0].id!;
 
     const override = overrideRunScore(tmpDir, runId, 0.8, "Reviewer re-evaluated");
     expect(override.score).toBe(0.8);
     expect(override.pass).toBe(true);
+    expect(override.status).toBe("PASS");
     expect(override.reason).toBe("Reviewer re-evaluated");
     expect(override.timestamp).toBeTruthy();
   });
@@ -281,7 +304,7 @@ describe("ledger (SQLite)", () => {
   });
 
   it("readLedger includes latest override on entries", () => {
-    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3, pass: false }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3 }));
     const entries = readLedger(tmpDir);
     const runId = entries[0].id!;
 
@@ -291,6 +314,7 @@ describe("ledger (SQLite)", () => {
     expect(updated[0].override).toBeDefined();
     expect(updated[0].override!.score).toBe(0.85);
     expect(updated[0].override!.pass).toBe(true);
+    expect(updated[0].override!.status).toBe("PASS");
     expect(updated[0].override!.reason).toBe("Manual review");
   });
 
@@ -301,14 +325,8 @@ describe("ledger (SQLite)", () => {
   });
 
   it("aggregation queries use override score when present", () => {
-    appendLedgerEntry(
-      tmpDir,
-      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.3, pass: false }),
-    );
-    appendLedgerEntry(
-      tmpDir,
-      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.4, pass: false }),
-    );
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.3 }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", agentRunner: "copilot", score: 0.4 }));
     const entries = readLedger(tmpDir);
 
     // Override first run's score from 0.3 → 0.9
@@ -321,10 +339,7 @@ describe("ledger (SQLite)", () => {
   });
 
   it("getAllRunnerStats uses override scores", () => {
-    appendLedgerEntry(
-      tmpDir,
-      makeEntry({ testId: "a", agentRunner: "cursor", score: 0.2, pass: false }),
-    );
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "a", agentRunner: "cursor", score: 0.2 }));
     const entries = readLedger(tmpDir);
 
     overrideRunScore(tmpDir, entries[0].id!, 0.8, "Adjusted");

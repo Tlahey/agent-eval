@@ -45,6 +45,7 @@ describe("Overview", () => {
       expect(screen.getByText("Total Runs")).toBeInTheDocument();
       expect(screen.getByText("Avg Score")).toBeInTheDocument();
       expect(screen.getByText("Pass Rate")).toBeInTheDocument();
+      expect(screen.getByText("Warnings")).toBeInTheDocument();
       expect(screen.getByText("Failures")).toBeInTheDocument();
     });
   });
@@ -60,7 +61,7 @@ describe("Overview", () => {
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
       expect(screen.getByText("Score Trend")).toBeInTheDocument();
-      expect(screen.getByText("Pass / Fail")).toBeInTheDocument();
+      expect(screen.getByText("Pass / Warn / Fail")).toBeInTheDocument();
       expect(screen.getByText("Runner Ranking")).toBeInTheDocument();
     });
   });

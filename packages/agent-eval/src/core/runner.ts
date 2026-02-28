@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
+import { getGlobalThresholds } from "./expect.js";
 import { gitResetHard } from "../git/git.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
 import type {
@@ -11,6 +12,7 @@ import type {
   LedgerEntry,
   TestDefinition,
 } from "./types.js";
+import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 
@@ -200,6 +202,7 @@ export async function runTest(
     const ctx = new EvalContext(cwd);
     const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title);
     const start = Date.now();
+    const thresholds = config.thresholds ?? getGlobalThresholds?.() ?? DEFAULT_THRESHOLDS;
 
     try {
       await testDef.fn({ agent, ctx, judge: config.judge });
@@ -213,6 +216,7 @@ export async function runTest(
         judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
         score: 0,
         pass: false,
+        status: "FAIL",
         reason: "Test completed without judge evaluation",
         improvement: "",
         context: {
@@ -220,6 +224,7 @@ export async function runTest(
           commands: ctx.commands,
         },
         durationMs,
+        thresholds,
       };
 
       // If the test fn stored judge results via expect(), they'll be in the
@@ -228,16 +233,22 @@ export async function runTest(
       if (judgeResult) {
         entry.score = judgeResult.score;
         entry.pass = judgeResult.pass;
+        entry.status = judgeResult.status;
         entry.reason = judgeResult.reason;
         entry.improvement = judgeResult.improvement;
         clearLastJudgeResult();
+      } else {
+        entry.status = computeStatus(entry.score, thresholds);
+        entry.pass = entry.status !== "FAIL";
       }
 
       appendLedgerEntry(outputDir, entry);
 
       const resultEvent = { ...event, entry, durationMs };
-      if (entry.pass) {
+      if (entry.status === "PASS") {
         rep.onTestPass(resultEvent);
+      } else if (entry.status === "WARN") {
+        rep.onTestWarn(resultEvent);
       } else {
         rep.onTestFail(resultEvent);
       }
@@ -262,6 +273,7 @@ export async function runTest(
         judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
         score: 0,
         pass: false,
+        status: "FAIL",
         reason: `Execution error: ${errorMsg}`,
         improvement: "",
         context: {
@@ -269,6 +281,7 @@ export async function runTest(
           commands: ctx.commands,
         },
         durationMs,
+        thresholds,
       };
 
       appendLedgerEntry(outputDir, entry);

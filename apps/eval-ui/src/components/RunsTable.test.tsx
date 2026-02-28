@@ -48,9 +48,15 @@ describe("RunsTable", () => {
   });
 
   it("shows FAIL badge for failing runs", () => {
-    const run = createMockRun({ pass: false });
+    const run = createMockRun({ score: 0.3 });
     render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
     expect(screen.getByText("Fail")).toBeInTheDocument();
+  });
+
+  it("shows WARN badge for warning runs", () => {
+    const run = createMockRun({ score: 0.65 });
+    render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
+    expect(screen.getByText("Warn")).toBeInTheDocument();
   });
 
   it("formats duration in seconds", () => {

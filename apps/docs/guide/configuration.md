@@ -92,21 +92,29 @@ export default defineConfig({
 
   // Timeout per agent run (ms)
   timeout: 300_000,
+
+  // Global scoring thresholds (optional)
+  // score >= warn → PASS, score >= fail → WARN, score < fail → FAIL
+  thresholds: {
+    warn: 0.8, // default
+    fail: 0.5, // default
+  },
 });
 ```
 
 ## Options Reference
 
-| Option      | Type                     | Default                                  | Description                                             |
-| ----------- | ------------------------ | ---------------------------------------- | ------------------------------------------------------- |
-| `rootDir`   | `string`                 | `process.cwd()`                          | Project root directory                                  |
-| `testFiles` | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                      |
-| `runners`   | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate                               |
-| `judge`     | `JudgeConfig`            | _required_                               | LLM judge configuration                                 |
-| `afterEach` | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first) |
-| `matrix`    | `{ runners?: string[] }` | —                                        | Filter which runners to execute                         |
-| `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory                                 |
-| `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)                                  |
+| Option       | Type                             | Default                                  | Description                                             |
+| ------------ | -------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| `rootDir`    | `string`                         | `process.cwd()`                          | Project root directory                                  |
+| `testFiles`  | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                      |
+| `runners`    | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                               |
+| `judge`      | `JudgeConfig`                    | _required_                               | LLM judge configuration                                 |
+| `afterEach`  | `AfterEachCommand[]`             | —                                        | Commands to run after each agent (auto storeDiff first) |
+| `matrix`     | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                         |
+| `outputDir`  | `string`                         | `.agenteval`                             | Ledger output directory                                 |
+| `timeout`    | `number`                         | `300000`                                 | Agent run timeout (ms)                                  |
+| `thresholds` | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL        |
 
 ## Environment Variables
 
@@ -267,3 +275,74 @@ judge: {
 ```
 
 Use `{{prompt_file}}` to pass the (potentially very long) prompt via a temp file, or `{{prompt}}` for inline replacement.
+
+## Scoring Thresholds
+
+AgentEval uses a three-level scoring system: **PASS**, **WARN**, and **FAIL**. The status is derived from the judge's numeric score and configurable thresholds.
+
+```mermaid
+flowchart LR
+    S["Score"] --> C{"score ≥ warn?"}
+    C -- Yes --> P["✅ PASS"]
+    C -- No --> D{"score ≥ fail?"}
+    D -- Yes --> W["⚠️ WARN"]
+    D -- No --> F["❌ FAIL"]
+
+    style P fill:#10b981,color:#fff
+    style W fill:#f59e0b,color:#000
+    style F fill:#ef4444,color:#fff
+```
+
+### Default Thresholds
+
+| Threshold | Default | Meaning                             |
+| --------- | ------- | ----------------------------------- |
+| `warn`    | `0.8`   | Scores ≥ 0.8 are **PASS**           |
+| `fail`    | `0.5`   | Scores ≥ 0.5 but < 0.8 are **WARN** |
+|           |         | Scores < 0.5 are **FAIL**           |
+
+::: tip WARN doesn't break CI
+Only **FAIL** throws an error and fails the test. **WARN** results are flagged but still count as passing — they won't break your pipeline.
+:::
+
+### Global Thresholds
+
+Set thresholds in your config file to apply to all tests:
+
+```ts
+export default defineConfig({
+  // ...
+  thresholds: {
+    warn: 0.85, // Higher bar for PASS
+    fail: 0.6, // Higher bar before FAIL
+  },
+});
+```
+
+### Per-Test Thresholds
+
+Override globally for individual tests via `JudgeOptions.thresholds`:
+
+```ts
+test("critical feature", async ({ agent, ctx }) => {
+  await agent.run("Implement authentication");
+  await expect(ctx).toPassJudge({
+    criteria: "Secure auth implementation",
+    thresholds: { warn: 0.9, fail: 0.7 }, // Stricter for this test
+  });
+});
+```
+
+### Threshold Precedence
+
+```mermaid
+flowchart TD
+    PT["Per-test thresholds\n(JudgeOptions.thresholds)"] --> |"highest priority"| R["Resolved thresholds"]
+    GT["Global config thresholds\n(config.thresholds)"] --> |"fallback"| R
+    DT["Default thresholds\n({ warn: 0.8, fail: 0.5 })"] --> |"last resort"| R
+
+    style PT fill:#6366f1,color:#fff
+    style GT fill:#4f46e5,color:#fff
+    style DT fill:#374151,color:#fff
+    style R fill:#10b981,color:#fff
+```

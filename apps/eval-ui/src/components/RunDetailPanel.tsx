@@ -79,7 +79,7 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
 
   const cmdCount = run.context.commands?.length ?? 0;
   const effectiveScore = run.override?.score ?? run.score;
-  const effectivePass = run.override?.pass ?? run.pass;
+  const effectiveStatus = run.override?.status ?? run.status ?? (run.pass ? "PASS" : "FAIL");
 
   const loadOverrides = useCallback(() => {
     if (run.id != null) {
@@ -122,10 +122,14 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
               <span>{(run.durationMs / 1000).toFixed(1)}s</span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  effectivePass ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
+                  effectiveStatus === "PASS"
+                    ? "bg-ok/10 text-ok"
+                    : effectiveStatus === "WARN"
+                      ? "bg-warn/10 text-warn"
+                      : "bg-err/10 text-err"
                 }`}
               >
-                {effectivePass ? "PASS" : "FAIL"}
+                {effectiveStatus}
               </span>
               {run.override && (
                 <span className="rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-semibold text-warn">

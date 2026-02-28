@@ -1,7 +1,14 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { LedgerEntry, CommandResult, ScoreOverride } from "../core/types.js";
+import type {
+  LedgerEntry,
+  CommandResult,
+  ScoreOverride,
+  TestStatus,
+  Thresholds,
+} from "../core/types.js";
+import { computeStatus, DEFAULT_THRESHOLDS } from "../core/types.js";
 
 /**
  * Resolve the SQLite database path.
@@ -51,6 +58,25 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
     // Column already exists — ignore
   }
 
+  // Migrate: add status column if missing
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN status TEXT NOT NULL DEFAULT 'FAIL'`);
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Migrate: add threshold columns if missing
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN warn_threshold REAL NOT NULL DEFAULT 0.8`);
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN fail_threshold REAL NOT NULL DEFAULT 0.5`);
+  } catch {
+    // Column already exists — ignore
+  }
+
   // Score overrides table (HITL — human-in-the-loop)
   db.exec(`
     CREATE TABLE IF NOT EXISTS score_overrides (
@@ -58,11 +84,19 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
       run_id    INTEGER NOT NULL REFERENCES runs(id),
       score     REAL    NOT NULL,
       pass      INTEGER NOT NULL,
+      status    TEXT    NOT NULL DEFAULT 'FAIL',
       reason    TEXT    NOT NULL,
       timestamp TEXT    NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_overrides_run_id ON score_overrides(run_id);
   `);
+
+  // Migrate: add status to score_overrides if missing
+  try {
+    db.exec(`ALTER TABLE score_overrides ADD COLUMN status TEXT NOT NULL DEFAULT 'FAIL'`);
+  } catch {
+    // Column already exists — ignore
+  }
 
   return db;
 }
@@ -78,14 +112,18 @@ interface RunRow {
   judge_model: string;
   score: number;
   pass: number;
+  status: string;
   reason: string;
   improvement: string;
   diff: string | null;
   commands: string | null;
   duration_ms: number;
+  warn_threshold: number;
+  fail_threshold: number;
   /* Override columns (nullable, from LEFT JOIN) */
   override_score: number | null;
   override_pass: number | null;
+  override_status: string | null;
   override_reason: string | null;
   override_timestamp: string | null;
 }
@@ -95,11 +133,12 @@ const RUNS_WITH_OVERRIDE = `
   SELECT r.*,
          o.score     AS override_score,
          o.pass      AS override_pass,
+         o.status    AS override_status,
          o.reason    AS override_reason,
          o.timestamp AS override_timestamp
   FROM runs r
   LEFT JOIN (
-    SELECT run_id, score, pass, reason, timestamp,
+    SELECT run_id, score, pass, status, reason, timestamp,
            ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY id DESC) AS rn
     FROM score_overrides
   ) o ON o.run_id = r.id AND o.rn = 1
@@ -112,6 +151,15 @@ function rowToEntry(row: RunRow): LedgerEntry {
   } catch {
     suitePath = [];
   }
+  const thresholds: Thresholds = {
+    warn: row.warn_threshold ?? DEFAULT_THRESHOLDS.warn,
+    fail: row.fail_threshold ?? DEFAULT_THRESHOLDS.fail,
+  };
+  // Backward compat: if status is missing or default, recompute from score
+  const status =
+    row.status === "PASS" || row.status === "WARN" || row.status === "FAIL"
+      ? (row.status as TestStatus)
+      : computeStatus(row.score, thresholds);
   const entry: LedgerEntry = {
     id: row.id,
     testId: row.test_id,
@@ -121,6 +169,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
     judgeModel: row.judge_model,
     score: row.score,
     pass: row.pass === 1,
+    status,
     reason: row.reason,
     improvement: row.improvement ?? "",
     context: {
@@ -128,11 +177,19 @@ function rowToEntry(row: RunRow): LedgerEntry {
       commands: row.commands ? (JSON.parse(row.commands) as CommandResult[]) : [],
     },
     durationMs: row.duration_ms,
+    thresholds,
   };
   if (row.override_score != null) {
+    const overrideStatus =
+      row.override_status === "PASS" ||
+      row.override_status === "WARN" ||
+      row.override_status === "FAIL"
+        ? (row.override_status as TestStatus)
+        : computeStatus(row.override_score, thresholds);
     entry.override = {
       score: row.override_score,
       pass: row.override_pass === 1,
+      status: overrideStatus,
       reason: row.override_reason ?? "",
       timestamp: row.override_timestamp ?? "",
     };
@@ -147,8 +204,8 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
   const db = openDb(outputDir);
   try {
     const stmt = db.prepare(`
-      INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, status, reason, improvement, diff, commands, duration_ms, warn_threshold, fail_threshold)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
@@ -158,11 +215,14 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.judgeModel,
       entry.score,
       entry.pass ? 1 : 0,
+      entry.status,
       entry.reason,
       entry.improvement,
       entry.context.diff,
       JSON.stringify(entry.context.commands),
       entry.durationMs,
+      entry.thresholds.warn,
+      entry.thresholds.fail,
     );
   } finally {
     db.close();
@@ -414,20 +474,25 @@ export function overrideRunScore(
 
   const db = openDb(outputDir);
   try {
-    // Verify the run exists
-    const run = db.prepare("SELECT id FROM runs WHERE id = ?").get(runId) as
-      | { id: number }
-      | undefined;
+    // Get the run to read its thresholds
+    const run = db
+      .prepare("SELECT id, warn_threshold, fail_threshold FROM runs WHERE id = ?")
+      .get(runId) as { id: number; warn_threshold: number; fail_threshold: number } | undefined;
     if (!run) throw new Error(`Run #${runId} not found`);
 
+    const thresholds: Thresholds = {
+      warn: run.warn_threshold ?? DEFAULT_THRESHOLDS.warn,
+      fail: run.fail_threshold ?? DEFAULT_THRESHOLDS.fail,
+    };
     const timestamp = new Date().toISOString();
-    const pass = newScore >= 0.5 ? 1 : 0;
+    const status = computeStatus(newScore, thresholds);
+    const pass = status !== "FAIL" ? 1 : 0;
 
     db.prepare(
-      `INSERT INTO score_overrides (run_id, score, pass, reason, timestamp) VALUES (?, ?, ?, ?, ?)`,
-    ).run(runId, newScore, pass, reason.trim(), timestamp);
+      `INSERT INTO score_overrides (run_id, score, pass, status, reason, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(runId, newScore, pass, status, reason.trim(), timestamp);
 
-    return { score: newScore, pass: pass === 1, reason: reason.trim(), timestamp };
+    return { score: newScore, pass: pass === 1, status, reason: reason.trim(), timestamp };
   } finally {
     db.close();
   }
@@ -442,17 +507,19 @@ export function getRunOverrides(outputDir: string, runId: number): ScoreOverride
   try {
     const rows = db
       .prepare(
-        `SELECT score, pass, reason, timestamp FROM score_overrides WHERE run_id = ? ORDER BY id DESC`,
+        `SELECT score, pass, status, reason, timestamp FROM score_overrides WHERE run_id = ? ORDER BY id DESC`,
       )
       .all(runId) as unknown as Array<{
       score: number;
       pass: number;
+      status: string;
       reason: string;
       timestamp: string;
     }>;
     return rows.map((r) => ({
       score: r.score,
       pass: r.pass === 1,
+      status: (r.status as TestStatus) ?? (r.pass === 1 ? "PASS" : "FAIL"),
       reason: r.reason,
       timestamp: r.timestamp,
     }));

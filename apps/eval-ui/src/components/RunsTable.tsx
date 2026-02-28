@@ -64,16 +64,7 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                      (run.override?.pass ?? run.pass) ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
-                    }`}
-                  >
-                    <span
-                      className={`h-1 w-1 rounded-full ${(run.override?.pass ?? run.pass) ? "bg-ok" : "bg-err"}`}
-                    />
-                    {(run.override?.pass ?? run.pass) ? "Pass" : "Fail"}
-                  </span>
+                  <StatusBadge run={run} />
                   {run.override && (
                     <span className="rounded-full bg-warn/10 px-1.5 py-0.5 text-[10px] font-semibold text-warn">
                       Adjusted
@@ -123,4 +114,23 @@ function timeAgo(timestamp: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+const STATUS_STYLES = {
+  PASS: { bg: "bg-ok/10", text: "text-ok", dot: "bg-ok", label: "Pass" },
+  WARN: { bg: "bg-warn/10", text: "text-warn", dot: "bg-warn", label: "Warn" },
+  FAIL: { bg: "bg-err/10", text: "text-err", dot: "bg-err", label: "Fail" },
+} as const;
+
+export function StatusBadge({ run }: { run: LedgerRun }) {
+  const effectiveStatus = run.override?.status ?? run.status ?? (run.pass ? "PASS" : "FAIL");
+  const style = STATUS_STYLES[effectiveStatus] ?? STATUS_STYLES.FAIL;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${style.bg} ${style.text}`}
+    >
+      <span className={`h-1 w-1 rounded-full ${style.dot}`} />
+      {style.label}
+    </span>
+  );
 }

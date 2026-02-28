@@ -32,6 +32,8 @@ export interface Reporter {
   onFileWrite(event: TestEvent, filePath: string): void;
   /** Called when a test passes */
   onTestPass(event: TestResultEvent): void;
+  /** Called when a test gets a warning (score between fail and warn thresholds) */
+  onTestWarn(event: TestResultEvent): void;
   /** Called when a test fails */
   onTestFail(event: TestResultEvent): void;
   /** Called when a test errors */
@@ -81,6 +83,17 @@ export class DefaultReporter implements Reporter {
     }
   }
 
+  onTestWarn(event: TestResultEvent): void {
+    const score = chalk.yellow(event.entry.score.toFixed(2));
+    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    if (this.spinner) {
+      this.spinner.warn(
+        `${chalk.blue(event.testId)} ${chalk.gray(`[${event.runner}]`)} ${chalk.yellow("WARN")} ${score} ${dur}`,
+      );
+      this.spinner = null;
+    }
+  }
+
   onTestFail(event: TestResultEvent): void {
     const score = chalk.yellow(event.entry.score.toFixed(2));
     const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
@@ -103,14 +116,18 @@ export class DefaultReporter implements Reporter {
   }
 
   onRunEnd(results: TestResultEvent[], durationMs: number): void {
-    const passed = results.filter((r) => r.entry.pass).length;
-    const failed = results.length - passed;
+    const passed = results.filter((r) => r.entry.status === "PASS").length;
+    const warned = results.filter((r) => r.entry.status === "WARN").length;
+    const failed = results.filter((r) => r.entry.status === "FAIL").length;
 
     console.log("");
     printSummaryTable(results);
 
     console.log(chalk.bold("\n─── Summary ───"));
     console.log(chalk.green(`  ✓ ${passed} passed`));
+    if (warned > 0) {
+      console.log(chalk.yellow(`  ⚠ ${warned} warnings`));
+    }
     if (failed > 0) {
       console.log(chalk.red(`  ✗ ${failed} failed`));
     }
@@ -127,6 +144,7 @@ export class SilentReporter implements Reporter {
   onGitReset(): void {}
   onFileWrite(): void {}
   onTestPass(): void {}
+  onTestWarn(): void {}
   onTestFail(): void {}
   onTestError(): void {}
   onRunEnd(): void {}
@@ -164,6 +182,18 @@ export class VerboseReporter implements Reporter {
     }
   }
 
+  onTestWarn(event: TestResultEvent): void {
+    const score = chalk.yellow(event.entry.score.toFixed(2));
+    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${chalk.yellow("⚠")} Score: ${score} – ${chalk.yellow("WARN")} ${dur}`);
+    if (event.entry.reason) {
+      console.log(chalk.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
+    }
+    if (event.entry.improvement) {
+      console.log(chalk.dim(`    Improve: ${truncate(event.entry.improvement, 120)}`));
+    }
+  }
+
   onTestFail(event: TestResultEvent): void {
     const score = chalk.yellow(event.entry.score.toFixed(2));
     const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
@@ -181,14 +211,18 @@ export class VerboseReporter implements Reporter {
   }
 
   onRunEnd(results: TestResultEvent[], durationMs: number): void {
-    const passed = results.filter((r) => r.entry.pass).length;
-    const failed = results.length - passed;
+    const passed = results.filter((r) => r.entry.status === "PASS").length;
+    const warned = results.filter((r) => r.entry.status === "WARN").length;
+    const failed = results.filter((r) => r.entry.status === "FAIL").length;
 
     console.log("");
     printSummaryTable(results);
 
     console.log(chalk.bold("\n─── Summary ───"));
     console.log(chalk.green(`  ✓ ${passed} passed`));
+    if (warned > 0) {
+      console.log(chalk.yellow(`  ⚠ ${warned} warnings`));
+    }
     if (failed > 0) {
       console.log(chalk.red(`  ✗ ${failed} failed`));
     }
@@ -220,7 +254,12 @@ function printSummaryTable(results: TestResultEvent[]): void {
   console.log(sep);
 
   for (const r of results) {
-    const status = r.entry.pass ? chalk.green("PASS") : chalk.red("FAIL");
+    const statusMap = {
+      PASS: chalk.green("PASS"),
+      WARN: chalk.yellow("WARN"),
+      FAIL: chalk.red("FAIL"),
+    };
+    const status = statusMap[r.entry.status] ?? chalk.red("FAIL");
     const score = chalk.yellow(r.entry.score.toFixed(2));
     const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
 

@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useOutletContext, Link } from "react-router-dom";
-import { BarChart3, TrendingUp, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
+import {
+  BarChart3,
+  TrendingUp,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -56,17 +63,19 @@ export function Overview() {
   }
 
   const totalRuns = runs.length;
-  const passCount = runs.filter((r) => r.pass).length;
-  const failCount = totalRuns - passCount;
+  const passCount = runs.filter((r) => r.status === "PASS" || (!r.status && r.pass)).length;
+  const warnCount = runs.filter((r) => r.status === "WARN").length;
+  const failCount = runs.filter((r) => r.status === "FAIL" || (!r.status && !r.pass)).length;
   const avgScore = totalRuns > 0 ? runs.reduce((s, r) => s + r.score, 0) / totalRuns : 0;
   const recentRuns = [...runs].slice(0, 8);
 
   // Score trend data
   const trendData = buildTrendData(runs);
 
-  // Pass/fail donut
+  // Pass/warn/fail donut
   const pieData = [
     { name: "Pass", value: passCount, color: "var(--color-success)" },
+    { name: "Warn", value: warnCount, color: "var(--color-warning)" },
     { name: "Fail", value: failCount, color: "var(--color-danger)" },
   ];
 
@@ -79,7 +88,7 @@ export function Overview() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KPICard
           icon={<BarChart3 size={18} />}
           label="Total Runs"
@@ -98,6 +107,17 @@ export function Overview() {
           value={totalRuns > 0 ? `${((passCount / totalRuns) * 100).toFixed(0)}%` : "—"}
           accent="ok"
           sub={`${passCount} passed`}
+        />
+        <KPICard
+          icon={<AlertTriangle size={18} />}
+          label="Warnings"
+          value={warnCount.toString()}
+          accent={warnCount > 0 ? "warn" : "ok"}
+          sub={
+            warnCount > 0
+              ? `${((warnCount / totalRuns) * 100).toFixed(0)}% warn rate`
+              : "No warnings"
+          }
         />
         <KPICard
           icon={<XCircle size={18} />}
@@ -173,7 +193,7 @@ export function Overview() {
         <div className="flex flex-col gap-4">
           {/* Pass/Fail donut */}
           <div className="rounded-xl border border-border bg-surface-1 p-5">
-            <h3 className="mb-2 text-sm font-semibold text-txt-base">Pass / Fail</h3>
+            <h3 className="mb-2 text-sm font-semibold text-txt-base">Pass / Warn / Fail</h3>
             <div className="flex items-center justify-center">
               <PieChart width={120} height={120}>
                 <Pie
@@ -195,6 +215,10 @@ export function Overview() {
                 <div className="flex items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full bg-ok" />
                   <span className="text-txt-secondary">{passCount} Pass</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="h-2.5 w-2.5 rounded-full bg-warn" />
+                  <span className="text-txt-secondary">{warnCount} Warn</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full bg-err" />

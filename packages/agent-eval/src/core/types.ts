@@ -41,6 +41,34 @@ export interface JudgeConfig {
   maxRetries?: number;
 }
 
+// ─── Status & Thresholds ───
+
+/** Test result status based on score thresholds */
+export type TestStatus = "PASS" | "WARN" | "FAIL";
+
+/** Score thresholds for determining test status */
+export interface Thresholds {
+  /** Minimum score for PASS status (default: 0.8) */
+  warn: number;
+  /** Minimum score for WARN status; below this is FAIL (default: 0.5) */
+  fail: number;
+}
+
+/** Default thresholds used when none are specified */
+export const DEFAULT_THRESHOLDS: Thresholds = { warn: 0.8, fail: 0.5 };
+
+/**
+ * Compute the test status from a score and thresholds.
+ */
+export function computeStatus(
+  score: number,
+  thresholds: Thresholds = DEFAULT_THRESHOLDS,
+): TestStatus {
+  if (score >= thresholds.warn) return "PASS";
+  if (score >= thresholds.fail) return "WARN";
+  return "FAIL";
+}
+
 // ─── Main Configuration ───
 
 export interface AgentEvalConfig {
@@ -66,6 +94,12 @@ export interface AgentEvalConfig {
    * Example: [{ name: "test", command: "pnpm test" }, { name: "typecheck", command: "pnpm build" }]
    */
   afterEach?: AfterEachCommand[];
+  /**
+   * Global scoring thresholds for determining test status (PASS / WARN / FAIL).
+   * Can be overridden per-test via JudgeOptions.thresholds.
+   * Defaults to { warn: 0.8, fail: 0.5 }.
+   */
+  thresholds?: Thresholds;
 }
 
 export interface AfterEachCommand {
@@ -102,8 +136,10 @@ export interface TestContext {
 // ─── Judge Result ───
 
 export interface JudgeResult {
-  /** Whether the test passed the judge evaluation */
+  /** Whether the test passed the judge evaluation (PASS or WARN = true, FAIL = false) */
   pass: boolean;
+  /** Rich status: PASS, WARN, or FAIL */
+  status: TestStatus;
   /** Score from 0.0 to 1.0 */
   score: number;
   /** Markdown-formatted reason / explanation */
@@ -123,6 +159,11 @@ export interface JudgeOptions {
    * unexpected modifications as potential scope creep.
    */
   expectedFiles?: string[];
+  /**
+   * Per-test scoring thresholds. Overrides global config thresholds.
+   * Defaults to { warn: 0.8, fail: 0.5 }.
+   */
+  thresholds?: Thresholds;
 }
 
 // ─── Ledger Entry ───
@@ -142,8 +183,10 @@ export interface LedgerEntry {
   judgeModel: string;
   /** Score from 0.0 to 1.0 */
   score: number;
-  /** Pass / fail */
+  /** Pass / fail (PASS or WARN = true, FAIL = false) */
   pass: boolean;
+  /** Rich status: PASS, WARN, or FAIL */
+  status: TestStatus;
   /** Judge's markdown reason */
   reason: string;
   /** Judge's markdown improvement suggestions */
@@ -155,6 +198,8 @@ export interface LedgerEntry {
   };
   /** Duration of the agent run in ms */
   durationMs: number;
+  /** Thresholds used for this run (preserved for historical accuracy) */
+  thresholds: Thresholds;
   /** Human override (if any). Present only when reading from DB. */
   override?: ScoreOverride;
 }
@@ -165,6 +210,8 @@ export interface ScoreOverride {
   score: number;
   /** Updated pass/fail based on the overridden score */
   pass: boolean;
+  /** Rich status: PASS, WARN, or FAIL */
+  status: TestStatus;
   /** Human-provided reason for the override */
   reason: string;
   /** ISO timestamp of when the override was applied */

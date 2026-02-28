@@ -235,25 +235,40 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [x] Updated `guide/dashboard.md`: HITL workflow guide with Mermaid diagram, override behaviors
   - [x] Updated seed script with score_overrides table and ~15% override seeding
 
-## Phase 10 — Custom Scoring Thresholds (Warn / Error)
+## Phase 10 — Custom Scoring Thresholds (Warn / Error) ✅
 
-- [ ] **Core API (`core/index.ts` & `core/expect.ts`)**
-  - [ ] Extend test configuration or `toPassJudge()` options to accept `thresholds: { warn: number, fail: number }`
-  - [ ] Implement logic to compute the final test status (`PASS`, `WARN`, `FAIL`) based on the LLM's raw score and the custom thresholds
-  - [ ] Allow setting global default thresholds in `agenteval.config.ts`
+- [x] **Core API (`core/types.ts`, `core/expect.ts`)**
+  - [x] Add `TestStatus` type (`"PASS" | "WARN" | "FAIL"`), `Thresholds` interface, `DEFAULT_THRESHOLDS` constant, `computeStatus()` function
+  - [x] Extend `toPassJudge()` options to accept `thresholds: { warn: number, fail: number }`
+  - [x] Compute final test status from score + thresholds (per-test → global → defaults)
+  - [x] Allow global default thresholds in `agenteval.config.ts` via `setGlobalThresholds()`
+  - [x] WARN does not throw; only FAIL throws `JudgeFailure`
 
-- [ ] **Database & Ledger (`ledger/ledger.ts`)**
-  - [ ] Update SQLite schema: migrate the boolean `pass` column to a `status` enum (`'PASS' | 'WARN' | 'FAIL'`)
-  - [ ] Store the applied `warn_threshold` and `fail_threshold` in the `runs` table to preserve historical context (if thresholds change in the codebase later, old runs remain accurate)
+- [x] **Database & Ledger (`ledger/ledger.ts`)**
+  - [x] Add `status`, `warn_threshold`, `fail_threshold` columns with migrations
+  - [x] Store applied thresholds per run for historical accuracy
+  - [x] Update `overrideRunScore` to compute status from stored thresholds
+  - [x] Backward compatible: `rowToEntry()` recomputes status from score when reading old data
 
-- [ ] **Visual Dashboard (`apps/eval-ui`)**
-  - [ ] **Status Badges:** Introduce a yellow/orange "Warning" badge across the UI (RunsTable, Overview)
-  - [ ] **Score Gauge:** Update the circular `ScoreRing` component to visually indicate the threshold markers (e.g., red zone, yellow zone, green zone) based on the test's specific config
-  - [ ] **Metrics:** Include "Warnings" in the aggregate statistics (e.g., "Pass Rate" vs "Warn Rate")
+- [x] **Runner & Reporter (`core/runner.ts`, `core/reporter.ts`)**
+  - [x] Compute thresholds per run (per-test → global → defaults) and set `entry.status`/`entry.thresholds`
+  - [x] Add `onTestWarn()` to Reporter interface, all 3 implementations updated
+  - [x] Summary table shows PASS/WARN/FAIL counts
 
-- [ ] **Documentation (`apps/docs`)**
-  - [ ] Add a guide on "Fuzzy Evaluation & Thresholds" explaining how to handle non-binary LLM scores
-  - [ ] Update API references for `test()`, `expect()`, and the configuration object
+- [x] **Visual Dashboard (`apps/eval-ui`)**
+  - [x] `StatusBadge` component with PASS (green) / WARN (yellow) / FAIL (red) styling
+  - [x] Warnings KPI card on Overview page
+  - [x] 3-segment donut chart (Pass / Warn / Fail)
+  - [x] RunDetailPanel shows 3-state status badge
+
+- [x] **Seed Data & Tests**
+  - [x] Updated seed script with status/thresholds columns
+  - [x] 144 core tests pass (added threshold tests to expect, reporter, ledger)
+  - [x] 128 UI tests pass (added WARN badge tests to RunsTable, RunDetailPanel, Overview)
+
+- [x] **Documentation (`apps/docs`)**
+  - [x] Added "Scoring Thresholds" section to configuration guide with Mermaid diagrams
+  - [x] Updated `api/expect.md` with thresholds option, 3-state behavior diagram, and `TestStatus` type
 
 ## Phase 11 — Dynamic CLI Reporter & Summary Table ✅
 
@@ -279,17 +294,135 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [x] Updated CLI Reference (`guide/cli.md`) with `--silent`/`--verbose` flags, reporter modes diagram, output examples
   - [x] Exported `Reporter`, `DefaultReporter`, `SilentReporter`, `VerboseReporter` from public API
 
+## Phase 12 — Advanced Dashboard: Real-time & Reporting
+
+- [ ] **Local API & Real-time Engine (`cli/server.ts`)**
+  - [ ] Implement Server-Sent Events (SSE) or WebSockets to broadcast database changes (`INSERT` on the `runs` table) in real-time
+  - [ ] Add backend endpoints for data export (`GET /api/export/csv` and `/api/export/json`) to easily extract ledger data
+  - [ ] Ensure the local server gracefully handles concurrent read/writes during live CLI test executions
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **Live Reload:** Integrate a WebSocket/SSE client to automatically refresh the Runs Table and Analytics Graphs without page reloads while `agenteval run` is executing
+  - [ ] **Comparison View:** Build a side-by-side UI allowing users to select two different runs of the same test (e.g., Copilot vs. Claude) to visually compare their Code Diffs, Execution Times, and Judge Reasoning
+  - [ ] **Export & Reporting:** Add "Export to CSV" buttons on the data tables for spreadsheet analysis
+  - [ ] **PDF Generation:** Implement a "Download Report" feature (using print stylesheets or libraries like `html2pdf.js`) to generate clean, management-ready PDF summaries of the test suites
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Document the real-time architecture and how to keep the dashboard open during CLI executions
+  - [ ] Add a guide on "Generating Stakeholder Reports" explaining the PDF and CSV export features
+
+## Phase 13 — Cost & Token Tracking (AI FinOps)
+
+- [ ] **Core Engine & Judges (`core/runner.ts` & `judge/judge.ts`)**
+  - [ ] Extract token usage (`promptTokens`, `completionTokens`, `totalTokens`) from the Vercel AI SDK responses for both the Agent Runner and the LLM Judge
+  - [ ] Implement a Pricing Engine (dictionary) mapping models to their current API costs (e.g., `$3/1M input`, `$15/1M output` for Claude 3.5 Sonnet)
+  - [ ] Calculate the total cost (in USD) for each execution (Agent Cost + Judge Cost)
+  - [ ] Track precise API latency alongside overall execution time
+
+- [ ] **Database & Ledger (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema: add columns for `prompt_tokens`, `completion_tokens`, `total_tokens`, and `cost_usd` to the `runs` table
+  - [ ] Update aggregation queries to include `SUM(cost_usd)` and average token usage across test suites and models
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **FinOps Overview:** Add a "Total Spend" and "Cost per Run" widget to the Overview page to monitor the budget
+  - [ ] **Efficiency Metrics:** Build a scatter plot chart comparing "Score vs. Cost" (to easily spot models that are cheap and effective vs. expensive and underperforming)
+  - [ ] **Run Details:** Display token usage, cost, and API latency clearly inside the `RunDetailPanel`
+  - [ ] **Runs Table:** Add sortable columns for `Cost` and `Tokens`
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Create an "AI FinOps" guide explaining how costs are calculated and how to configure custom pricing for proprietary/internal models
+  - [ ] Document best practices for reducing token usage in agent prompts
+
+## Phase 14 — Custom Programmatic Scorers (Deterministic Evaluation)
+
+- [ ] **Core API (`core/expect.ts` & `core/scorers/`)**
+  - [ ] Extend the assertion API to support custom scoring functions: `expect(ctx).toPassScorer(myCustomScorer)`
+  - [ ] Define the `Scorer` interface: a function taking the `EvalContext` and returning `{ pass: boolean, score: number, reason: string }`
+  - [ ] Implement built-in deterministic scorers out-of-the-box (e.g., `RegexScorer`, `ASTScorer`, `TestCoverageScorer`, `BundleSizeScorer`)
+  - [ ] Allow composite/hybrid scoring (e.g., combining an LLM Judge score with a deterministic Test Coverage score via weighted averages)
+
+- [ ] **Database & Ledger (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema to track the _type_ of judge/scorer used for the run (e.g., `scorer_type: 'llm' | 'custom' | 'hybrid'`)
+  - [ ] Store specific metrics emitted by custom scorers (e.g., exact test coverage percentage) alongside the final 0.0-1.0 score
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **Run Details:** Clearly display whether the score was generated by an LLM (showing token usage) or by a deterministic Custom Scorer (showing the execution logic/metrics)
+  - [ ] **Metrics:** Allow filtering the Runs Table and Analytics Graphs by scorer type (e.g., "Show me only runs evaluated by the AST Scorer")
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Create a "Custom Scorers" guide demonstrating how developers can write their own deterministic evaluation functions
+  - [ ] Document the built-in programmatic scorers and how they save time and API costs compared to LLM Judges
+
+## Phase 15 — Dockerized Execution (Sandboxed Environments)
+
+- [ ] **Core Engine & Sandbox (`core/runner.ts` & `core/sandbox/`)**
+  - [ ] Integrate Docker support (via Docker CLI wrapper or `dockerode`) to manage ephemeral container lifecycles (Spin up → Run Agent → Extract Diff → Tear down)
+  - [ ] Implement workspace mounting strategies (copying the target repo into the container rather than mutating the host file system)
+  - [ ] Unlock **Parallel Execution**: Allow running multiple evaluation scenarios concurrently since each agent now operates in its own isolated container
+  - [ ] Support custom base images in `agenteval.config.ts` (e.g., `image: 'node:22-alpine'` or custom internal images pre-loaded with dependencies)
+
+- [ ] **Security & Context (`core/context.ts`)**
+  - [ ] Enforce hard timeouts at the container level to strictly kill runaway agents (e.g., infinite `while` loops generated by the LLM)
+  - [ ] Implement network isolation options (preventing the agent from making unauthorized HTTP requests, except to allowed LLM provider IPs)
+
+- [ ] **Database & Ledger (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema to track execution environment details (e.g., `environment: 'local' | 'docker'`, `docker_image`)
+  - [ ] Log container setup time versus actual agent execution time
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **Run Details:** Add a "Sandboxed" badge and display the specific Docker image/environment variables used for the evaluation
+  - [ ] **Performance Metrics:** Differentiate container boot time from agent reasoning time in the execution charts
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Create a "Sandboxing & Security" guide explaining how to safely evaluate untrusted AI-generated code
+  - [ ] Document how to optimize Dockerfiles for faster eval setups (e.g., caching `node_modules` in the base image)
+
+## Phase 16 — A/B Testing & Statistical Significance
+
+- [ ] **Math & Analytics Engine (`core/analytics/`)**
+  - [ ] Implement statistical tests (e.g., Welch's t-test or Mann-Whitney U test) to compare the performance distributions of two runners or prompts
+  - [ ] Calculate p-values and Confidence Intervals (e.g., 95% CI) to mathematically prove if a score difference is statistically significant or just random LLM variance
+  - [ ] Enable A/B testing configuration directly in the runner (e.g., automatically running the same test 10 times to build a statistically viable sample size)
+
+- [ ] **Database & Ledger (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema to track "Experiment IDs" or "Prompt Versions" to group runs for accurate A/B comparison
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **A/B Test View:** Create a dedicated interface where users select a Baseline (Control) and a Challenger (Variant) to generate a comparison report
+  - [ ] **Confidence Intervals:** Display error bars or shaded variance zones on the Recharts line charts
+  - [ ] **Winner Declaration:** Automatically display a "Statistically Significant Winner" badge (or declare a "Statistical Tie") with plain-English explanations of the math
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Create an "A/B Testing & Math" guide explaining concepts like p-value and sample size to developers in an accessible way
+
+## Phase 17 — Extensibility & Plugin Ecosystem
+
+- [ ] **Core Plugin Architecture (`core/plugin.ts`)**
+  - [ ] Define a strict `Plugin` interface exposing hooks for the evaluation lifecycle (e.g., `onSetup`, `onAgentRun`, `onEvaluate`, `onTeardown`)
+  - [ ] Implement a dynamic module loader in the configuration engine to support external npm packages (e.g., `plugins: [require('@agenteval/plugin-bedrock')]`)
+  - [ ] Expose an API for plugins to register custom Agent Runners and custom LLM Judges seamlessly
+
+- [ ] **Config & Validation (`core/config.ts`)**
+  - [ ] Update `agenteval.config.ts` schema to accept the `plugins` array
+  - [ ] Add namespace collision detection to ensure a plugin doesn't accidentally overwrite a core runner (e.g., reserving the `core:` prefix)
+
+- [ ] **Ledger & Database (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema to allow plugins to store custom metadata (e.g., a `plugin_metadata` JSON column in the `runs` table)
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **Plugin Registry View:** Display active plugins and their versions in the dashboard settings
+  - [ ] **Custom UI Injections:** Provide a safe way for plugins to render custom data or specific metrics inside the `RunDetailPanel`
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Write a comprehensive "Authoring Plugins" guide with boilerplate code to help the community build their own runners and judges
+  - [ ] Document the lifecycle hooks available to plugin developers
+
 ---
 
 ## Future — Planned
 
 - [ ] Benchmark suites — Curated evaluation sets for common tasks (React components, API endpoints, refactoring)
-- [ ] Plugin system — Custom runners and judges as installable packages
 - [ ] Remote execution — Cloud-based agent execution and evaluation
 - [ ] Parallel evaluation — Safe concurrent execution with workspace isolation
-- [ ] Dashboard improvements — Live reload, comparison views, export to PDF/CSV
 - [ ] Notification hooks — Webhooks/Slack alerts on score regressions
 - [ ] Multi-repo support — Evaluate agents across multiple project repositories
-- [ ] Cost tracking — Track API costs per run (tokens, latency, pricing)
-- [ ] A/B testing — Statistical significance testing between runner versions
-- [ ] Custom scorers — User-defined scoring functions (beyond LLM judge)

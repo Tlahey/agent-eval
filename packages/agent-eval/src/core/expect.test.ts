@@ -1,7 +1,14 @@
 import { describe, it, expect as vitestExpect, vi, beforeEach } from "vitest";
-import { expect as agentExpect, setJudgeConfig, clearJudgeConfig } from "./expect.js";
+import {
+  expect as agentExpect,
+  setJudgeConfig,
+  clearJudgeConfig,
+  setGlobalThresholds,
+  getGlobalThresholds,
+} from "./expect.js";
 import { clearLastJudgeResult, getLastJudgeResult } from "./runner.js";
 import type { TestContext, JudgeConfig } from "./types.js";
+import { DEFAULT_THRESHOLDS } from "./types.js";
 
 // Mock the judge module
 vi.mock("../judge/judge.js", () => ({
@@ -123,6 +130,7 @@ describe("expect", () => {
     const stored = getLastJudgeResult();
     vitestExpect(stored).toEqual({
       pass: true,
+      status: "PASS",
       score: 0.95,
       reason: "perfect",
       improvement: "No improvement needed.",
@@ -165,5 +173,67 @@ describe("expect", () => {
       vitestExpect(error.message).toContain("0.20");
       vitestExpect(error.message).toContain("no tests pass");
     }
+  });
+
+  // ─── Threshold tests ───
+
+  it("computes WARN status for score between fail and warn thresholds", async () => {
+    setJudgeConfig(judgeConfig);
+    const ctx = createMockContext();
+
+    vi.mocked(mockJudge).mockResolvedValue({
+      pass: true,
+      score: 0.65,
+      reason: "partially correct",
+      improvement: "needs more work",
+    });
+
+    const result = await agentExpect(ctx).toPassJudge({ criteria: "test" });
+    vitestExpect(result.status).toBe("WARN");
+    vitestExpect(result.pass).toBe(true); // WARN still passes
+  });
+
+  it("uses per-test thresholds over global", async () => {
+    setJudgeConfig(judgeConfig);
+    setGlobalThresholds({ warn: 0.9, fail: 0.7 });
+    const ctx = createMockContext();
+
+    vi.mocked(mockJudge).mockResolvedValue({
+      pass: true,
+      score: 0.75,
+      reason: "ok",
+      improvement: "none",
+    });
+
+    // With global thresholds (warn=0.9, fail=0.7): 0.75 → WARN
+    // With per-test thresholds (warn=0.6, fail=0.3): 0.75 → PASS
+    const result = await agentExpect(ctx).toPassJudge({
+      criteria: "test",
+      thresholds: { warn: 0.6, fail: 0.3 },
+    });
+    vitestExpect(result.status).toBe("PASS");
+  });
+
+  it("uses global thresholds when no per-test thresholds", async () => {
+    setJudgeConfig(judgeConfig);
+    setGlobalThresholds({ warn: 0.95, fail: 0.8 });
+    const ctx = createMockContext();
+
+    vi.mocked(mockJudge).mockResolvedValue({
+      pass: true,
+      score: 0.9,
+      reason: "good",
+      improvement: "none",
+    });
+
+    // score 0.9 with warn=0.95 → WARN
+    const result = await agentExpect(ctx).toPassJudge({ criteria: "test" });
+    vitestExpect(result.status).toBe("WARN");
+  });
+
+  it("resets global thresholds on clearJudgeConfig", () => {
+    setGlobalThresholds({ warn: 0.99, fail: 0.9 });
+    clearJudgeConfig();
+    vitestExpect(getGlobalThresholds()).toEqual(DEFAULT_THRESHOLDS);
   });
 });

@@ -7,6 +7,8 @@ export interface CommandResult {
   durationMs: number;
 }
 
+export type TestStatus = "PASS" | "WARN" | "FAIL";
+
 export interface LedgerRun {
   id?: number;
   testId: string;
@@ -16,6 +18,7 @@ export interface LedgerRun {
   judgeModel: string;
   score: number;
   pass: boolean;
+  status: TestStatus;
   reason: string;
   improvement: string;
   context: {
@@ -23,12 +26,14 @@ export interface LedgerRun {
     commands: CommandResult[];
   };
   durationMs: number;
+  thresholds: { warn: number; fail: number };
   override?: ScoreOverride;
 }
 
 export interface ScoreOverride {
   score: number;
   pass: boolean;
+  status: TestStatus;
   reason: string;
   timestamp: string;
 }

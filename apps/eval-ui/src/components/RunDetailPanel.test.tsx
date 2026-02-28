@@ -40,7 +40,7 @@ describe("RunDetailPanel", () => {
   });
 
   it("shows FAIL badge for failing runs", () => {
-    const run = createMockRun({ pass: false });
+    const run = createMockRun({ score: 0.3 });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
     expect(screen.getByText("FAIL")).toBeInTheDocument();
   });

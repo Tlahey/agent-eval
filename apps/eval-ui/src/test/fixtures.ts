@@ -1,7 +1,16 @@
-import type { LedgerRun, CommandResult, RunnerStats } from "../lib/api";
+import type { LedgerRun, CommandResult, RunnerStats, TestStatus } from "../lib/api";
 import type { TestTreeNode } from "../lib/api";
 
+function computeStatus(score: number, thresholds = { warn: 0.8, fail: 0.5 }): TestStatus {
+  if (score >= thresholds.warn) return "PASS";
+  if (score >= thresholds.fail) return "WARN";
+  return "FAIL";
+}
+
 export function createMockRun(overrides: Partial<LedgerRun> = {}): LedgerRun {
+  const score = overrides.score ?? 0.88;
+  const thresholds = overrides.thresholds ?? { warn: 0.8, fail: 0.5 };
+  const status = overrides.status ?? computeStatus(score, thresholds);
   return {
     id: 1,
     testId: "add close button to Banner",
@@ -9,8 +18,9 @@ export function createMockRun(overrides: Partial<LedgerRun> = {}): LedgerRun {
     timestamp: "2026-02-20T10:00:00.000Z",
     agentRunner: "copilot",
     judgeModel: "gpt-4o",
-    score: 0.88,
-    pass: true,
+    score,
+    pass: status !== "FAIL",
+    status,
     reason: "The close button was added correctly with proper event handling.",
     improvement: "Consider adding an aria-label for accessibility.",
     context: {
@@ -51,6 +61,7 @@ index 1234567..abcdefg 100644
       ],
     },
     durationMs: 45000,
+    thresholds,
     ...overrides,
   };
 }
@@ -58,17 +69,17 @@ index 1234567..abcdefg 100644
 export function createMockRuns(count = 5): LedgerRun[] {
   const runners = ["copilot", "cursor", "claude-code", "aider"];
   const testIds = ["add close button to Banner", "implement search with debounce"];
-  return Array.from({ length: count }, (_, i) =>
-    createMockRun({
+  return Array.from({ length: count }, (_, i) => {
+    const score = 0.5 + Math.random() * 0.5;
+    return createMockRun({
       id: i + 1,
       testId: testIds[i % testIds.length],
       agentRunner: runners[i % runners.length],
-      score: 0.5 + Math.random() * 0.5,
-      pass: i % 3 !== 0,
+      score,
       timestamp: new Date(Date.now() - i * 86400000).toISOString(),
       durationMs: 20000 + i * 10000,
-    }),
-  );
+    });
+  });
 }
 
 export function createMockStats(): RunnerStats[] {
