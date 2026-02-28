@@ -112,6 +112,7 @@ export type {
   TestContext,
   CommandResult,
   LedgerEntry,
+  ScoreOverride,
   TestFn,
   TestDefinition,
   AgentHandle,

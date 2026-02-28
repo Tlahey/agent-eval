@@ -194,28 +194,46 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [x] Suite tree navigation docs in `guide/dashboard.md`
   - [x] Updated CLI and ledger API endpoint tables with `/api/tree`
 
-## Phase 9 — Human-in-the-Loop (HITL) Score Overrides
+## Phase 9 — Human-in-the-Loop (HITL) Score Overrides ✅
 
-- [ ] **Database & Ledger (`ledger/ledger.ts`)**
-  - [ ] Update SQLite schema to support audit trails (e.g., create a `score_overrides` table linked to `runs`, or add `manual_score`, `override_reason`, and `override_timestamp` columns to the `runs` table)
-  - [ ] Implement `overrideRunScore(runId, newScore, reason)` function
-  - [ ] Ensure the original LLM-generated score and reasoning are strictly preserved and never overwritten
-  - [ ] Update aggregation queries to prioritize the manual score over the LLM score in the overall stats
+- [x] **Database & Ledger (`ledger/ledger.ts`)**
+  - [x] Created `score_overrides` table (run_id, score, pass, reason, timestamp) with FK to runs
+  - [x] Implemented `overrideRunScore(outputDir, runId, newScore, reason)` with validation
+  - [x] Implemented `getRunOverrides(outputDir, runId)` for audit trail (newest first)
+  - [x] Original LLM score preserved — overrides stored in separate table
+  - [x] Updated all aggregation queries (`getRunnerStats`, `getAllRunnerStats`) to use `COALESCE` with latest override
+  - [x] Updated `readLedger`, `readLedgerByTestId`, `getLatestEntries` to include `override` field via LEFT JOIN
 
-- [ ] **API & Backend (`cli/server.ts`)**
-  - [ ] Add `PATCH /api/runs/:id/override` endpoint to handle score adjustment requests
-  - [ ] Implement strict validation (ensure the new score is between 0.0 and 1.0, and that the `reason` string is not empty)
-  - [ ] Add `GET /api/runs/:id/history` endpoint to fetch the audit trail of a specific run
+- [x] **API & Backend (`cli/cli.ts`)**
+  - [x] Added `PATCH /api/runs/:id/override` endpoint with body validation (score 0-1, non-empty reason)
+  - [x] Added `GET /api/runs/:id/overrides` endpoint for audit trail
+  - [x] Added CORS support for PATCH method + OPTIONS preflight handling
+  - [x] Added request body parsing for the raw `node:http` server
 
-- [ ] **Visual Dashboard (`apps/eval-ui`)**
-  - [ ] **RunDetailPanel:** Add an "Edit Score" action button next to the current LLM score
-  - [ ] **Override Modal:** Create a form component requiring the user to input the new score and a mandatory text area for the justification
-  - [ ] **Audit Trail View:** Add a "History" or "Changelog" section in the run details, displaying the original LLM score and a chronological list of all human adjustments
-  - [ ] **Visual Indicators:** Add a "Manually Adjusted" badge or icon in the `RunsTable` to easily identify evaluations that were corrected by a human
+- [x] **Types (`core/types.ts`)**
+  - [x] Added `ScoreOverride` interface (score, pass, reason, timestamp)
+  - [x] Added `override?: ScoreOverride` to `LedgerEntry`
+  - [x] Exported `ScoreOverride` from public API
 
-- [ ] **Documentation (`apps/docs`)**
-  - [ ] Document the Human-in-the-Loop (HITL) workflow and the importance of tracking LLM mistakes
-  - [ ] Update the SQLite ER (Entity-Relationship) diagram to include the new override/history tables
+- [x] **Visual Dashboard (`apps/eval-ui`)**
+  - [x] **OverrideScoreModal**: New component with score slider (0–1), required reason textarea, Original→New score preview
+  - [x] **RunDetailPanel**: Added pencil "Edit Score" button, override modal integration, "Adjusted" badge, History tab with audit trail
+  - [x] **RunsTable**: Shows "Adjusted" badge and uses override score for display when present
+  - [x] **API client**: Added `overrideScore()` and `fetchOverrides()` functions, `ScoreOverride` type
+
+- [x] **Tests (29 new tests)**
+  - [x] 9 ledger tests: overrideRunScore validation, getRunOverrides audit trail, readLedger with overrides, aggregation with overrides
+  - [x] 7 API client tests: overrideScore PATCH, fetchOverrides GET, error handling
+  - [x] 7 OverrideScoreModal tests: rendering, validation, submit, cancel, backdrop click
+  - [x] 6 RunDetailPanel tests: Adjusted badge, override score display, edit button, modal open, History tab
+  - [x] 3 RunsTable tests: Adjusted badge, override score in ScoreRing, no badge without override
+
+- [x] **Documentation**
+  - [x] Updated `api/ledger.md`: override endpoints, score_overrides table schema, ER diagram, HITL sequence diagram, programmatic API
+  - [x] Updated `guide/architecture.md`: ER diagram with score_overrides table
+  - [x] Updated `guide/cli.md`: new endpoint table with PATCH and GET override endpoints
+  - [x] Updated `guide/dashboard.md`: HITL workflow guide with Mermaid diagram, override behaviors
+  - [x] Updated seed script with score_overrides table and ~15% override seeding
 
 ## Phase 10 — Custom Scoring Thresholds (Warn / Error)
 

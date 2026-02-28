@@ -60,17 +60,26 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
                 </div>
               </td>
               <td className="px-4 py-3 text-center">
-                <ScoreRing value={run.score} size={32} strokeWidth={3} />
+                <ScoreRing value={run.override?.score ?? run.score} size={32} strokeWidth={3} />
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                    run.pass ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
-                  }`}
-                >
-                  <span className={`h-1 w-1 rounded-full ${run.pass ? "bg-ok" : "bg-err"}`} />
-                  {run.pass ? "Pass" : "Fail"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      (run.override?.pass ?? run.pass) ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
+                    }`}
+                  >
+                    <span
+                      className={`h-1 w-1 rounded-full ${(run.override?.pass ?? run.pass) ? "bg-ok" : "bg-err"}`}
+                    />
+                    {(run.override?.pass ?? run.pass) ? "Pass" : "Fail"}
+                  </span>
+                  {run.override && (
+                    <span className="rounded-full bg-warn/10 px-1.5 py-0.5 text-[10px] font-semibold text-warn">
+                      Adjusted
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="px-4 py-3 text-right">
                 <span className="inline-flex items-center gap-1 text-xs text-txt-muted">

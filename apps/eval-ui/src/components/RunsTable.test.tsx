@@ -81,6 +81,29 @@ describe("RunsTable", () => {
     render(<RunsTable runs={runs} onSelect={vi.fn()} />);
     expect(screen.getByText("Eval")).toBeInTheDocument();
   });
+
+  it("shows Adjusted badge for overridden runs", () => {
+    const run = createMockRun({
+      override: { score: 0.9, pass: true, reason: "Manual", timestamp: "2025-01-01" },
+    });
+    render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
+    expect(screen.getByText("Adjusted")).toBeInTheDocument();
+  });
+
+  it("does not show Adjusted badge for runs without override", () => {
+    const run = createMockRun();
+    render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
+    expect(screen.queryByText("Adjusted")).not.toBeInTheDocument();
+  });
+
+  it("uses override score in ScoreRing when present", () => {
+    const run = createMockRun({
+      score: 0.3,
+      override: { score: 0.95, pass: true, reason: "R", timestamp: "2025-01-01" },
+    });
+    render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
+    expect(screen.getByText("95")).toBeInTheDocument();
+  });
 });
 
 describe("RunnerDot", () => {

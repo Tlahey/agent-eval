@@ -155,6 +155,20 @@ export interface LedgerEntry {
   };
   /** Duration of the agent run in ms */
   durationMs: number;
+  /** Human override (if any). Present only when reading from DB. */
+  override?: ScoreOverride;
+}
+
+/** A human-in-the-loop score override for a run. */
+export interface ScoreOverride {
+  /** The manually assigned score (0.0 – 1.0) */
+  score: number;
+  /** Updated pass/fail based on the overridden score */
+  pass: boolean;
+  /** Human-provided reason for the override */
+  reason: string;
+  /** ISO timestamp of when the override was applied */
+  timestamp: string;
 }
 
 // ─── Test Definition ───

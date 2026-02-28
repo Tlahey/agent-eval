@@ -4,6 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { RunDetailPanel } from "./RunDetailPanel";
 import { createMockRun } from "../test/fixtures";
 
+vi.mock("../lib/api", async () => {
+  const actual = await vi.importActual("../lib/api");
+  return {
+    ...actual,
+    overrideScore: vi
+      .fn()
+      .mockResolvedValue({ score: 0.9, pass: true, reason: "test", timestamp: "2025-01-01" }),
+    fetchOverrides: vi.fn().mockResolvedValue([]),
+  };
+});
+
 describe("RunDetailPanel", () => {
   const defaultRun = createMockRun();
 
@@ -34,12 +45,13 @@ describe("RunDetailPanel", () => {
     expect(screen.getByText("FAIL")).toBeInTheDocument();
   });
 
-  it("renders all 4 tab buttons", () => {
+  it("renders all 5 tab buttons", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
     expect(screen.getByText("Reason")).toBeInTheDocument();
     expect(screen.getByText("Improve")).toBeInTheDocument();
     expect(screen.getByText("Diff")).toBeInTheDocument();
     expect(screen.getByText("Commands")).toBeInTheDocument();
+    expect(screen.getByText("History")).toBeInTheDocument();
   });
 
   it("defaults to showing the Diff tab content", () => {
@@ -115,10 +127,13 @@ describe("RunDetailPanel", () => {
     const onClose = vi.fn();
     render(<RunDetailPanel run={defaultRun} onClose={onClose} />);
 
-    // The X button — find it by role
+    // The X close button is the last button with an SVG in the header
     const buttons = screen.getAllByRole("button");
-    const closeBtn = buttons.find((btn) => btn.querySelector("svg"));
-    // The first small button with just an SVG is the close button
+    const closeBtn = buttons.find((btn) => {
+      const svg = btn.querySelector("svg");
+      // Look for button that is NOT the pencil button (no title attribute)
+      return svg && !btn.getAttribute("title");
+    });
     if (closeBtn) await user.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
   });
@@ -144,5 +159,45 @@ describe("RunDetailPanel", () => {
     const run = createMockRun({ durationMs: 123456 });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
     expect(screen.getByText("123.5s")).toBeInTheDocument();
+  });
+
+  it("shows Adjusted badge when run has override", () => {
+    const run = createMockRun({
+      override: { score: 0.9, pass: true, reason: "Manual review", timestamp: "2025-01-01" },
+    });
+    render(<RunDetailPanel run={run} onClose={vi.fn()} />);
+    expect(screen.getByText("Adjusted")).toBeInTheDocument();
+  });
+
+  it("uses override score for display when present", () => {
+    const run = createMockRun({
+      score: 0.3,
+      override: { score: 0.95, pass: true, reason: "Review", timestamp: "2025-01-01" },
+    });
+    render(<RunDetailPanel run={run} onClose={vi.fn()} />);
+    // Should show override score (95) not original score (30)
+    expect(screen.getByText("95")).toBeInTheDocument();
+  });
+
+  it("renders the edit score (pencil) button", () => {
+    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
+    const pencilBtn = screen.getByTitle("Override score");
+    expect(pencilBtn).toBeInTheDocument();
+  });
+
+  it("opens override modal when pencil button is clicked", async () => {
+    const user = userEvent.setup();
+    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
+
+    await user.click(screen.getByTitle("Override score"));
+    expect(screen.getByText("Override Score")).toBeInTheDocument();
+  });
+
+  it("shows no overrides message on History tab", async () => {
+    const user = userEvent.setup();
+    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
+
+    await user.click(screen.getByText("History"));
+    expect(screen.getByText("No score overrides")).toBeInTheDocument();
   });
 });

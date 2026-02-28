@@ -45,6 +45,16 @@ function initDb(): InstanceType<typeof DatabaseSync> {
     );
     CREATE INDEX IF NOT EXISTS idx_runs_test_id  ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs(timestamp);
+
+    CREATE TABLE IF NOT EXISTS score_overrides (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id    INTEGER NOT NULL REFERENCES runs(id),
+      score     REAL    NOT NULL,
+      pass      INTEGER NOT NULL,
+      reason    TEXT    NOT NULL,
+      timestamp TEXT    NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_overrides_run_id ON score_overrides(run_id);
   `);
   return db;
 }
@@ -834,12 +844,43 @@ function seed(): void {
     }
   }
 
+  // ── seed score overrides (HITL) ─────────────────────────────────────────────
+  const OVERRIDE_REASONS = [
+    "Re-evaluated after manual review — agent output was better than judge estimated",
+    "Score adjusted: the diff was valid but lacked proper test coverage",
+    "Reviewer override: false positive — the code change was correct",
+    "Judge was too lenient — missing critical error handling",
+    "Manual QA revealed the implementation meets requirements despite low auto-score",
+  ];
+
+  const overrideStmt = db.prepare(`
+    INSERT INTO score_overrides (run_id, score, pass, reason, timestamp)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  // Pick ~15% of runs to have overrides
+  const allRunIds = (db.prepare("SELECT id FROM runs").all() as Array<{ id: number }>).map(
+    (r) => r.id,
+  );
+  let overrideCount = 0;
+
+  for (const runId of allRunIds) {
+    if (Math.random() > 0.15) continue;
+    const newScore = Math.round(rand(0.2, 1.0) * 100) / 100;
+    const newPass = newScore >= 0.5 ? 1 : 0;
+    const reason = pick(OVERRIDE_REASONS);
+    const ts = new Date(Date.now() - randInt(0, 7 * 24 * 60 * 60 * 1000)).toISOString();
+    overrideStmt.run(runId, newScore, newPass, reason, ts);
+    overrideCount++;
+  }
+
   db.close();
 
   // ── summary ──────────────────────────────────────────────────────────────
   console.log("\n🌱  Seed complete!\n");
   console.log(`   Database:  ${DB_PATH}`);
   console.log(`   Entries:   ${totalEntries}`);
+  console.log(`   Overrides: ${overrideCount}`);
   console.log(
     `   Period:    ${new Date(startTime).toLocaleDateString()} → ${new Date(now).toLocaleDateString()}`,
   );

@@ -124,12 +124,14 @@ agenteval view [options]   # alias
 
 ### API Endpoints
 
-| Endpoint         | Description                             |
-| ---------------- | --------------------------------------- |
-| `GET /api/runs`  | All runs (filter with `?testId=...`)    |
-| `GET /api/tests` | List of unique test IDs                 |
-| `GET /api/tree`  | Hierarchical test tree (suites + tests) |
-| `GET /api/stats` | Aggregate stats per runner per test     |
+| Endpoint                  | Method  | Description                             |
+| ------------------------- | ------- | --------------------------------------- |
+| `/api/runs`               | `GET`   | All runs (filter with `?testId=...`)    |
+| `/api/tests`              | `GET`   | List of unique test IDs                 |
+| `/api/tree`               | `GET`   | Hierarchical test tree (suites + tests) |
+| `/api/stats`              | `GET`   | Aggregate stats per runner per test     |
+| `/api/runs/:id/override`  | `PATCH` | Override a run's score (HITL)           |
+| `/api/runs/:id/overrides` | `GET`   | Audit trail of score overrides          |
 
 ### Examples
 

@@ -63,12 +63,14 @@ agenteval view           # default port 4747
 agenteval ui -p 8080     # custom port
 ```
 
-| Endpoint         | Description                             |
-| ---------------- | --------------------------------------- |
-| `GET /api/runs`  | All runs (filter with `?testId=...`)    |
-| `GET /api/tests` | List of unique test IDs                 |
-| `GET /api/tree`  | Hierarchical test tree (suites + tests) |
-| `GET /api/stats` | Aggregate stats per runner per test     |
+| Endpoint                  | Method  | Description                             |
+| ------------------------- | ------- | --------------------------------------- |
+| `/api/runs`               | `GET`   | All runs (filter with `?testId=...`)    |
+| `/api/tests`              | `GET`   | List of unique test IDs                 |
+| `/api/tree`               | `GET`   | Hierarchical test tree (suites + tests) |
+| `/api/stats`              | `GET`   | Aggregate stats per runner per test     |
+| `/api/runs/:id/override`  | `PATCH` | Override a run's score (HITL)           |
+| `/api/runs/:id/overrides` | `GET`   | Audit trail of overrides for a run      |
 
 See the [Dashboard guide](/guide/dashboard) for details on the web UI.
 
@@ -109,6 +111,15 @@ erDiagram
         text commands "JSON array"
         int duration_ms "agent run time"
     }
+    SCORE_OVERRIDES {
+        int id PK "auto-increment"
+        int run_id FK "references runs.id"
+        real score "0.0 – 1.0"
+        int pass "0 or 1"
+        text reason "human explanation"
+        text timestamp "ISO 8601"
+    }
+    RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
 ```
 
 | Column         | Type      | Description                                   |
@@ -129,12 +140,76 @@ erDiagram
 
 Indexes on `test_id` and `timestamp` for fast queries.
 
+### `score_overrides` Table
+
+| Column      | Type      | Description                        |
+| ----------- | --------- | ---------------------------------- |
+| `id`        | `INTEGER` | Auto-increment primary key         |
+| `run_id`    | `INTEGER` | Foreign key → `runs.id` (indexed)  |
+| `score`     | `REAL`    | Manually assigned score (0.0–1.0)  |
+| `pass`      | `INTEGER` | 1 = pass, 0 = fail (score ≥ 0.5)   |
+| `reason`    | `TEXT`    | Human-provided justification       |
+| `timestamp` | `TEXT`    | ISO 8601 timestamp of the override |
+
+Multiple overrides per run are supported (audit trail). Aggregation queries automatically use the **latest** override via `COALESCE`.
+
+## Score Overrides (HITL)
+
+Human-in-the-loop score overrides allow reviewers to manually adjust scores when the LLM judge's assessment needs correction.
+
+```mermaid
+sequenceDiagram
+    participant R as Reviewer
+    participant UI as Dashboard
+    participant API as CLI Server
+    participant DB as SQLite
+
+    R->>UI: Click "Edit Score" on a run
+    UI->>R: Show override modal (slider + reason)
+    R->>UI: Submit score=0.9, reason="..."
+    UI->>API: PATCH /api/runs/42/override
+    API->>DB: INSERT INTO score_overrides
+    DB-->>API: OK
+    API-->>UI: ScoreOverride object
+    UI->>R: Update display with new score + "Adjusted" badge
+```
+
+### Override API
+
+**Create an override:**
+
+```bash
+curl -X PATCH http://localhost:4747/api/runs/42/override \
+  -H "Content-Type: application/json" \
+  -d '{"score": 0.9, "reason": "Re-evaluated after manual review"}'
+```
+
+**Get override history:**
+
+```bash
+curl http://localhost:4747/api/runs/42/overrides
+```
+
+### Programmatic
+
+```ts
+import { overrideRunScore, getRunOverrides } from "agent-eval/ledger";
+
+// Override a run's score
+const override = overrideRunScore(".agenteval", 42, 0.9, "Better than expected");
+
+// Get audit trail
+const history = getRunOverrides(".agenteval", 42);
+```
+
 ## Query Functions
 
-| Function             | Description                                   |
-| -------------------- | --------------------------------------------- |
-| `readLedger(dir)`    | Read all entries                              |
-| `readLedgerByTestId` | Filter entries by test ID                     |
-| `getLatestEntries`   | Get latest N entries (default: 20)            |
-| `getRunnerStats`     | Get aggregate stats per runner for a test     |
-| `getAllRunnerStats`  | Get aggregate stats for all tests and runners |
+| Function             | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `readLedger(dir)`    | Read all entries (with latest override if any) |
+| `readLedgerByTestId` | Filter entries by test ID (with overrides)     |
+| `getLatestEntries`   | Get latest N entries (default: 20)             |
+| `getRunnerStats`     | Get aggregate stats per runner for a test      |
+| `getAllRunnerStats`  | Get aggregate stats for all tests and runners  |
+| `overrideRunScore`   | Add a human score override to a run            |
+| `getRunOverrides`    | Get all overrides for a run (audit trail)      |

@@ -16,6 +16,8 @@ import {
   getTestTree,
   getRunnerStats,
   getAllRunnerStats,
+  overrideRunScore,
+  getRunOverrides,
 } from "../ledger/ledger.js";
 
 program.name("agenteval").description("AI coding agent evaluation framework").version("0.1.0");
@@ -201,9 +203,27 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
 
   const server = createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.setHeader("Content-Type", "application/json");
 
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+
+    // Helper to read JSON body
+    const readBody = (): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on("data", (c: Buffer) => chunks.push(c));
+        req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+        req.on("error", reject);
+      });
 
     try {
       if (url.pathname === "/api/runs") {
@@ -218,6 +238,27 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
         const testId = url.searchParams.get("testId");
         const stats = testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir);
         res.end(JSON.stringify(stats));
+      } else if (req.method === "PATCH" && /^\/api\/runs\/\d+\/override$/.test(url.pathname)) {
+        const runId = parseInt(url.pathname.split("/")[3], 10);
+        readBody()
+          .then((raw) => {
+            const body = JSON.parse(raw) as { score?: number; reason?: string };
+            if (typeof body.score !== "number" || typeof body.reason !== "string") {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: "score (number) and reason (string) are required" }));
+              return;
+            }
+            const result = overrideRunScore(outputDir, runId, body.score, body.reason);
+            res.end(JSON.stringify(result));
+          })
+          .catch((err: unknown) => {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+          });
+        return; // Don't end response synchronously
+      } else if (req.method === "GET" && /^\/api\/runs\/\d+\/overrides$/.test(url.pathname)) {
+        const runId = parseInt(url.pathname.split("/")[3], 10);
+        res.end(JSON.stringify(getRunOverrides(outputDir, runId)));
       } else {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: "Not found" }));
@@ -231,10 +272,12 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
   server.listen(port, () => {
     console.log(chalk.green(`  ✓ API server running at http://localhost:${port}`));
     console.log(chalk.dim(`\n  Endpoints:`));
-    console.log(chalk.dim(`    GET /api/runs          All runs (or ?testId=...)`));
-    console.log(chalk.dim(`    GET /api/tests         List of test IDs`));
-    console.log(chalk.dim(`    GET /api/tree          Hierarchical test tree`));
-    console.log(chalk.dim(`    GET /api/stats         Aggregate stats per runner`));
+    console.log(chalk.dim(`    GET   /api/runs           All runs (or ?testId=...)`));
+    console.log(chalk.dim(`    GET   /api/tests          List of test IDs`));
+    console.log(chalk.dim(`    GET   /api/tree           Hierarchical test tree`));
+    console.log(chalk.dim(`    GET   /api/stats          Aggregate stats per runner`));
+    console.log(chalk.dim(`    PATCH /api/runs/:id/override  Override a run score`));
+    console.log(chalk.dim(`    GET   /api/runs/:id/overrides Override audit trail`));
     console.log(chalk.dim(`\n  Press Ctrl+C to stop.\n`));
   });
 }

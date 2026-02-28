@@ -1,14 +1,25 @@
-import { useState } from "react";
-import { X, MessageSquareText, Lightbulb, GitBranch, Terminal } from "lucide-react";
-import type { LedgerRun } from "../lib/api";
+import { useState, useEffect, useCallback } from "react";
+import {
+  X,
+  MessageSquareText,
+  Lightbulb,
+  GitBranch,
+  Terminal,
+  Pencil,
+  History,
+} from "lucide-react";
+import type { LedgerRun, ScoreOverride } from "../lib/api";
+import { overrideScore, fetchOverrides } from "../lib/api";
 import { ScoreRing } from "./ScoreRing";
 import { DiffViewer } from "./DiffViewer";
+import { OverrideScoreModal } from "./OverrideScoreModal";
 
-type Tab = "reason" | "improvement" | "diff" | "commands";
+type Tab = "reason" | "improvement" | "diff" | "commands" | "history";
 
 interface Props {
   run: LedgerRun;
   onClose: () => void;
+  onOverride?: () => void;
 }
 
 function CommandsViewer({ commands }: { commands: LedgerRun["context"]["commands"] }) {
@@ -58,12 +69,37 @@ const TABS: { key: Tab; icon: typeof MessageSquareText; label: string }[] = [
   { key: "improvement", icon: Lightbulb, label: "Improve" },
   { key: "diff", icon: GitBranch, label: "Diff" },
   { key: "commands", icon: Terminal, label: "Commands" },
+  { key: "history", icon: History, label: "History" },
 ];
 
-export function RunDetailPanel({ run, onClose }: Props) {
+export function RunDetailPanel({ run, onClose, onOverride }: Props) {
   const [tab, setTab] = useState<Tab>("diff");
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrides, setOverrides] = useState<ScoreOverride[]>([]);
 
   const cmdCount = run.context.commands?.length ?? 0;
+  const effectiveScore = run.override?.score ?? run.score;
+  const effectivePass = run.override?.pass ?? run.pass;
+
+  const loadOverrides = useCallback(() => {
+    if (run.id != null) {
+      fetchOverrides(run.id)
+        .then(setOverrides)
+        .catch(() => {});
+    }
+  }, [run.id]);
+
+  useEffect(() => {
+    loadOverrides();
+  }, [loadOverrides]);
+
+  const handleOverrideSubmit = async (score: number, reason: string) => {
+    if (run.id == null) return;
+    await overrideScore(run.id, score, reason);
+    setShowOverrideModal(false);
+    loadOverrides();
+    onOverride?.();
+  };
 
   return (
     <>
@@ -74,7 +110,7 @@ export function RunDetailPanel({ run, onClose }: Props) {
       <div className="fixed right-0 top-0 z-50 flex h-full w-[var(--panel-width)] max-w-[90vw] flex-col border-l border-border bg-surface-1 shadow-2xl animate-slide-in">
         {/* Header */}
         <div className="flex items-start gap-4 border-b border-border px-5 py-4">
-          <ScoreRing value={run.score} size={52} strokeWidth={4} />
+          <ScoreRing value={effectiveScore} size={52} strokeWidth={4} />
           <div className="flex-1 min-w-0">
             <h2 className="truncate text-sm font-bold text-txt-base">{run.testId}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-txt-muted">
@@ -86,16 +122,28 @@ export function RunDetailPanel({ run, onClose }: Props) {
               <span>{(run.durationMs / 1000).toFixed(1)}s</span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  run.pass ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
+                  effectivePass ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
                 }`}
               >
-                {run.pass ? "PASS" : "FAIL"}
+                {effectivePass ? "PASS" : "FAIL"}
               </span>
+              {run.override && (
+                <span className="rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-semibold text-warn">
+                  Adjusted
+                </span>
+              )}
             </div>
             <p className="mt-1 text-[10px] text-txt-muted">
               {new Date(run.timestamp).toLocaleString()}
             </p>
           </div>
+          <button
+            onClick={() => setShowOverrideModal(true)}
+            className="rounded-lg p-1.5 text-txt-muted transition-colors hover:bg-surface-3 hover:text-primary"
+            title="Override score"
+          >
+            <Pencil size={16} />
+          </button>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-txt-muted transition-colors hover:bg-surface-3 hover:text-txt-base"
@@ -159,7 +207,47 @@ export function RunDetailPanel({ run, onClose }: Props) {
           {tab === "diff" && <DiffViewer diff={run.context.diff} />}
 
           {tab === "commands" && <CommandsViewer commands={run.context.commands} />}
+
+          {tab === "history" && (
+            <div className="space-y-3">
+              {overrides.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-txt-muted">
+                  <History size={32} className="mb-2 opacity-40" />
+                  <p className="text-sm">No score overrides</p>
+                </div>
+              ) : (
+                overrides.map((o, i) => (
+                  <div key={i} className="rounded-lg border border-border bg-surface-2 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ScoreRing value={o.score} size={28} strokeWidth={3} />
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            o.pass ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
+                          }`}
+                        >
+                          {o.pass ? "PASS" : "FAIL"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-txt-muted">
+                        {new Date(o.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-txt-secondary">{o.reason}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
+
+        {showOverrideModal && (
+          <OverrideScoreModal
+            currentScore={effectiveScore}
+            onSubmit={handleOverrideSubmit}
+            onClose={() => setShowOverrideModal(false)}
+          />
+        )}
       </div>
     </>
   );

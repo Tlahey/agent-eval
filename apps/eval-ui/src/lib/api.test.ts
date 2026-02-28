@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchRuns, fetchRun, fetchTestIds, fetchTestTree, fetchStats } from "./api";
+import {
+  fetchRuns,
+  fetchRun,
+  fetchTestIds,
+  fetchTestTree,
+  fetchStats,
+  overrideScore,
+  fetchOverrides,
+} from "./api";
 
 describe("API client", () => {
   const originalFetch = globalThis.fetch;
@@ -148,6 +156,66 @@ describe("API client", () => {
       } as unknown as Response);
 
       await expect(fetchTestTree()).rejects.toThrow("Failed to fetch test tree");
+    });
+  });
+
+  describe("overrideScore", () => {
+    it("sends PATCH request with score and reason", async () => {
+      const mockResult = { score: 0.9, pass: true, reason: "Adjusted", timestamp: "2025-01-01" };
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResult),
+        statusText: "OK",
+      } as unknown as Response);
+
+      const result = await overrideScore(42, 0.9, "Adjusted");
+      expect(fetch).toHaveBeenCalledWith("/api/runs/42/override", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score: 0.9, reason: "Adjusted" }),
+      });
+      expect(result).toEqual(mockResult);
+    });
+
+    it("throws with server error message on non-OK response", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        statusText: "Bad Request",
+        json: vi.fn().mockResolvedValue({ error: "Score must be between 0 and 1" }),
+      } as unknown as Response);
+
+      await expect(overrideScore(42, 1.5, "reason")).rejects.toThrow(
+        "Score must be between 0 and 1",
+      );
+    });
+  });
+
+  describe("fetchOverrides", () => {
+    it("fetches overrides from /api/runs/:id/overrides", async () => {
+      await fetchOverrides(42);
+      expect(fetch).toHaveBeenCalledWith("/api/runs/42/overrides");
+    });
+
+    it("returns parsed override array", async () => {
+      const mockData = [{ score: 0.8, pass: true, reason: "test", timestamp: "2025-01-01" }];
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockData),
+        statusText: "OK",
+      } as unknown as Response);
+
+      const result = await fetchOverrides(1);
+      expect(result).toEqual(mockData);
+    });
+
+    it("throws on non-OK response", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        statusText: "Not Found",
+        json: vi.fn(),
+      } as unknown as Response);
+
+      await expect(fetchOverrides(999)).rejects.toThrow("Failed to fetch overrides");
     });
   });
 });

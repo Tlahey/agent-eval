@@ -23,6 +23,14 @@ export interface LedgerRun {
     commands: CommandResult[];
   };
   durationMs: number;
+  override?: ScoreOverride;
+}
+
+export interface ScoreOverride {
+  score: number;
+  pass: boolean;
+  reason: string;
+  timestamp: string;
 }
 
 export interface RunnerStats {
@@ -70,5 +78,28 @@ export async function fetchTestTree(): Promise<TestTreeNode[]> {
 export async function fetchStats(): Promise<RunnerStats[]> {
   const res = await fetch(`${BASE}/stats`);
   if (!res.ok) throw new Error(`Failed to fetch stats: ${res.statusText}`);
+  return res.json();
+}
+
+export async function overrideScore(
+  runId: number,
+  score: number,
+  reason: string,
+): Promise<ScoreOverride> {
+  const res = await fetch(`${BASE}/runs/${runId}/override`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ score, reason }),
+  });
+  if (!res.ok) {
+    const body = (await res.json()) as { error?: string };
+    throw new Error(body.error ?? `Failed to override score: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchOverrides(runId: number): Promise<ScoreOverride[]> {
+  const res = await fetch(`${BASE}/runs/${runId}/overrides`);
+  if (!res.ok) throw new Error(`Failed to fetch overrides: ${res.statusText}`);
   return res.json();
 }

@@ -68,11 +68,39 @@ Suite nodes can be collapsed/expanded. Tests without a `describe()` wrapper appe
 
 Click any run to see the full details:
 
-- **Score and pass/fail status**
+- **Score and pass/fail status** (uses override score if present)
 - **Judge reasoning** (full markdown)
 - **Improvement suggestions** from the judge
 - **GitHub-style diff viewer** with syntax highlighting
 - **Command outputs** (test results, build logs, exit codes)
+- **Override score** button (pencil icon) to manually adjust the score
+- **History tab** showing all score overrides (audit trail)
+
+### Human-in-the-Loop (HITL) Score Overrides
+
+Sometimes the LLM judge's score doesn't match your assessment. The dashboard allows manual score overrides:
+
+```mermaid
+flowchart TD
+    RUN["Run Detail Panel"] --> PENCIL["Click ✏️ Edit Score"]
+    PENCIL --> MODAL["Override Modal"]
+    MODAL --> SLIDER["Adjust score (0.0–1.0)"]
+    SLIDER --> REASON["Enter reason (required)"]
+    REASON --> SAVE["Save Override"]
+    SAVE --> BADGE["'Adjusted' badge shown"]
+    SAVE --> HISTORY["Audit trail in History tab"]
+
+    style PENCIL fill:#f59e0b,color:#000
+    style BADGE fill:#f59e0b,color:#000
+    style SAVE fill:#10b981,color:#fff
+```
+
+**Key behaviors:**
+
+- Original score is **never modified** — overrides are stored separately
+- Multiple overrides per run are supported (full audit trail)
+- **Aggregation queries** (avg score, pass rate) automatically use the latest override
+- Runs with overrides show an **"Adjusted" badge** in both the runs table and detail panel
 
 ## Architecture
 

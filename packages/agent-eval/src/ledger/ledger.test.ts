@@ -10,6 +10,9 @@ import {
   getTestTree,
   getLatestEntries,
   getRunnerStats,
+  overrideRunScore,
+  getRunOverrides,
+  getAllRunnerStats,
 } from "./ledger.js";
 import type { LedgerEntry } from "../core/types.js";
 
@@ -221,5 +224,114 @@ describe("ledger (SQLite)", () => {
     const standalone = tree.find((n) => n.name === "standalone");
     expect(standalone!.type).toBe("test");
     expect(standalone!.testId).toBe("standalone");
+  });
+
+  // ─── Score Override Tests ───
+
+  it("overrideRunScore inserts an override and returns it", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3, pass: false }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    const override = overrideRunScore(tmpDir, runId, 0.8, "Reviewer re-evaluated");
+    expect(override.score).toBe(0.8);
+    expect(override.pass).toBe(true);
+    expect(override.reason).toBe("Reviewer re-evaluated");
+    expect(override.timestamp).toBeTruthy();
+  });
+
+  it("overrideRunScore throws for invalid score", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    expect(() => overrideRunScore(tmpDir, runId, 1.5, "reason")).toThrow("between 0 and 1");
+    expect(() => overrideRunScore(tmpDir, runId, -0.1, "reason")).toThrow("between 0 and 1");
+  });
+
+  it("overrideRunScore throws for empty reason", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    expect(() => overrideRunScore(tmpDir, runId, 0.5, "")).toThrow("Reason is required");
+    expect(() => overrideRunScore(tmpDir, runId, 0.5, "   ")).toThrow("Reason is required");
+  });
+
+  it("overrideRunScore throws for non-existent run", () => {
+    // Create DB but no matching run
+    readLedger(tmpDir);
+    expect(() => overrideRunScore(tmpDir, 999, 0.5, "reason")).toThrow("not found");
+  });
+
+  it("getRunOverrides returns audit trail ordered newest first", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    overrideRunScore(tmpDir, runId, 0.6, "First override");
+    overrideRunScore(tmpDir, runId, 0.9, "Second override");
+
+    const overrides = getRunOverrides(tmpDir, runId);
+    expect(overrides).toHaveLength(2);
+    expect(overrides[0].reason).toBe("Second override");
+    expect(overrides[0].score).toBe(0.9);
+    expect(overrides[1].reason).toBe("First override");
+    expect(overrides[1].score).toBe(0.6);
+  });
+
+  it("readLedger includes latest override on entries", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3, pass: false }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    overrideRunScore(tmpDir, runId, 0.85, "Manual review");
+
+    const updated = readLedger(tmpDir);
+    expect(updated[0].override).toBeDefined();
+    expect(updated[0].override!.score).toBe(0.85);
+    expect(updated[0].override!.pass).toBe(true);
+    expect(updated[0].override!.reason).toBe("Manual review");
+  });
+
+  it("readLedger returns no override when none exists", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].override).toBeUndefined();
+  });
+
+  it("aggregation queries use override score when present", () => {
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.3, pass: false }),
+    );
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "x", agentRunner: "copilot", score: 0.4, pass: false }),
+    );
+    const entries = readLedger(tmpDir);
+
+    // Override first run's score from 0.3 → 0.9
+    overrideRunScore(tmpDir, entries[0].id!, 0.9, "Better than expected");
+
+    const stats = getRunnerStats(tmpDir, "x");
+    const copilot = stats.find((s) => s.agentRunner === "copilot")!;
+    // Average should be (0.9 + 0.4) / 2 = 0.65 instead of (0.3 + 0.4) / 2 = 0.35
+    expect(copilot.avgScore).toBeCloseTo(0.65);
+  });
+
+  it("getAllRunnerStats uses override scores", () => {
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "a", agentRunner: "cursor", score: 0.2, pass: false }),
+    );
+    const entries = readLedger(tmpDir);
+
+    overrideRunScore(tmpDir, entries[0].id!, 0.8, "Adjusted");
+
+    const stats = getAllRunnerStats(tmpDir);
+    const cursor = stats.find((s) => s.agentRunner === "cursor")!;
+    expect(cursor.avgScore).toBeCloseTo(0.8);
+    expect(cursor.passRate).toBe(1.0); // override pass = true (0.8 >= 0.5)
   });
 });

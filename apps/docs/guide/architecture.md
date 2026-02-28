@@ -243,6 +243,16 @@ erDiagram
         int duration_ms "agent run time"
     }
 
+    SCORE_OVERRIDES {
+        int id PK "auto-increment"
+        int run_id FK "references runs.id"
+        real score "0.0 – 1.0 (manually set)"
+        int pass "0 or 1"
+        text reason "human justification"
+        text timestamp "ISO 8601"
+    }
+
+    RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
     RUNS ||--o{ COMMANDS : "stored as JSON"
     COMMANDS {
         text name "command label"
