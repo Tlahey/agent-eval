@@ -18,10 +18,13 @@
 
 - **Vitest-like API** — `test()` / `expect()` syntax designed for evaluating AI agents
 - **Git Isolation** — automatic `git reset --hard` between runs for pristine environments
-- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, or local Ollama
+- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, Ollama, or any CLI tool
 - **Model Matrix** — compare multiple agents/models on the same test suite
+- **Auto Hooks** — `storeDiff()` and `afterEach` commands run automatically after each agent
+- **Expected Files** — scope analysis detects agents that modify too many files
+- **Improvement Feedback** — judge returns actionable suggestions alongside scores
 - **SQLite Ledger** — local, privacy-first historical tracking of all evaluation results
-- **Dashboard API** — `agenteval view` launches a local server to explore results
+- **Visual Dashboard** — React dashboard with charts, diff viewer, and per-evaluation breakdowns
 - **CLI-first** — `agenteval run`, `agenteval view`, `agenteval ledger`
 - **SOLID Architecture** — modular, extensible, every module has a single responsibility
 
@@ -103,10 +106,8 @@ import { test, expect } from "agent-eval";
 
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   await agent.run("Add a Close button inside the banner component");
-
-  ctx.storeDiff();
-  await ctx.runCommand("test", "pnpm test -- Banner");
-  await ctx.runCommand("build", "pnpm run build");
+  // storeDiff() is automatic — no need to call it
+  // afterEach commands (pnpm test, pnpm build) run automatically too
 
   await expect(ctx).toPassJudge({
     criteria: `
@@ -115,6 +116,7 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
       - All tests pass
       - Build succeeds
     `,
+    expectedFiles: ["src/components/Banner.tsx"],
   });
 });
 ```
@@ -289,16 +291,16 @@ pnpm install
 
 ### Commands
 
-| Command                              | Description                   |
-| ------------------------------------ | ----------------------------- |
-| `pnpm build`                         | Build the core package        |
-| `pnpm test`                          | Run unit + E2E tests (Vitest) |
-| `pnpm lint`                          | Run ESLint                    |
-| `pnpm lint:fix`                      | ESLint with auto-fix          |
-| `pnpm format`                        | Format with Prettier          |
-| `pnpm format:check`                  | Check formatting              |
-| `pnpm dev`                           | Start docs dev server         |
-| `pnpm --filter agent-eval typecheck` | Type-check the framework      |
+| Command                              | Description               |
+| ------------------------------------ | ------------------------- |
+| `pnpm build`                         | Build the core package    |
+| `pnpm test`                          | Run all tests (196 total) |
+| `pnpm lint`                          | Run ESLint                |
+| `pnpm lint:fix`                      | ESLint with auto-fix      |
+| `pnpm format`                        | Format with Prettier      |
+| `pnpm format:check`                  | Check formatting          |
+| `pnpm dev`                           | Start docs dev server     |
+| `pnpm --filter agent-eval typecheck` | Type-check the framework  |
 
 ### Workflow
 
@@ -321,7 +323,7 @@ Run the docs locally:
 pnpm dev
 ```
 
-Covers: [Getting Started](apps/docs/guide/getting-started.md) · [Configuration](apps/docs/guide/configuration.md) · [Writing Tests](apps/docs/guide/writing-tests.md) · [Runners](apps/docs/guide/runners.md) · [Judges](apps/docs/guide/judges.md) · [CLI](apps/docs/guide/cli.md) · [Architecture](apps/docs/guide/architecture.md) · [Contributing](apps/docs/guide/contributing.md)
+Covers: [Getting Started](apps/docs/guide/getting-started.md) · [Configuration](apps/docs/guide/configuration.md) · [Writing Tests](apps/docs/guide/writing-tests.md) · [Runners](apps/docs/guide/runners.md) · [Judges](apps/docs/guide/judges.md) · [Dashboard](apps/docs/guide/dashboard.md) · [CLI](apps/docs/guide/cli.md) · [Architecture](apps/docs/guide/architecture.md) · [Contributing](apps/docs/guide/contributing.md)
 
 ---
 

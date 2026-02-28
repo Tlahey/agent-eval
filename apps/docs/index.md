@@ -17,11 +17,11 @@ features:
   - title: 🔒 Git Isolation
     details: Automatic git reset between test runs guarantees pristine environments.
   - title: ⚖️ LLM-as-a-Judge
-    details: Structured evaluation via Anthropic, OpenAI, or local Ollama models.
+    details: Structured evaluation via Anthropic, OpenAI, Ollama, or any CLI tool as judge.
   - title: 📊 SQLite Ledger
-    details: Local, privacy-first historical tracking. No data leaves your machine.
-  - title: 🖥️ Dashboard API
-    details: "Run `agenteval view` to launch a local API server and explore results."
+    details: Local, privacy-first historical tracking with SQL-powered analytics.
+  - title: 📈 Visual Dashboard
+    details: Built-in React dashboard with score trends, runner comparison, and GitHub-style diff viewer.
   - title: 🏗️ SOLID Architecture
     details: Modular, extensible design. Add providers without touching core logic.
 ---

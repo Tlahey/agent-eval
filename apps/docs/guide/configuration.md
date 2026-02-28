@@ -2,6 +2,26 @@
 
 AgentEval is configured via `agenteval.config.ts` at the root of your project.
 
+## Config Resolution
+
+```mermaid
+flowchart TD
+    A["agenteval run -c path/config.ts"] --> B{"--config flag?"}
+    B -- Yes --> C["Load specified file"]
+    B -- No --> D["Search for config file"]
+    D --> E["agenteval.config.ts"]
+    D --> F["agenteval.config.js"]
+    D --> G["agenteval.config.mts"]
+    D --> H["agenteval.config.mjs"]
+    E & F & G & H --> I["jiti loader\n(TypeScript support)"]
+    C --> I
+    I --> J["Merge with defaults"]
+    J --> K["Validated config ready"]
+
+    style A fill:#4f46e5,color:#fff
+    style K fill:#10b981,color:#fff
+```
+
 ## Full Example
 
 ```ts
@@ -52,6 +72,7 @@ export default defineConfig({
   // judge: {
   //   type: "cli",
   //   command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
+  //   maxRetries: 3, // Retry on invalid JSON (default: 2)
   // },
 
   // Commands to run automatically after each agent execution.
@@ -87,7 +108,39 @@ export default defineConfig({
 | `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory                                 |
 | `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)                                  |
 
+## Environment Variables
+
+AgentEval reads these environment variables automatically:
+
+| Variable            | Used by                | Description               |
+| ------------------- | ---------------------- | ------------------------- |
+| `ANTHROPIC_API_KEY` | Anthropic runner/judge | API key for Claude models |
+| `OPENAI_API_KEY`    | OpenAI runner/judge    | API key for GPT models    |
+
+You can set them in your shell or use a `.env` file:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+```
+
+::: tip
+Since `agenteval.config.ts` is a TypeScript file, you can use `process.env` directly or import `dotenv` for `.env` file support.
+:::
+
 ## Automatic Post-Agent Hooks
+
+```mermaid
+flowchart LR
+    A["agent.run(prompt)"] --> B["📸 storeDiff()\n(automatic)"]
+    B --> C["⚙️ afterEach[0]\npnpm test"]
+    C --> D["⚙️ afterEach[1]\npnpm build"]
+    D --> E["Ready for\njudge evaluation"]
+
+    style A fill:#f59e0b,color:#000
+    style B fill:#6366f1,color:#fff
+    style E fill:#10b981,color:#fff
+```
 
 After each `agent.run()` call, AgentEval automatically:
 

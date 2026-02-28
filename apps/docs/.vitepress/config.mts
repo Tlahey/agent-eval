@@ -19,6 +19,7 @@ export default withMermaid(
             { text: "Writing Tests", link: "/guide/writing-tests" },
             { text: "Runners", link: "/guide/runners" },
             { text: "Judges", link: "/guide/judges" },
+            { text: "Dashboard", link: "/guide/dashboard" },
             { text: "CLI", link: "/guide/cli" },
             { text: "Architecture", link: "/guide/architecture" },
             { text: "Contributing", link: "/guide/contributing" },

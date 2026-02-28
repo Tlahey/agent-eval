@@ -26,6 +26,10 @@ export default defineConfig({
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
   },
+  afterEach: [
+    { name: "test", command: "pnpm test" },
+    { name: "typecheck", command: "pnpm build" },
+  ],
 });
 ```
 
@@ -33,12 +37,58 @@ export default defineConfig({
 
 ```ts
 interface AgentEvalConfig {
-  rootDir?: string;
-  testFiles?: string | string[];
-  runners: AgentRunnerConfig[];
-  judge: JudgeConfig;
-  matrix?: { runners?: string[] };
-  outputDir?: string;
-  timeout?: number;
+  rootDir?: string; // Project root (default: cwd)
+  testFiles?: string | string[]; // Glob patterns for test discovery
+  runners: AgentRunnerConfig[]; // Agent runners to evaluate
+  judge: JudgeConfig; // LLM judge configuration
+  afterEach?: AfterEachCommand[]; // Auto commands after each agent run
+  matrix?: { runners?: string[] }; // Filter which runners to execute
+  outputDir?: string; // Ledger output dir (default: .agenteval)
+  timeout?: number; // Agent run timeout ms (default: 300000)
+}
+
+interface AgentRunnerConfig {
+  name: string;
+  type: "cli" | "api";
+  command?: string; // CLI runners: shell command with {{prompt}}
+  api?: {
+    provider: "anthropic" | "openai" | "ollama";
+    model: string;
+    apiKey?: string;
+    baseURL?: string;
+  };
+}
+
+type JudgeConfig = JudgeApiConfig | JudgeCliConfig;
+
+interface JudgeApiConfig {
+  provider: "anthropic" | "openai" | "ollama";
+  model: string;
+  apiKey?: string;
+  baseURL?: string;
+}
+
+interface JudgeCliConfig {
+  type: "cli";
+  command: string; // CLI command with {{prompt}} or {{prompt_file}}
+  maxRetries?: number; // Retry on invalid JSON (default: 2)
+}
+
+interface AfterEachCommand {
+  name: string; // Label for the command
+  command: string; // Shell command to execute
 }
 ```
+
+## Config Options
+
+| Option      | Type                     | Default                                  | Description                                             |
+| ----------- | ------------------------ | ---------------------------------------- | ------------------------------------------------------- |
+| `rootDir`   | `string`                 | `process.cwd()`                          | Project root directory                                  |
+| `testFiles` | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                      |
+| `runners`   | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate                               |
+| `judge`     | `JudgeConfig`            | _required_                               | LLM judge configuration                                 |
+| `afterEach` | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first) |
+| `matrix`    | `{ runners?: string[] }` | —                                        | Filter which runners to execute                         |
+| `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory                                 |
+| `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)                                  |

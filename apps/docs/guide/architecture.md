@@ -2,6 +2,28 @@
 
 AgentEval follows **SOLID principles** to stay modular, testable, and extensible.
 
+## Monorepo Layout
+
+```mermaid
+flowchart TD
+    ROOT["agent-eval/\n(pnpm workspace)"]
+    ROOT --> PKG["packages/agent-eval\nCore framework (npm)"]
+    ROOT --> DOCS["apps/docs\nVitePress documentation"]
+    ROOT --> UI["apps/eval-ui\nReact dashboard"]
+    ROOT --> EXAMPLE["apps/example-target-app\nExample project"]
+
+    PKG --> CORE["core/\ntypes, config, runner,\ncontext, expect"]
+    PKG --> GIT["git/\nisolation (reset, clean, diff)"]
+    PKG --> JUDGE["judge/\nLLM-as-a-Judge"]
+    PKG --> LEDGER["ledger/\nSQLite persistence"]
+    PKG --> CLI["cli/\ncommand parsing + API server"]
+
+    style ROOT fill:#4f46e5,color:#fff
+    style PKG fill:#6366f1,color:#fff
+    style UI fill:#10b981,color:#fff
+    style DOCS fill:#f59e0b,color:#000
+```
+
 ## Module Map
 
 ```
@@ -19,8 +41,21 @@ packages/agent-eval/src/
 ├── ledger/
 │   └── ledger.ts       SQLite persistence & queries
 ├── cli/
-│   └── cli.ts          CLI command parsing
+│   └── cli.ts          CLI command parsing + API server
 └── index.ts            Public API surface
+
+apps/eval-ui/src/
+├── components/         Reusable UI components
+│   ├── Sidebar.tsx         Navigation + connectivity
+│   ├── DiffViewer.tsx      GitHub-style diff rendering
+│   └── RunDetailPanel.tsx  Detailed run view
+├── pages/              Route pages
+│   ├── Overview.tsx        Stats + charts
+│   ├── Runs.tsx            Filterable runs table
+│   └── EvalDetail.tsx      Per-evaluation breakdown
+├── lib/
+│   └── api.ts          Fetch functions for /api/*
+└── App.tsx             Router + layout
 ```
 
 ## SOLID in Practice
@@ -61,7 +96,7 @@ Interfaces are small and focused. Test functions receive only what they need:
 | -------------- | ------------------------------------------------- | ------------------------ |
 | `AgentHandle`  | `run()`, `name`, `model`                          | Test functions           |
 | `TestContext`  | `storeDiff()`, `runCommand()`, `diff`, `commands` | Test functions           |
-| `JudgeOptions` | `criteria`, `model?`                              | `expect().toPassJudge()` |
+| `JudgeOptions` | `criteria`, `model?`, `expectedFiles?`            | `expect().toPassJudge()` |
 
 ### Dependency Inversion (DIP)
 
@@ -196,6 +231,7 @@ erDiagram
         text test_id "test title"
         text timestamp "ISO 8601"
         text agent_runner "runner name"
+        text agent_model "runner model"
         text judge_model "model or CLI command"
         real score "0.0 – 1.0"
         int pass "0 or 1"
@@ -204,6 +240,15 @@ erDiagram
         text diff "raw git diff"
         text commands "JSON: CommandResult[]"
         int duration_ms "agent run time"
+    }
+
+    RUNS ||--o{ COMMANDS : "stored as JSON"
+    COMMANDS {
+        text name "command label"
+        text stdout "captured stdout"
+        text stderr "captured stderr"
+        int exitCode "0 = success"
+        int durationMs "execution time"
     }
 ```
 

@@ -13,12 +13,18 @@ pnpm install
 
 Every commit is guarded by **four automated checks** via a Husky pre-commit hook. All must pass or the commit is rejected.
 
-```
-git commit
-  └─ .husky/pre-commit
-       ├─ lint-staged    → ESLint + Prettier on staged files
-       ├─ pnpm test      → All Vitest unit + E2E tests
-       └─ pnpm build     → tsup compilation (ESM + CJS + DTS)
+```mermaid
+flowchart TD
+    A["git commit"] --> B["Husky pre-commit hook"]
+    B --> C["lint-staged\nESLint + Prettier"]
+    C --> D["pnpm test\n196 tests (agent-eval + eval-ui)"]
+    D --> E["pnpm build\ntsup (ESM + CJS + DTS)"]
+    E --> F{"All passed?"}
+    F -- Yes --> G["✅ Commit created"]
+    F -- No --> H["❌ Commit rejected"]
+
+    style G fill:#10b981,color:#fff
+    style H fill:#ef4444,color:#fff
 ```
 
 ::: warning
@@ -37,7 +43,7 @@ pnpm format     # Prettier auto-format
 ### 2. Test
 
 ```bash
-pnpm test
+pnpm test       # Runs both agent-eval (94 tests) and eval-ui (102 tests)
 ```
 
 ### 3. Build
@@ -57,15 +63,15 @@ The pre-commit hook will run all gates automatically. If everything passes, the 
 
 ## Available Scripts
 
-| Command             | Description                       |
-| ------------------- | --------------------------------- |
-| `pnpm test`         | Run Vitest unit + E2E tests       |
-| `pnpm build`        | Build the core package with tsup  |
-| `pnpm lint`         | Run ESLint on the entire codebase |
-| `pnpm lint:fix`     | ESLint with auto-fix              |
-| `pnpm format`       | Format all files with Prettier    |
-| `pnpm format:check` | Check formatting without writing  |
-| `pnpm dev`          | Start VitePress docs locally      |
+| Command             | Description                          |
+| ------------------- | ------------------------------------ |
+| `pnpm test`         | Run all tests (agent-eval + eval-ui) |
+| `pnpm build`        | Build the core package with tsup     |
+| `pnpm lint`         | Run ESLint on the entire codebase    |
+| `pnpm lint:fix`     | ESLint with auto-fix                 |
+| `pnpm format`       | Format all files with Prettier       |
+| `pnpm format:check` | Check formatting without writing     |
+| `pnpm dev`          | Start VitePress docs locally         |
 
 ## Commit Convention
 
@@ -82,10 +88,54 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## Testing Guidelines
 
+### Core Package (`packages/agent-eval`)
+
 - Tests are **colocated** next to their source file: `git/git.ts` → `git/git.test.ts`
 - Use `describe` / `it` with clear descriptions
 - Mock external dependencies — no real API calls in unit tests
 - The E2E integration tests in `src/e2e/` validate the full pipeline using temp git repos
+- **94 tests** covering types, config, context, runner, expect, git, ledger
+
+### Dashboard (`apps/eval-ui`)
+
+- Tests use **Vitest + React Testing Library** (colocated next to source)
+- Components: `DiffViewer.test.tsx`, `Sidebar.test.tsx`, `RunDetailPanel.test.tsx`
+- Pages: `Overview.test.tsx`, `Runs.test.tsx`, `EvalDetail.test.tsx`
+- API: `api.test.ts`
+- Use `renderPage()` from `src/test/render.tsx` for page components (provides `useOutletContext`)
+- Mock `fetch` via `vi.fn()` — never make real API calls
+- Mock `ResponsiveContainer` from Recharts (jsdom can't measure SVG)
+- **102 tests** covering all components, pages, and API functions
+
+::: tip CSS text-transform gotcha
+CSS `text-transform: uppercase` changes visual appearance but **not** DOM `textContent`. Test against the original source text (e.g., "Navigation" not "NAVIGATION").
+:::
+
+## Local Development
+
+### Core package
+
+```bash
+cd packages/agent-eval
+pnpm test         # Run unit tests
+pnpm build        # Build with tsup
+```
+
+### Dashboard
+
+```bash
+cd apps/eval-ui
+npx tsx src/seed.ts  # Generate seed data
+pnpm dev             # Start dev server
+pnpm test            # Run component tests
+```
+
+### Documentation
+
+```bash
+cd apps/docs
+pnpm dev          # Start VitePress dev server
+```
 
 ## Architecture
 

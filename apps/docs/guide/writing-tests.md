@@ -1,5 +1,27 @@
 # Writing Tests
 
+## Test Lifecycle
+
+Every eval test follows a precise lifecycle:
+
+```mermaid
+flowchart TD
+    A["test() registers evaluation"] --> B["Runner picks up test"]
+    B --> C["🔄 Git reset (clean state)"]
+    C --> D["🤖 agent.run(prompt)"]
+    D --> E["📸 Auto storeDiff()"]
+    E --> F["⚙️ afterEach commands"]
+    F --> G["⚖️ expect(ctx).toPassJudge()"]
+    G --> H{"score ≥ 0.7?"}
+    H -- Yes --> I["✅ PASS → Ledger"]
+    H -- No --> J["❌ FAIL → Ledger"]
+
+    style D fill:#f59e0b,color:#000
+    style G fill:#10b981,color:#fff
+    style I fill:#10b981,color:#fff
+    style J fill:#ef4444,color:#fff
+```
+
 ## File Naming
 
 Test files are discovered automatically using these patterns:
@@ -35,9 +57,17 @@ test("Test title", async ({ agent, ctx }) => {
 
 The `test()` function receives an object with:
 
-- **`agent`** – Handle to trigger the AI agent
-- **`ctx`** – Test context for capturing diffs and command outputs
-- **`judge`** – The judge configuration (read-only)
+| Parameter | Type          | Description                                     |
+| --------- | ------------- | ----------------------------------------------- |
+| `agent`   | `AgentHandle` | Handle to trigger the AI agent                  |
+| `ctx`     | `TestContext` | Context for capturing diffs and command outputs |
+| `judge`   | `JudgeConfig` | The judge configuration (read-only)             |
+
+The `agent` object exposes:
+
+- `agent.run(prompt)` — trigger the agent with a prompt
+- `agent.name` — the runner's name (e.g., `"copilot"`)
+- `agent.model` — the runner's model (e.g., `"claude-sonnet-4-20250514"`)
 
 ## Capturing Context
 
@@ -57,6 +87,10 @@ await ctx.runCommand("test", "pnpm test -- Banner");
 // See Configuration > Automatic Post-Agent Hooks
 ```
 
+::: info Command timeout
+Each `runCommand()` call has a **120-second timeout**. If the command doesn't complete in time, it's killed and the exit code is set to 1.
+:::
+
 ## Evaluation Criteria
 
 The `criteria` string supports Markdown. Be specific:
@@ -74,6 +108,34 @@ await expect(ctx).toPassJudge({
 });
 ```
 
+## Expected Files
+
+Use `expectedFiles` to tell the judge which files **should** have been modified. The judge will flag scope creep if the agent touches unexpected files:
+
+```ts
+await expect(ctx).toPassJudge({
+  criteria: "Add close button to Banner component",
+  expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
+});
+```
+
+The judge prompt includes a **file scope analysis** section that compares the expected files against what was actually changed in the diff. This helps detect agents that modify too many files.
+
+## Judge Result
+
+The judge returns a structured result with four fields:
+
+```ts
+interface JudgeResult {
+  pass: boolean; // true if score >= 0.7
+  score: number; // 0.0 to 1.0
+  reason: string; // Why the agent got this score
+  improvement: string; // Suggestions to improve the score
+}
+```
+
+The `improvement` field is stored in the ledger alongside the score and reason, providing actionable feedback for improving agent performance.
+
 ## Tagged Tests
 
 ```ts
@@ -82,11 +144,13 @@ test.tagged(["ui", "banner"], "Add Close button", async ({ agent, ctx }) => {
 });
 ```
 
+Run only tagged tests: `agenteval run -t ui`
+
 ## Skipping Tests
 
 ```ts
 test.skip("Not ready yet", async ({ agent, ctx }) => {
-  // This test won't run
+  // This test is registered but won't execute
 });
 ```
 
@@ -97,17 +161,33 @@ You can make multiple judge calls in one test:
 ```ts
 test("Complex feature", async ({ agent, ctx }) => {
   await agent.run("Add search with debounce");
-  ctx.storeDiff();
 
-  await ctx.runCommand("test", "pnpm test");
-
+  // First judge call — check the UI
   await expect(ctx).toPassJudge({
     criteria: "Search input renders correctly",
   });
 
+  // Second judge call — check the logic (with a stronger model)
   await expect(ctx).toPassJudge({
     criteria: "Debounce is implemented with 300ms delay",
-    model: "gpt-4o", // Use a different judge model
+    model: "claude-opus-4-20250514",
   });
 });
+```
+
+## Error Handling
+
+If a judge call fails (score < 0.7), it throws a `JudgeFailure` error. The runner catches this error per-test and records the failure in the ledger — **a single test failure never crashes the entire run**.
+
+```mermaid
+flowchart LR
+    A["toPassJudge()"] --> B{"score ≥ 0.7?"}
+    B -- Yes --> C["Return JudgeResult"]
+    B -- No --> D["Throw JudgeFailure"]
+    D --> E["Runner catches error"]
+    E --> F["Record FAIL in ledger"]
+    F --> G["Continue to next test"]
+
+    style C fill:#10b981,color:#fff
+    style D fill:#ef4444,color:#fff
 ```

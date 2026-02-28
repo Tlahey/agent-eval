@@ -16,13 +16,43 @@ When possible, use a **different provider** for the runner and the judge. If you
 
 ## How It Works
 
+```mermaid
+flowchart TD
+    A["Evaluation triggered"] --> B["Build judge prompt"]
+    B --> C["Include: criteria + diff + commands + file scope"]
+
+    C --> D{"Judge type?"}
+    D -- API --> E["generateObject()\nVercel AI SDK + Zod"]
+    D -- CLI --> F["execSync(command)\nparse JSON from stdout"]
+
+    F --> G{"Valid JSON?"}
+    G -- No --> H{"Retries left?"}
+    H -- Yes --> F
+    H -- No --> I["❌ Throw Error"]
+    G -- Yes --> J["Zod validation"]
+
+    E --> J
+    J --> K{"score ≥ 0.7?"}
+    K -- Yes --> L["✅ PASS"]
+    K -- No --> M["❌ FAIL"]
+    L --> N["Return { pass, score, reason, improvement }"]
+    M --> N
+    N --> O["📝 Append to ledger"]
+
+    style E fill:#6366f1,color:#fff
+    style L fill:#10b981,color:#fff
+    style M fill:#ef4444,color:#fff
+    style I fill:#ef4444,color:#fff
+```
+
 1. AgentEval builds a prompt with:
    - Your evaluation criteria
    - The captured git diff
    - All command outputs (test results, build logs)
+   - **File scope analysis** (expected vs. actual files changed)
 2. The judge LLM returns a structured response:
    ```json
-   { "pass": true, "score": 0.85, "reason": "..." }
+   { "pass": true, "score": 0.85, "reason": "...", "improvement": "..." }
    ```
 3. Score ≥ 0.7 = pass, < 0.7 = fail
 
@@ -74,14 +104,8 @@ judge: {
 
 No API key needed. Runs entirely on your machine.
 
-| Model            | Notes                     |
-| ---------------- | ------------------------- |
-| `llama3`         | Meta's open model         |
-| `mistral`        | Fast, general-purpose     |
-| `deepseek-coder` | Strong on code evaluation |
-
-::: info
-Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama3`.
+::: warning
+Local models lack the reasoning depth for reliable code evaluation. Use them only for experimentation, not production evaluations.
 :::
 
 ### Custom / Enterprise Provider
@@ -107,6 +131,7 @@ You can use **any CLI tool** as a judge — including `claude`, `gh copilot`, or
 judge: {
   type: "cli",
   command: 'claude -p "Evaluate this code change: {{prompt}}" --output-format json',
+  maxRetries: 3, // Retry on invalid JSON (default: 2)
 }
 ```
 
@@ -122,29 +147,18 @@ judge: {
 
 :::
 
-**Example — Claude CLI as judge:**
-
-```ts
-import { defineConfig } from "@anthropic-ai/agent-eval";
-
-export default defineConfig({
-  runner: {
-    command: 'gh copilot suggest "{{prompt}}"',
-  },
-  judge: {
-    type: "cli",
-    command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
-  },
-});
-```
-
 **The CLI must return valid JSON:**
 
 ```json
-{ "pass": true, "score": 0.85, "reason": "The implementation is correct..." }
+{
+  "pass": true,
+  "score": 0.85,
+  "reason": "The implementation is correct...",
+  "improvement": "Consider adding tests"
+}
 ```
 
-AgentEval extracts the first JSON object containing `pass`, `score`, and `reason` from stdout, so preamble text is ignored.
+AgentEval extracts the first JSON object containing `pass`, `score`, and `reason` from stdout (preamble text and markdown fences are ignored). Failed attempts are automatically retried up to `maxRetries` times.
 
 ## Per-Test Model Override
 
@@ -159,6 +173,35 @@ await expect(ctx).toPassJudge({
 
 This is useful when some tests need a stronger model for accurate evaluation while most can use a cheaper default.
 
+## Expected Files (Scope Analysis)
+
+Tell the judge which files should have been modified to detect scope creep:
+
+```ts
+await expect(ctx).toPassJudge({
+  criteria: "Add close button to Banner",
+  expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
+});
+```
+
+The judge prompt includes a **file scope analysis** section:
+
+```mermaid
+flowchart LR
+    A["Expected files"] --> C["Compare"]
+    B["Actually changed files\n(from git diff)"] --> C
+    C --> D{"Match?"}
+    D -- "Extra files" --> E["⚠️ Flag scope creep"]
+    D -- "Missing files" --> F["⚠️ Flag incomplete"]
+    D -- "Match" --> G["✅ Scope OK"]
+
+    style E fill:#f59e0b,color:#000
+    style F fill:#f59e0b,color:#000
+    style G fill:#10b981,color:#fff
+```
+
+This is powerful for ensuring agents make **surgical changes** rather than modifying half the codebase.
+
 ## Scoring
 
 | Score   | Meaning            |
@@ -171,13 +214,32 @@ This is useful when some tests need a stronger model for accurate evaluation whi
 
 The judge is instructed to be "strict but fair" and award partial credit.
 
+## Judge Result Structure
+
+Every judge evaluation returns four fields, all stored in the ledger:
+
+| Field         | Type    | Description                                             |
+| ------------- | ------- | ------------------------------------------------------- |
+| `pass`        | boolean | `true` if `score >= 0.7`                                |
+| `score`       | number  | Score between 0.0 and 1.0                               |
+| `reason`      | string  | Detailed explanation of the score                       |
+| `improvement` | string  | Actionable suggestions for improving the agent's output |
+
+The `improvement` field is the judge's **opinion on how the agent could do better**. This is visible in the dashboard's "Improve" tab for each run.
+
 ## Judge Prompt Anatomy
 
 The system prompt sent to the judge includes:
 
-1. **Role**: "You are an expert code reviewer acting as a judge"
-2. **Criteria**: Your `criteria` string from `toPassJudge()`
-3. **Git Diff**: The full diff captured by `ctx.storeDiff()`
-4. **Command Outputs**: All `ctx.runCommand()` results (stdout, stderr, exit codes)
+```mermaid
+flowchart TD
+    A["Judge Prompt"] --> B["1. Role\n'Expert code reviewer\nacting as a judge'"]
+    A --> C["2. Evaluation Criteria\nYour criteria from toPassJudge()"]
+    A --> D["3. Git Diff\nFull diff from storeDiff()"]
+    A --> E["4. Command Outputs\nstdout, stderr, exit codes"]
+    A --> F["5. File Scope Analysis\nExpected vs. actual files"]
 
-The response is enforced via Zod structured output (`generateObject`) for API judges, guaranteeing `{ pass, score, reason }` — no prompt injection or malformed JSON. For CLI judges, the JSON is parsed from stdout and validated against the same Zod schema.
+    style A fill:#6366f1,color:#fff
+```
+
+The response is enforced via Zod structured output (`generateObject`) for API judges, guaranteeing `{ pass, score, reason, improvement }` — no prompt injection or malformed JSON. For CLI judges, the JSON is parsed from stdout and validated against the same schema.

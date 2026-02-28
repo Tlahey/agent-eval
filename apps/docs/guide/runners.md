@@ -232,16 +232,86 @@ This works with Azure OpenAI, Together AI, Fireworks, Groq, and any provider exp
 
 ## How API Runners Work
 
-When an API runner executes:
+```mermaid
+sequenceDiagram
+    participant AE as AgentEval
+    participant LLM as LLM API
+    participant FS as File System
+    participant Git as Git
+
+    AE->>LLM: generateObject(prompt, Zod schema)
+    LLM-->>AE: { files: [{ path, content }] }
+    loop For each file
+        AE->>FS: writeFileSync(path, content)
+    end
+    AE->>Git: storeDiff() [automatic]
+    Git-->>AE: diff captured
+```
 
 1. AgentEval sends the test prompt to the model via `generateObject()` with a Zod schema
 2. The model returns structured output: `{ files: [{ path, content }] }`
 3. AgentEval writes each file to disk in the project directory
-4. The test continues with `ctx.storeDiff()`, command execution, and judge evaluation
+4. `storeDiff()` is called automatically, followed by any `afterEach` commands
 
+---
+
+## CLI vs API Runner Comparison
+
+```mermaid
+flowchart LR
+    subgraph CLI["CLI Runner"]
+        A["execSync(command)"] --> B["Agent modifies files"]
+        B --> C["storeDiff()"]
+    end
+
+    subgraph API["API Runner"]
+        D["generateObject(prompt)"] --> E["Returns files[] JSON"]
+        E --> F["Write files to disk"]
+        F --> G["storeDiff()"]
+    end
+
+    style CLI fill:#f0f4ff
+    style API fill:#f0fdf4
 ```
-prompt → LLM → { files: [{ path, content }] } → write to disk → git diff → judge
-```
+
+| Aspect        | CLI Runner               | API Runner                    |
+| ------------- | ------------------------ | ----------------------------- |
+| **Execution** | Spawns shell command     | HTTP API call                 |
+| **Agent**     | IDE agents, CLI tools    | Raw LLM models                |
+| **Timeout**   | 600s default             | Network-dependent             |
+| **Output**    | Agent writes files       | AgentEval writes from JSON    |
+| **CI**        | Needs agent installed    | Only needs API key            |
+| **Use case**  | Real-world agent testing | Model comparison, headless CI |
+
+---
+
+## Environment Variables
+
+API runners use environment variables for authentication:
+
+| Provider    | Variable            | Notes                            |
+| ----------- | ------------------- | -------------------------------- |
+| `anthropic` | `ANTHROPIC_API_KEY` | Or set `apiKey` in runner config |
+| `openai`    | `OPENAI_API_KEY`    | Or set `apiKey` in runner config |
+| `ollama`    | —                   | No key needed (local)            |
+
+You can also use a `.env` file — AgentEval loads it automatically via the config file (since it's a TypeScript file, you can use `dotenv` or `process.env`).
+
+---
+
+## Error Handling
+
+| Scenario                  | Behavior                                  |
+| ------------------------- | ----------------------------------------- |
+| Command not found         | Error logged, test recorded as FAIL       |
+| Agent timeout (600s)      | Process killed, test recorded as FAIL     |
+| API rate limit            | Error thrown, test recorded as FAIL       |
+| Non-zero exit code        | Captured in context, available to judge   |
+| Agent produces no changes | Empty diff, judge evaluates (likely FAIL) |
+
+::: tip
+A failing agent execution never crashes the entire run. Each test is wrapped in a try/catch, and failures are recorded in the ledger for later analysis.
+:::
 
 ---
 
@@ -267,4 +337,4 @@ export default defineConfig({
 });
 ```
 
-The dashboard Analytics page plots score-over-time per runner, making it easy to compare agent performance.
+The [dashboard](/guide/dashboard) Analytics page plots score-over-time per runner, making it easy to compare agent performance.
