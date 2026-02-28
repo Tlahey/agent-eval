@@ -520,27 +520,36 @@ We use [Changesets](https://github.com/changesets/changesets) for version manage
 ```mermaid
 flowchart LR
     A["Developer\nruns pnpm changeset"] --> B["Changeset file\ncreated in .changeset/"]
-    B --> C["PR merged\nto main"]
-    C --> D{"Changesets\nAction"}
-    D -->|"changesets exist"| E["Creates\nVersion PR"]
-    D -->|"versions bumped"| F["Publishes\nto npm"]
+    B --> C["pnpm version\n(bumps versions + CHANGELOG)"]
+    C --> D["git tag v*\ngit push --tags"]
+    D --> E{"Release\nworkflow"}
+    E --> F["Test + Build"]
+    F --> G["Publish to npm\n+ GitHub Release"]
 
     style A fill:#6366f1,color:#fff
-    style D fill:#f59e0b,color:#000
-    style E fill:#10b981,color:#fff
-    style F fill:#10b981,color:#fff
+    style E fill:#f59e0b,color:#000
+    style G fill:#10b981,color:#fff
 ```
 
-#### How to Create a Changeset
+#### How to Create a Release
 
 ```bash
-# Interactive prompt: select packages affected and semver bump type
+# 1. Create a changeset (interactive: select packages + semver bump)
 pnpm changeset
 
-# This creates a markdown file in .changeset/ — commit it with your PR
-git add .changeset/
-git commit -m "chore: add changeset for <feature>"
+# 2. Commit the changeset file with your PR
+git add .changeset/ && git commit -m "chore: add changeset"
+
+# 3. When ready to release: consume changesets, bump versions, update CHANGELOG
+pnpm version
+
+# 4. Commit the version bump, tag it, and push
+git add -A && git commit -m "chore(release): v$(node -p "require('./packages/agent-eval/package.json').version")"
+git tag "v$(node -p "require('./packages/agent-eval/package.json').version")"
+git push && git push --tags
 ```
+
+The `release.yml` workflow triggers on the `v*` tag push, runs tests, builds everything (including UI bundling), publishes to npm, and creates a GitHub Release with auto-generated notes.
 
 #### Versioning Rules
 
@@ -558,11 +567,11 @@ git commit -m "chore: add changeset for <feature>"
 
 Three GitHub Actions workflows:
 
-| Workflow    | File          | Trigger                       | Purpose                                    |
-| ----------- | ------------- | ----------------------------- | ------------------------------------------ |
-| **CI**      | `ci.yml`      | Push + PR                     | Lint, format check, test, build, typecheck |
-| **Release** | `release.yml` | Push to `main`                | Create version PR or publish to npm        |
-| **Docs**    | `docs.yml`    | Push to `main` (docs changed) | Build & deploy VitePress to GitHub Pages   |
+| Workflow    | File          | Trigger                       | Purpose                                      |
+| ----------- | ------------- | ----------------------------- | -------------------------------------------- |
+| **CI**      | `ci.yml`      | Push + PR                     | Lint, format check, test, build, typecheck   |
+| **Release** | `release.yml` | Tag `v*`                      | Test, build, publish to npm + GitHub Release |
+| **Docs**    | `docs.yml`    | Push to `main` (docs changed) | Build & deploy VitePress to GitHub Pages     |
 
 ### UI Bundling
 
