@@ -9,6 +9,8 @@ import { createJiti } from "jiti";
 import { loadConfig } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
 import { runTest } from "../core/runner.js";
+import { DefaultReporter, SilentReporter, VerboseReporter } from "../core/reporter.js";
+import type { Reporter, TestResultEvent } from "../core/reporter.js";
 import {
   readLedger,
   readLedgerByTestId,
@@ -29,11 +31,20 @@ interface RunOptions {
   filter?: string;
   tag?: string;
   output?: string;
+  silent?: boolean;
+  verbose?: boolean;
+}
+
+function createReporter(opts: RunOptions): Reporter {
+  if (opts.silent) return new SilentReporter();
+  if (opts.verbose) return new VerboseReporter();
+  return new DefaultReporter();
 }
 
 async function executeRun(opts: RunOptions): Promise<void> {
   const cwd = process.cwd();
-  const spinner = ora("Loading config...").start();
+  const reporter = createReporter(opts);
+  const spinner = opts.silent ? null : ora("Loading config...").start();
 
   try {
     const config = await loadConfig(cwd, opts.config);
@@ -42,7 +53,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
     }
 
     initSession(config);
-    spinner.succeed("Config loaded");
+    if (spinner) spinner.succeed("Config loaded");
 
     // Discover test files
     const patterns =
@@ -57,17 +68,17 @@ async function executeRun(opts: RunOptions): Promise<void> {
     });
 
     if (files.length === 0) {
-      console.log(chalk.yellow("No test files found."));
+      if (!opts.silent) console.log(chalk.yellow("No test files found."));
       process.exit(0);
     }
 
-    console.log(chalk.dim(`Found ${files.length} test file(s)\n`));
+    if (!opts.silent) console.log(chalk.dim(`Found ${files.length} test file(s)\n`));
 
     // Load test files sequentially (each file registers tests via test())
     const jiti = createJiti(cwd, { interopDefault: true });
 
-    let totalPassed = 0;
-    let totalFailed = 0;
+    const allResults: TestResultEvent[] = [];
+    const runStart = Date.now();
 
     for (const file of files) {
       clearRegisteredTests();
@@ -86,29 +97,33 @@ async function executeRun(opts: RunOptions): Promise<void> {
       if (tests.length === 0) continue;
 
       const relPath = file.replace(cwd + "/", "");
-      console.log(chalk.bold(`📄 ${relPath}`));
+      reporter.onFileStart(relPath);
+
+      // Count total tests × runners for onRunStart
+      const totalRunners = config.runners.length;
+      reporter.onRunStart(tests.length, totalRunners);
 
       // Run each test sequentially
       for (const testDef of tests) {
-        const results = await runTest(testDef, config);
+        const results = await runTest(testDef, config, reporter);
         for (const r of results) {
-          if (r.passed) totalPassed++;
-          else totalFailed++;
+          allResults.push({
+            testId: r.testId,
+            runner: r.runner,
+            entry: r.entries[0],
+            durationMs: r.entries[0].durationMs,
+          });
         }
       }
     }
 
-    // Summary
-    console.log(chalk.bold("\n─── Summary ───"));
-    console.log(chalk.green(`  ✓ ${totalPassed} passed`));
-    if (totalFailed > 0) {
-      console.log(chalk.red(`  ✗ ${totalFailed} failed`));
-    }
-    console.log();
+    // Final summary via reporter
+    reporter.onRunEnd(allResults, Date.now() - runStart);
 
+    const totalFailed = allResults.filter((r) => !r.entry.pass).length;
     process.exit(totalFailed > 0 ? 1 : 0);
   } catch (err: unknown) {
-    spinner.fail("Failed");
+    if (spinner) spinner.fail("Failed");
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
     process.exit(1);
   }
@@ -123,6 +138,8 @@ program
   .option("-f, --filter <pattern>", "Filter tests by title (substring match)")
   .option("-t, --tag <tag>", "Filter tests by tag")
   .option("-o, --output <dir>", "Override output directory for the ledger database")
+  .option("-s, --silent", "Suppress all output except errors")
+  .option("-v, --verbose", "Show detailed output including judge reasoning")
   .action(executeRun);
 
 // ─── Ledger command ───

@@ -36,6 +36,8 @@ agenteval run [options]
 | `-f, --filter <pattern>` | Filter tests by title (substring match)           |
 | `-t, --tag <tag>`        | Filter tests by tag                               |
 | `-o, --output <dir>`     | Override output directory for the ledger database |
+| `-s, --silent`           | Suppress all output except errors (for CI)        |
+| `-v, --verbose`          | Show detailed output including judge reasoning    |
 
 ### Examples
 
@@ -60,6 +62,77 @@ agenteval run -t ui -f close
 
 # Save results to a custom directory
 agenteval run -o ./my-results
+
+# Silent mode (CI-friendly, no terminal output)
+agenteval run --silent
+
+# Verbose mode (includes judge reasoning and improvement suggestions)
+agenteval run --verbose
+
+# Combine: verbose output filtered to a specific tag
+agenteval run -v -t ui
+```
+
+### Reporter Modes
+
+AgentEval uses a **Reporter** system for CLI output. Three built-in reporters are available:
+
+```mermaid
+flowchart LR
+    subgraph Default["Default (default)"]
+        D1["Spinner per test"]
+        D2["✓/✗ on completion"]
+        D3["Summary table"]
+    end
+
+    subgraph Silent["Silent (--silent)"]
+        S1["No output"]
+        S2["Exit code only"]
+    end
+
+    subgraph Verbose["Verbose (--verbose)"]
+        V1["Full test details"]
+        V2["Judge reasoning"]
+        V3["Improvement suggestions"]
+        V4["Summary table"]
+    end
+
+    style Default fill:#6366f1,color:#fff
+    style Silent fill:#f59e0b,color:#000
+    style Verbose fill:#10b981,color:#fff
+```
+
+#### Default Output
+
+```
+📄 evals/banner.eval.ts
+✓ Add close button [copilot-cli] PASS 0.85 1.2s
+✗ Add animation [copilot-cli] FAIL 0.35 2.1s
+
+─── Results ───
+
+  Test              Runner        Score   Status  Duration
+  ──────────────────────────────────────────────────────────
+  Add close button  copilot-cli   0.85    PASS    1.2s
+  Add animation     copilot-cli   0.35    FAIL    2.1s
+
+─── Summary ───
+  ✓ 1 passed
+  ✗ 1 failed
+  ⏱ 3.3s total
+```
+
+#### Verbose Output
+
+```
+🧪 AgentEval — 2 test(s) × 1 runner(s)
+
+📄 evals/banner.eval.ts
+
+▶ Add close button [copilot-cli]
+  ↺ git reset --hard && git clean -fd
+  ✓ Score: 0.85 – PASS 1.2s
+    Reason: Close button implemented correctly with proper event handling
 ```
 
 ### Execution Flow

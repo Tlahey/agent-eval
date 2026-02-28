@@ -255,22 +255,29 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [ ] Add a guide on "Fuzzy Evaluation & Thresholds" explaining how to handle non-binary LLM scores
   - [ ] Update API references for `test()`, `expect()`, and the configuration object
 
-## Phase 11 — Dynamic CLI Reporter & Summary Table
+## Phase 11 — Dynamic CLI Reporter & Summary Table ✅
 
-- [ ] **CLI & UI Engine (`cli/reporter.ts`)**
-  - [ ] Integrate a terminal UI library (e.g., `ora`, `@clack/prompts`, or `picocolors`) to handle dynamic console output
-  - [ ] Implement real-time test progress indicators (spinners for running tests, `✓` for PASS, `⚠` for WARN, `✗` for FAIL)
-  - [ ] Build a final summary table output (displaying Test ID, Agent Model, Score, Status, and Duration) at the end of the execution suite
-  - [ ] Add support for CLI verbosity flags (e.g., `--silent` for CI environments, `--verbose` for detailed execution logs)
+- [x] **CLI & UI Engine (`cli/reporter.ts`)** — _Implemented in `core/reporter.ts`_
+  - [x] Integrate `ora` for spinners + `chalk` for colors in terminal output
+  - [x] Implement real-time test progress indicators (spinners for running tests, `✓` for PASS, `✗` for FAIL)
+  - [x] Build a final summary table output (Test ID, Runner, Score, Status, Duration) at the end of the execution suite
+  - [x] Add support for CLI verbosity flags (`--silent` for CI environments, `--verbose` for detailed execution logs)
+  - [x] Implement `Reporter` interface with three built-in implementations: `DefaultReporter`, `SilentReporter`, `VerboseReporter`
 
-- [ ] **Core Runner Integration (`core/runner.ts`)**
-  - [ ] Refactor the runner loop to decouple execution logic from standard `console.log` outputs (emit events or use a Reporter interface)
-  - [ ] Track precise execution time per test (and per agent runner) to feed the summary table
-  - [ ] Gracefully handle multi-line error outputs and LLM reasoning directly in the terminal without breaking the layout
+- [x] **Core Runner Integration (`core/runner.ts`)**
+  - [x] Refactor runner to accept `Reporter` parameter (dependency injection, replacing all `console.log` calls)
+  - [x] Emit events through Reporter methods (`onTestStart`, `onTestPass`, `onTestFail`, `onTestError`, `onGitReset`, `onFileWrite`)
+  - [x] Track precise execution time per test with `durationMs` in `TestResultEvent`
+  - [x] Gracefully handle multi-line error outputs via `onTestError` and truncation helpers
 
-- [ ] **Documentation (`apps/docs`)**
-  - [ ] Update the CLI Reference page with examples of the new terminal output
-  - [ ] Document the new CLI flags (`--silent`, `--reporter`, etc.)
+- [x] **Testing**
+  - [x] Unit tests for `DefaultReporter`, `SilentReporter`, `VerboseReporter` (`reporter.test.ts`, 22 tests)
+  - [x] Existing runner tests continue to pass (reporter parameter is optional)
+  - [x] Total: 261 tests passing (134 core + 127 UI)
+
+- [x] **Documentation (`apps/docs`)**
+  - [x] Updated CLI Reference (`guide/cli.md`) with `--silent`/`--verbose` flags, reporter modes diagram, output examples
+  - [x] Exported `Reporter`, `DefaultReporter`, `SilentReporter`, `VerboseReporter` from public API
 
 ---
 

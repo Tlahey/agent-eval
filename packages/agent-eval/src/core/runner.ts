@@ -1,7 +1,6 @@
 import { execSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import chalk from "chalk";
 import { EvalContext } from "./context.js";
 import { gitResetHard } from "../git/git.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
@@ -12,6 +11,8 @@ import type {
   LedgerEntry,
   TestDefinition,
 } from "./types.js";
+import type { Reporter, TestResultEvent } from "./reporter.js";
+import { SilentReporter } from "./reporter.js";
 
 // ─── File operation types for API runner structured output ───
 
@@ -61,7 +62,12 @@ async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
 /**
  * Create the raw AgentHandle for a given runner config.
  */
-function createRawAgent(runner: AgentRunnerConfig, cwd: string): AgentHandle {
+function createRawAgent(
+  runner: AgentRunnerConfig,
+  cwd: string,
+  reporter: Reporter,
+  testId: string,
+): AgentHandle {
   return {
     name: runner.name,
     model: runner.api?.model ?? runner.command ?? "unknown",
@@ -115,7 +121,7 @@ Respond with the list of files to create or modify. Each file must include the f
           const fullPath = resolve(cwd, file.path);
           mkdirSync(dirname(fullPath), { recursive: true });
           writeFileSync(fullPath, file.content, "utf-8");
-          console.log(chalk.dim(`  📝 wrote ${file.path}`));
+          reporter.onFileWrite({ testId, runner: runner.name }, file.path);
         }
       } else {
         throw new Error(`Unknown runner type: ${(runner as AgentRunnerConfig).type}`);
@@ -132,8 +138,10 @@ function createAgent(
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
+  reporter: Reporter,
+  testId: string,
 ): AgentHandle {
-  const raw = createRawAgent(runner, cwd);
+  const raw = createRawAgent(runner, cwd, reporter, testId);
 
   return {
     name: raw.name,
@@ -169,29 +177,34 @@ export interface RunResult {
 export async function runTest(
   testDef: TestDefinition,
   config: AgentEvalConfig,
+  reporter?: Reporter,
 ): Promise<RunResult[]> {
+  const rep = reporter ?? new SilentReporter();
   const cwd = config.rootDir ?? process.cwd();
   const outputDir = config.outputDir ?? ".agenteval";
   const runners = config.matrix?.runners
     ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
     : config.runners;
 
+  const allEvents: TestResultEvent[] = [];
   const results: RunResult[] = [];
 
   for (const runner of runners) {
-    console.log(chalk.blue(`\n▶ ${testDef.title}`) + chalk.gray(` [${runner.name}]`));
+    const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
+    rep.onTestStart(event);
 
     // Reset git state before each runner
-    console.log(chalk.dim("  ↺ git reset --hard && git clean -fd"));
+    rep.onGitReset(event);
     gitResetHard(cwd);
 
     const ctx = new EvalContext(cwd);
-    const agent = createAgent(runner, cwd, ctx, config);
+    const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title);
     const start = Date.now();
 
     try {
       await testDef.fn({ agent, ctx, judge: config.judge });
 
+      const durationMs = Date.now() - start;
       const entry: LedgerEntry = {
         testId: testDef.title,
         suitePath: testDef.suitePath ?? [],
@@ -206,7 +219,7 @@ export async function runTest(
           diff: ctx.diff,
           commands: ctx.commands,
         },
-        durationMs: Date.now() - start,
+        durationMs,
       };
 
       // If the test fn stored judge results via expect(), they'll be in the
@@ -222,9 +235,13 @@ export async function runTest(
 
       appendLedgerEntry(outputDir, entry);
 
-      const icon = entry.pass ? chalk.green("✓") : chalk.red("✗");
-      const scoreStr = chalk.yellow(`${entry.score.toFixed(2)}`);
-      console.log(`  ${icon} Score: ${scoreStr} – ${entry.pass ? "PASS" : "FAIL"}`);
+      const resultEvent = { ...event, entry, durationMs };
+      if (entry.pass) {
+        rep.onTestPass(resultEvent);
+      } else {
+        rep.onTestFail(resultEvent);
+      }
+      allEvents.push(resultEvent);
 
       results.push({
         testId: testDef.title,
@@ -234,9 +251,9 @@ export async function runTest(
       });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      rep.onTestError(event, errorMsg);
 
-      console.log(chalk.red(`  ✗ Error: ${errorMsg}`));
-
+      const durationMs = Date.now() - start;
       const entry: LedgerEntry = {
         testId: testDef.title,
         suitePath: testDef.suitePath ?? [],
@@ -251,10 +268,11 @@ export async function runTest(
           diff: ctx.diff,
           commands: ctx.commands,
         },
-        durationMs: Date.now() - start,
+        durationMs,
       };
 
       appendLedgerEntry(outputDir, entry);
+      allEvents.push({ ...event, entry, durationMs });
       results.push({
         testId: testDef.title,
         runner: runner.name,
