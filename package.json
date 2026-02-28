@@ -7,7 +7,7 @@
     "build": "pnpm --filter agent-eval build",
     "dev": "pnpm --filter docs dev",
     "docs:build": "pnpm --filter docs build",
-    "test": "pnpm --filter agent-eval test",
+    "test": "pnpm --filter agent-eval test && pnpm --filter eval-ui test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

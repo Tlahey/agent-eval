@@ -173,6 +173,26 @@ git commit -m "docs(readme): add quick start guide"
 - Use `describe` / `it` blocks with clear descriptions
 - Mock external dependencies (git commands, LLM APIs) — don't make real API calls in tests
 - Test edge cases: empty inputs, missing files, malformed data
+- **Every source file must have a corresponding test file**
+- Aim for **95%+ coverage** (statements, functions, lines) and **85%+ branch coverage**
+
+### eval-ui Testing Guidelines
+
+The `apps/eval-ui` dashboard uses **Vitest + Testing Library** for component tests:
+
+- **Framework**: Vitest with `jsdom` environment, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`
+- **Colocated tests**: `src/components/Sidebar.tsx` → `src/components/Sidebar.test.tsx`
+- **Every component and page must have a test file**
+- **Test helpers** in `src/test/`:
+  - `setup.ts` — Vitest setup file with jest-dom matchers
+  - `fixtures.ts` — Mock data factories (`createMockRun()`, `createMockRuns()`, `createMockStats()`)
+  - `render.tsx` — `renderWithRouter()` for components needing React Router, `renderPage()` for pages needing `useOutletContext`
+- **Mocking patterns**:
+  - Mock API functions with `vi.mock("../lib/api")` — never make real API calls
+  - Mock `recharts` `ResponsiveContainer` to avoid SVG measurement issues in jsdom
+  - Use `waitFor()` for async state updates (data fetching, etc.)
+- **CSS `uppercase`**: Text styled with CSS `uppercase` retains its original casing in the DOM — match against source text, not visual text
+- **Run tests**: `pnpm --filter eval-ui test` or `cd apps/eval-ui && npx vitest run`
 
 ### Coverage Requirements
 
