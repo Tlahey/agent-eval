@@ -133,6 +133,105 @@ git add -A
 git commit -m "<type>(<scope>): <description>"
 ```
 
+### 5. Open a Pull Request before merging
+
+**Every change MUST go through a Pull Request (PR). Never push directly to `main`.**
+
+Create a feature branch, push your commits, then open a PR on GitHub:
+
+```bash
+# Create a feature branch from main
+git checkout -b feat/<scope>-<short-description>
+
+# ... make your changes, commit ...
+
+# Push the branch
+git push origin feat/<scope>-<short-description>
+
+# Open a PR via GitHub CLI
+gh pr create --title "<type>(<scope>): <description>" --body-file -
+```
+
+#### PR Description Template
+
+The PR description **must** contain a structured summary (always in English) that clearly explains the entire feature. Use the following template:
+
+```markdown
+## Summary
+
+One-paragraph high-level description of **what** this PR does and **why**.
+
+## Changes
+
+Bullet list of all meaningful changes, grouped by area:
+
+### Core (`packages/agent-eval/src/`)
+
+- `core/types.ts` — Added `Foo` interface, extended `Bar` with `baz` field
+- `core/runner.ts` — Integrated new `Foo` into execution pipeline
+- ...
+
+### UI (`apps/eval-ui/src/`)
+
+- `components/FooCard.tsx` — New component for displaying Foo data
+- `pages/Overview.tsx` — Added Foo KPI card to dashboard
+- ...
+
+### Documentation (`apps/docs/`)
+
+- `guide/configuration.md` — Added Foo config section with Mermaid diagram
+- `api/expect.md` — Updated JudgeOptions with new `foo` option
+- ...
+
+### Tests
+
+- Added X new tests (total: Y core + Z UI = N)
+- Key test scenarios: ...
+
+## How to test
+
+Step-by-step instructions for the reviewer to verify the feature:
+
+1. `pnpm install && pnpm build`
+2. `node --experimental-strip-types scripts/seed-ledger.ts`
+3. `cd apps/eval-ui && pnpm dev` — check the dashboard
+4. `pnpm test` — all N tests should pass
+
+## Screenshots / Recordings
+
+_(Optional but recommended for UI changes)_
+
+## Breaking changes
+
+List any breaking changes, or write "None" if backward compatible.
+```
+
+#### PR Rules
+
+- **One feature per PR.** Don't bundle unrelated changes.
+- **The PR title follows [Conventional Commits](https://www.conventionalcommits.org/)** — same format as commit messages.
+- **The description must be in English**, even if the discussion happens in another language.
+- **All CI checks must pass** before merging (lint, test, build, typecheck).
+- **Squash-merge into `main`** to keep a clean linear history.
+- **Delete the feature branch** after merging.
+- **Link related issues** using `Closes #123` or `Fixes #456` in the description when applicable.
+
+```mermaid
+flowchart LR
+    A["Feature branch\nfeat/thresholds"] --> B["Commits\n(lint+test+build)"]
+    B --> C["Push branch"]
+    C --> D["Open PR\n(structured description)"]
+    D --> E["CI passes ✅"]
+    E --> F["Review & Approve"]
+    F --> G["Squash-merge\ninto main"]
+    G --> H["Delete branch"]
+
+    style A fill:#6366f1,color:#fff
+    style D fill:#f59e0b,color:#000
+    style E fill:#10b981,color:#fff
+    style G fill:#4f46e5,color:#fff
+```
+
 ### Commit Convention
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
@@ -159,10 +258,12 @@ git commit -m "docs(readme): add quick start guide"
 
 - **ALL 4 gates must pass before committing:** lint ✅ → format ✅ → test ✅ → build ✅
 - **Husky enforces this automatically.** The pre-commit hook runs `lint-staged` (ESLint + Prettier on staged files), `pnpm test`, and `pnpm build`. A failure at any step blocks the commit.
+- **NEVER push directly to `main`.** Always go through a Pull Request.
 - **NEVER leave working code uncommitted.** If it passes all gates, commit it.
 - **NEVER commit broken code.** Never use `--no-verify` to bypass the hook.
 - **Commit frequently.** Small, focused commits are better than large ones.
 - **Write tests for every new feature or bug fix.**
+- **Open a PR with a structured description** before merging into `main`.
 - **If you're unsure whether to commit, commit.** You can always amend or squash later.
 
 ### Testing Guidelines
