@@ -128,31 +128,53 @@ Build must succeed with zero errors.
 
 ### 4. Commit when green
 
-Once lint + format + tests + build all succeed, **commit immediately**:
+Once lint + format + tests + build all succeed, **commit immediately to your feature branch**:
 
 ```bash
 git add -A
 git commit -m "<type>(<scope>): <description>"
 ```
 
-### 5. Open a Pull Request before merging
+> ⚠️ **You MUST always work on a feature branch, never on `main`.**
+> Before starting any work, create a branch: `git checkout -b <type>/<scope>-<short-description>`
 
-**Every change MUST go through a Pull Request (PR). Never push directly to `main`.**
+### 5. Push and open a Pull Request
 
-Create a feature branch, push your commits, then open a PR on GitHub:
+**Every change MUST go through a Pull Request (PR). The maintainer validates and merges — never merge yourself.**
 
 ```bash
-# Create a feature branch from main
+# 1. Create a feature branch BEFORE starting work
 git checkout -b feat/<scope>-<short-description>
 
-# ... make your changes, commit ...
+# 2. ... make your changes, commit (gates must pass) ...
 
-# Push the branch
+# 3. Push the branch
 git push origin feat/<scope>-<short-description>
 
-# Open a PR via GitHub CLI
-gh pr create --title "<type>(<scope>): <description>" --body-file -
+# 4. Open a PR via GitHub CLI
+gh pr create --title "<type>(<scope>): <description>" --body "$(cat <<'EOF'
+## Summary
+...
+EOF
+)"
 ```
+
+```mermaid
+flowchart LR
+    A["1. Create\nfeature branch"] --> B["2. Code + commit\n(lint+test+build)"]
+    B --> C["3. Push branch"]
+    C --> D["4. Open PR\n(gh pr create)"]
+    D --> E["5. CI runs ✅"]
+    E --> F["6. Maintainer\nreviews & merges"]
+    F --> G["7. Delete branch"]
+
+    style A fill:#6366f1,color:#fff
+    style D fill:#f59e0b,color:#000
+    style E fill:#10b981,color:#fff
+    style F fill:#ef4444,color:#fff
+```
+
+> 🔴 **Step 6 is done by the maintainer, not by you.** Your job ends at step 5 (CI green). Wait for approval.
 
 #### PR Description Template
 
@@ -210,29 +232,15 @@ List any breaking changes, or write "None" if backward compatible.
 
 #### PR Rules
 
+- **ALWAYS work on a feature branch.** Never commit directly to `main`.
 - **One feature per PR.** Don't bundle unrelated changes.
 - **The PR title follows [Conventional Commits](https://www.conventionalcommits.org/)** — same format as commit messages.
 - **The description must be in English**, even if the discussion happens in another language.
-- **All CI checks must pass** before merging (lint, test, build, typecheck).
+- **All CI checks must pass** before the PR can be merged (lint, format, test, build, typecheck).
+- **Only the maintainer merges.** You open the PR and ensure CI is green — the maintainer reviews and approves the merge.
 - **Squash-merge into `main`** to keep a clean linear history.
 - **Delete the feature branch** after merging.
 - **Link related issues** using `Closes #123` or `Fixes #456` in the description when applicable.
-
-```mermaid
-flowchart LR
-    A["Feature branch\nfeat/thresholds"] --> B["Commits\n(lint+test+build)"]
-    B --> C["Push branch"]
-    C --> D["Open PR\n(structured description)"]
-    D --> E["CI passes ✅"]
-    E --> F["Review & Approve"]
-    F --> G["Squash-merge\ninto main"]
-    G --> H["Delete branch"]
-
-    style A fill:#6366f1,color:#fff
-    style D fill:#f59e0b,color:#000
-    style E fill:#10b981,color:#fff
-    style G fill:#4f46e5,color:#fff
-```
 
 ### Commit Convention
 
@@ -260,12 +268,13 @@ git commit -m "docs(readme): add quick start guide"
 
 - **ALL 4 gates must pass before committing:** lint ✅ → format ✅ → test ✅ → build ✅
 - **Husky enforces this automatically.** The pre-commit hook runs `lint-staged` (ESLint + Prettier on staged files), `pnpm test`, and `pnpm build`. A failure at any step blocks the commit.
-- **NEVER push directly to `main`.** Always go through a Pull Request.
+- **NEVER commit or push directly to `main`.** Always work on a feature branch and open a Pull Request.
+- **NEVER merge your own PR.** The maintainer reviews and merges.
 - **NEVER leave working code uncommitted.** If it passes all gates, commit it.
 - **NEVER commit broken code.** Never use `--no-verify` to bypass the hook.
 - **Commit frequently.** Small, focused commits are better than large ones.
 - **Write tests for every new feature or bug fix.**
-- **Open a PR with a structured description** before merging into `main`.
+- **Open a PR with a structured description** and wait for CI + maintainer approval.
 - **If you're unsure whether to commit, commit.** You can always amend or squash later.
 
 ### Testing Guidelines
