@@ -31,6 +31,7 @@ function initDb(): InstanceType<typeof DatabaseSync> {
     CREATE TABLE IF NOT EXISTS runs (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       test_id      TEXT    NOT NULL,
+      suite_path   TEXT    NOT NULL DEFAULT '[]',
       timestamp    TEXT    NOT NULL,
       agent_runner TEXT    NOT NULL,
       judge_model  TEXT    NOT NULL,
@@ -67,6 +68,15 @@ const TEST_IDS = [
   "create dark mode toggle",
   "refactor API service layer",
 ] as const;
+
+/** Suite hierarchy for each test (simulates describe() nesting) */
+const SUITE_PATHS: Record<string, string[]> = {
+  "add close button to Banner": ["UI Components", "Banner"],
+  "implement search with debounce": ["UI Components", "Search"],
+  "add loading spinner": ["UI Components"],
+  "create dark mode toggle": ["Theme"],
+  "refactor API service layer": [], // top-level test, no suite
+};
 
 const RUNNERS: Record<string, { min: number; max: number }> = {
   copilot: { min: 0.7, max: 0.95 },
@@ -771,8 +781,8 @@ function seed(): void {
   const db = initDb();
 
   const stmt = db.prepare(`
-    INSERT INTO runs (test_id, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
@@ -806,6 +816,7 @@ function seed(): void {
 
         stmt.run(
           testId,
+          JSON.stringify(SUITE_PATHS[testId] ?? []),
           ts.toISOString(),
           runner,
           pick(JUDGE_MODELS),

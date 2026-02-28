@@ -29,6 +29,7 @@ function createEvalRuns(): LedgerRun[] {
       createMockRun({
         id: ri * 3 + i + 1,
         testId: "create dark mode toggle",
+        suitePath: ["Theme"],
         agentRunner: runner,
         score: 0.6 + ri * 0.08 + i * 0.03,
         pass: ri * 3 + i !== 2, // one failure
@@ -120,6 +121,13 @@ describe("EvalDetail", () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
       expect(screen.getByText("Evaluations")).toBeInTheDocument();
+    });
+  });
+
+  it("shows suite path in breadcrumbs", async () => {
+    renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
+    await waitFor(() => {
+      expect(screen.getByText("Theme")).toBeInTheDocument();
     });
   });
 

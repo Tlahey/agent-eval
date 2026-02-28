@@ -124,11 +124,12 @@ agenteval view [options]   # alias
 
 ### API Endpoints
 
-| Endpoint         | Description                          |
-| ---------------- | ------------------------------------ |
-| `GET /api/runs`  | All runs (filter with `?testId=...`) |
-| `GET /api/tests` | List of unique test IDs              |
-| `GET /api/stats` | Aggregate stats per runner per test  |
+| Endpoint         | Description                             |
+| ---------------- | --------------------------------------- |
+| `GET /api/runs`  | All runs (filter with `?testId=...`)    |
+| `GET /api/tests` | List of unique test IDs                 |
+| `GET /api/tree`  | Hierarchical test tree (suites + tests) |
+| `GET /api/stats` | Aggregate stats per runner per test     |
 
 ### Examples
 

@@ -53,7 +53,7 @@ agent-eval/
 │       │   │   └── ledger.test.ts
 │       │   ├── cli/       ← CLI binary
 │       │   │   └── cli.ts         ← agenteval run|ledger|ui
-│       │   └── index.ts   ← Public API (test, expect, defineConfig)
+│       │   └── index.ts   ← Public API (test, describe, expect, defineConfig)
 │       ├── tsup.config.ts ← Build config (ESM + CJS + DTS)
 │       └── tsconfig.json
 └── docs/adrs/             ← Architecture Decision Records

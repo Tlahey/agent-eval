@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchRuns, fetchRun, fetchTestIds, fetchStats } from "./api";
+import { fetchRuns, fetchRun, fetchTestIds, fetchTestTree, fetchStats } from "./api";
 
 describe("API client", () => {
   const originalFetch = globalThis.fetch;
@@ -113,6 +113,41 @@ describe("API client", () => {
       } as unknown as Response);
 
       await expect(fetchStats()).rejects.toThrow("Failed to fetch stats");
+    });
+  });
+
+  describe("fetchTestTree", () => {
+    it("fetches test tree from /api/tree", async () => {
+      await fetchTestTree();
+      expect(fetch).toHaveBeenCalledWith("/api/tree");
+    });
+
+    it("returns the parsed tree structure", async () => {
+      const mockTree = [
+        {
+          name: "Suite",
+          type: "suite",
+          children: [{ name: "test1", type: "test", testId: "test1" }],
+        },
+      ];
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockTree),
+        statusText: "OK",
+      } as unknown as Response);
+
+      const result = await fetchTestTree();
+      expect(result).toEqual(mockTree);
+    });
+
+    it("throws on non-OK response", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        statusText: "Service Unavailable",
+        json: vi.fn(),
+      } as unknown as Response);
+
+      await expect(fetchTestTree()).rejects.toThrow("Failed to fetch test tree");
     });
   });
 });

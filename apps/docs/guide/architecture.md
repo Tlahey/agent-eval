@@ -229,6 +229,7 @@ erDiagram
     RUNS {
         int id PK "auto-increment"
         text test_id "test title"
+        text suite_path "JSON array of suite names"
         text timestamp "ISO 8601"
         text agent_runner "runner name"
         text agent_model "runner model"

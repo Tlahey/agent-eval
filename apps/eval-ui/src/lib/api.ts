@@ -10,6 +10,7 @@ export interface CommandResult {
 export interface LedgerRun {
   id?: number;
   testId: string;
+  suitePath: string[];
   timestamp: string;
   agentRunner: string;
   judgeModel: string;
@@ -49,6 +50,20 @@ export async function fetchRun(id: number): Promise<LedgerRun> {
 export async function fetchTestIds(): Promise<string[]> {
   const res = await fetch(`${BASE}/tests`);
   if (!res.ok) throw new Error(`Failed to fetch tests: ${res.statusText}`);
+  return res.json();
+}
+
+/** A tree node representing a suite or test in the hierarchy */
+export interface TestTreeNode {
+  name: string;
+  type: "suite" | "test";
+  testId?: string;
+  children?: TestTreeNode[];
+}
+
+export async function fetchTestTree(): Promise<TestTreeNode[]> {
+  const res = await fetch(`${BASE}/tree`);
+  if (!res.ok) throw new Error(`Failed to fetch test tree: ${res.statusText}`);
   return res.json();
 }
 

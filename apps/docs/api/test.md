@@ -72,3 +72,77 @@ test.skip("WIP test", async ({ agent, ctx }) => {
   // This test is registered but skipped during execution
 });
 ```
+
+## describe()
+
+Group tests into named suites. Supports nesting.
+
+### Signature
+
+```ts
+function describe(name: string, fn: () => void): void;
+```
+
+### Parameters
+
+| Param  | Type         | Description                                            |
+| ------ | ------------ | ------------------------------------------------------ |
+| `name` | `string`     | Suite name (part of the hierarchy path)                |
+| `fn`   | `() => void` | Synchronous function that registers tests inside scope |
+
+### Suite Path
+
+Tests registered inside `describe()` blocks automatically get a `suitePath` array:
+
+```mermaid
+flowchart LR
+    D1["describe('UI')"] --> D2["describe('Banner')"]
+    D2 --> T["test('Add close button')"]
+    T --> SP["suitePath = ['UI', 'Banner']"]
+
+    style D1 fill:#6366f1,color:#fff
+    style D2 fill:#6366f1,color:#fff
+    style T fill:#f59e0b,color:#000
+    style SP fill:#10b981,color:#fff
+```
+
+### Usage
+
+```ts
+import { test, describe, expect } from "agent-eval";
+
+describe("UI Components", () => {
+  describe("Banner", () => {
+    test("Add close button", async ({ agent, ctx }) => {
+      await agent.run("Add a close button to the Banner component");
+      await expect(ctx).toPassJudge({ criteria: "Close button works" });
+    });
+
+    test("Add animation", async ({ agent, ctx }) => {
+      await agent.run("Add fade-in animation to Banner");
+      await expect(ctx).toPassJudge({ criteria: "Animation is smooth" });
+    });
+  });
+
+  describe("Search", () => {
+    test("Add debounce", async ({ agent, ctx }) => {
+      await agent.run("Implement search with debounce");
+      await expect(ctx).toPassJudge({ criteria: "Debounce works correctly" });
+    });
+  });
+});
+
+// Top-level tests (no suite) are also supported
+test("Standalone test", async ({ agent, ctx }) => {
+  await agent.run("Do something");
+  await expect(ctx).toPassJudge({ criteria: "..." });
+});
+```
+
+### How It Works
+
+1. `describe()` pushes the suite name onto a scope stack
+2. Tests registered inside the callback capture the current stack as `suitePath`
+3. After the callback, the suite name is popped from the stack
+4. If the callback throws, the stack is still cleaned up (try/finally)
+5. The `suitePath` is stored in the ledger as a JSON array in the `suite_path` column

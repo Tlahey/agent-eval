@@ -7,6 +7,7 @@ import {
   readLedger,
   readLedgerByTestId,
   getTestIds,
+  getTestTree,
   getLatestEntries,
   getRunnerStats,
 } from "./ledger.js";
@@ -21,6 +22,7 @@ function makeTmpDir(): string {
 function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
     testId: "test-1",
+    suitePath: [],
     timestamp: new Date().toISOString(),
     agentRunner: "mock-runner",
     judgeModel: "mock-model",
@@ -164,5 +166,60 @@ describe("ledger (SQLite)", () => {
     expect(copilot.avgScore).toBeCloseTo(0.7);
     expect(copilot.totalRuns).toBe(2);
     expect(copilot.passRate).toBe(0.5);
+  });
+
+  it("stores and retrieves suitePath as JSON", () => {
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "nested", suitePath: ["UI Components", "Banner"] }),
+    );
+
+    const entries = readLedger(tmpDir);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].suitePath).toEqual(["UI Components", "Banner"]);
+  });
+
+  it("defaults suitePath to empty array for entries without it", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "simple" }));
+
+    const entries = readLedger(tmpDir);
+    expect(entries[0].suitePath).toEqual([]);
+  });
+
+  it("getTestTree returns flat list for tests without suitePath", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "test-a" }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "test-b" }));
+
+    const tree = getTestTree(tmpDir);
+    expect(tree).toEqual([
+      { name: "test-a", type: "test", testId: "test-a" },
+      { name: "test-b", type: "test", testId: "test-b" },
+    ]);
+  });
+
+  it("getTestTree builds hierarchical structure from suitePaths", () => {
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ testId: "Add close button", suitePath: ["UI", "Banner"] }),
+    );
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "Add search", suitePath: ["UI", "Search"] }));
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "standalone" }));
+
+    const tree = getTestTree(tmpDir);
+    expect(tree).toHaveLength(2); // "UI" suite + "standalone" test
+
+    const uiSuite = tree.find((n) => n.name === "UI");
+    expect(uiSuite).toBeDefined();
+    expect(uiSuite!.type).toBe("suite");
+    expect(uiSuite!.children).toHaveLength(2); // Banner + Search
+
+    const bannerSuite = uiSuite!.children!.find((n) => n.name === "Banner");
+    expect(bannerSuite!.type).toBe("suite");
+    expect(bannerSuite!.children).toHaveLength(1);
+    expect(bannerSuite!.children![0].testId).toBe("Add close button");
+
+    const standalone = tree.find((n) => n.name === "standalone");
+    expect(standalone!.type).toBe("test");
+    expect(standalone!.testId).toBe("standalone");
   });
 });

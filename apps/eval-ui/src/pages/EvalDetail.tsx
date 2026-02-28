@@ -117,6 +117,9 @@ export function EvalDetail() {
   // Score distribution histogram
   const distribution = buildDistribution(runs);
 
+  // Derive suitePath from the first run (all runs for same testId share the same suitePath)
+  const suitePath = runs.length > 0 && runs[0].suitePath?.length > 0 ? runs[0].suitePath : [];
+
   return (
     <div className="p-6 space-y-6">
       {/* Breadcrumb */}
@@ -126,6 +129,12 @@ export function EvalDetail() {
         </Link>
         <span className="text-xs text-txt-muted">/</span>
         <span className="text-xs text-txt-muted">Evaluations</span>
+        {suitePath.map((segment, i) => (
+          <span key={i} className="flex items-center gap-2">
+            <span className="text-xs text-txt-muted">/</span>
+            <span className="text-xs text-txt-muted">{segment}</span>
+          </span>
+        ))}
         <span className="text-xs text-txt-muted">/</span>
         <span className="text-sm font-semibold text-txt-base">{testId}</span>
       </div>

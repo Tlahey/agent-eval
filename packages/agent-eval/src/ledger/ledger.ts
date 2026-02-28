@@ -21,6 +21,7 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
     CREATE TABLE IF NOT EXISTS runs (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       test_id      TEXT    NOT NULL,
+      suite_path   TEXT    NOT NULL DEFAULT '[]',
       timestamp    TEXT    NOT NULL,
       agent_runner TEXT    NOT NULL,
       judge_model  TEXT    NOT NULL,
@@ -43,6 +44,13 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
     // Column already exists — ignore
   }
 
+  // Migrate: add suite_path column if missing (backward compat with older DBs)
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN suite_path TEXT NOT NULL DEFAULT '[]'`);
+  } catch {
+    // Column already exists — ignore
+  }
+
   return db;
 }
 
@@ -51,6 +59,7 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
 interface RunRow {
   id: number;
   test_id: string;
+  suite_path: string;
   timestamp: string;
   agent_runner: string;
   judge_model: string;
@@ -64,9 +73,16 @@ interface RunRow {
 }
 
 function rowToEntry(row: RunRow): LedgerEntry {
+  let suitePath: string[];
+  try {
+    suitePath = JSON.parse(row.suite_path) as string[];
+  } catch {
+    suitePath = [];
+  }
   return {
     id: row.id,
     testId: row.test_id,
+    suitePath,
     timestamp: row.timestamp,
     agentRunner: row.agent_runner,
     judgeModel: row.judge_model,
@@ -89,11 +105,12 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
   const db = openDb(outputDir);
   try {
     const stmt = db.prepare(`
-      INSERT INTO runs (test_id, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, reason, improvement, diff, commands, duration_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
+      JSON.stringify(entry.suitePath ?? []),
       entry.timestamp,
       entry.agentRunner,
       entry.judgeModel,
@@ -152,6 +169,61 @@ export function getTestIds(outputDir: string): string[] {
       test_id: string;
     }>;
     return rows.map((r) => r.test_id);
+  } finally {
+    db.close();
+  }
+}
+
+/** A tree node representing a suite or test in the hierarchy */
+export interface TestTreeNode {
+  name: string;
+  type: "suite" | "test";
+  testId?: string;
+  children?: TestTreeNode[];
+}
+
+/**
+ * Get hierarchical test tree from the ledger.
+ * Groups tests by their suite_path into a tree structure.
+ */
+export function getTestTree(outputDir: string): TestTreeNode[] {
+  const db = openDb(outputDir);
+  try {
+    const rows = db
+      .prepare("SELECT DISTINCT test_id, suite_path FROM runs ORDER BY test_id")
+      .all() as unknown as Array<{ test_id: string; suite_path: string }>;
+
+    const root: TestTreeNode[] = [];
+
+    for (const row of rows) {
+      let suitePath: string[];
+      try {
+        suitePath = JSON.parse(row.suite_path) as string[];
+      } catch {
+        suitePath = [];
+      }
+
+      if (suitePath.length === 0) {
+        // Top-level test (no suite)
+        root.push({ name: row.test_id, type: "test", testId: row.test_id });
+        continue;
+      }
+
+      // Navigate into the tree, creating suite nodes as needed
+      let current = root;
+      for (const suiteName of suitePath) {
+        let suiteNode = current.find((n) => n.type === "suite" && n.name === suiteName);
+        if (!suiteNode) {
+          suiteNode = { name: suiteName, type: "suite", children: [] };
+          current.push(suiteNode);
+        }
+        if (!suiteNode.children) suiteNode.children = [];
+        current = suiteNode.children;
+      }
+      current.push({ name: row.test_id, type: "test", testId: row.test_id });
+    }
+
+    return root;
   } finally {
     db.close();
   }

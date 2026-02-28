@@ -132,6 +132,8 @@ export interface LedgerEntry {
   id?: number;
   /** Unique test identifier */
   testId: string;
+  /** Suite path from nested describe() blocks (e.g., ["UI Components", "Banner"]) */
+  suitePath: string[];
   /** ISO timestamp */
   timestamp: string;
   /** Agent model / runner name */
@@ -179,6 +181,8 @@ export interface TestDefinition {
   fn: TestFn;
   /** Optional tags for filtering */
   tags?: string[];
+  /** Suite path from nested describe() blocks (e.g., ["UI Components", "Banner"]) */
+  suitePath?: string[];
 }
 
 // ─── Expect ───

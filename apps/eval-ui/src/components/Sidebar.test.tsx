@@ -1,20 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "../test/render";
 import { Sidebar } from "./Sidebar";
+import { createMockTree } from "../test/fixtures";
 
 vi.mock("../lib/api", () => ({
-  fetchTestIds: vi.fn(),
+  fetchTestTree: vi.fn(),
 }));
 
-import { fetchTestIds } from "../lib/api";
+import { fetchTestTree } from "../lib/api";
 
-const mockFetchTestIds = vi.mocked(fetchTestIds);
+const mockFetchTestTree = vi.mocked(fetchTestTree);
 
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetchTestIds.mockResolvedValue([]);
+    mockFetchTestTree.mockResolvedValue([]);
   });
 
   it("renders the AgentEval branding", () => {
@@ -47,29 +49,54 @@ describe("Sidebar", () => {
     expect(screen.getByText("Evaluations")).toBeInTheDocument();
   });
 
-  it("fetches and renders evaluation links", async () => {
-    mockFetchTestIds.mockResolvedValue(["add close button", "implement search"]);
+  it("fetches and renders tree with suite nodes and test links", async () => {
+    mockFetchTestTree.mockResolvedValue(createMockTree());
     renderWithRouter(<Sidebar />);
 
     await waitFor(() => {
-      expect(screen.getByText("add close button")).toBeInTheDocument();
-      expect(screen.getByText("implement search")).toBeInTheDocument();
+      expect(screen.getByText("UI Components")).toBeInTheDocument();
+      expect(screen.getByText("Banner")).toBeInTheDocument();
+      expect(screen.getByText("add close button to Banner")).toBeInTheDocument();
+      expect(screen.getByText("refactor API service layer")).toBeInTheDocument();
     });
   });
 
-  it("renders evaluation links with correct href", async () => {
-    mockFetchTestIds.mockResolvedValue(["add close button"]);
+  it("renders test links with correct href", async () => {
+    mockFetchTestTree.mockResolvedValue([{ name: "my test", type: "test", testId: "my test" }]);
     renderWithRouter(<Sidebar />);
 
     await waitFor(() => {
-      const link = screen.getByText("add close button").closest("a");
-      expect(link).toHaveAttribute("href", "/evals/add%20close%20button");
+      const link = screen.getByText("my test").closest("a");
+      expect(link).toHaveAttribute("href", "/evals/my%20test");
     });
+  });
+
+  it("collapses and expands suite nodes on click", async () => {
+    const user = userEvent.setup();
+    mockFetchTestTree.mockResolvedValue([
+      {
+        name: "Suite",
+        type: "suite",
+        children: [{ name: "nested test", type: "test", testId: "nested test" }],
+      },
+    ]);
+    renderWithRouter(<Sidebar />);
+
+    await waitFor(() => {
+      expect(screen.getByText("nested test")).toBeInTheDocument();
+    });
+
+    // Click to collapse
+    await user.click(screen.getByText("Suite"));
+    expect(screen.queryByText("nested test")).not.toBeInTheDocument();
+
+    // Click to expand
+    await user.click(screen.getByText("Suite"));
+    expect(screen.getByText("nested test")).toBeInTheDocument();
   });
 
   it("shows empty state while evals have not loaded yet", () => {
-    // Never resolve
-    mockFetchTestIds.mockReturnValue(new Promise(() => {}));
+    mockFetchTestTree.mockReturnValue(new Promise(() => {}));
     renderWithRouter(<Sidebar />);
     expect(screen.getByText("No evaluations yet")).toBeInTheDocument();
   });

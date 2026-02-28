@@ -53,6 +53,56 @@ test("Test title", async ({ agent, ctx }) => {
 `storeDiff()` is called **automatically** after `agent.run()`. You can also define global `afterEach` commands in your config to run tests, builds, or linters automatically — no need to call them manually in every eval file. See [Configuration](./configuration.md#automatic-post-agent-hooks).
 :::
 
+## Grouping Tests with describe()
+
+Use `describe()` to organize tests into suites. Suites can be nested:
+
+```ts
+import { test, describe, expect } from "agent-eval";
+
+describe("UI Components", () => {
+  describe("Banner", () => {
+    test("Add close button", async ({ agent, ctx }) => {
+      await agent.run("Add a close button to the Banner component");
+      await expect(ctx).toPassJudge({ criteria: "Close button implemented" });
+    });
+
+    test("Add animation", async ({ agent, ctx }) => {
+      await agent.run("Add fade-in animation to Banner");
+      await expect(ctx).toPassJudge({ criteria: "Animation is smooth" });
+    });
+  });
+
+  describe("Search", () => {
+    test("Add debounce", async ({ agent, ctx }) => {
+      await agent.run("Implement search with debounce");
+      await expect(ctx).toPassJudge({ criteria: "Debounce works correctly" });
+    });
+  });
+});
+```
+
+```mermaid
+flowchart TD
+    ROOT["Test File"] --> UI["describe('UI Components')"]
+    ROOT --> STANDALONE["test('Standalone')"]
+    UI --> BANNER["describe('Banner')"]
+    UI --> SEARCH["describe('Search')"]
+    BANNER --> T1["test('Add close button')\nsuitePath: ['UI Components', 'Banner']"]
+    BANNER --> T2["test('Add animation')\nsuitePath: ['UI Components', 'Banner']"]
+    SEARCH --> T3["test('Add debounce')\nsuitePath: ['UI Components', 'Search']"]
+    STANDALONE --> T4["suitePath: undefined"]
+
+    style UI fill:#6366f1,color:#fff
+    style BANNER fill:#6366f1,color:#fff
+    style SEARCH fill:#6366f1,color:#fff
+    style T1 fill:#f59e0b,color:#000
+    style T2 fill:#f59e0b,color:#000
+    style T3 fill:#f59e0b,color:#000
+```
+
+The dashboard displays these suites as a collapsible tree in the sidebar, with breadcrumb navigation showing the full suite path.
+
 ## The Test Function
 
 The `test()` function receives an object with:

@@ -194,6 +194,7 @@ export async function runTest(
 
       const entry: LedgerEntry = {
         testId: testDef.title,
+        suitePath: testDef.suitePath ?? [],
         timestamp: new Date().toISOString(),
         agentRunner: runner.name,
         judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
@@ -238,6 +239,7 @@ export async function runTest(
 
       const entry: LedgerEntry = {
         testId: testDef.title,
+        suitePath: testDef.suitePath ?? [],
         timestamp: new Date().toISOString(),
         agentRunner: runner.name,
         judgeModel: config.judge.model ?? config.judge.command ?? "unknown",

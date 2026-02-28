@@ -1,5 +1,14 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ListChecks, FlaskConical, Beaker } from "lucide-react";
+import {
+  LayoutDashboard,
+  ListChecks,
+  FlaskConical,
+  Beaker,
+  ChevronRight,
+  Folder,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { fetchTestTree, type TestTreeNode } from "../lib/api";
 
 const NAV = [
   { to: "/", icon: LayoutDashboard, label: "Overview", end: true },
@@ -50,7 +59,7 @@ export function Sidebar() {
           Evaluations
         </span>
         <div className="flex-1 overflow-y-auto">
-          <EvalLinks currentPath={location.pathname} />
+          <EvalTree currentPath={location.pathname} />
         </div>
       </div>
 
@@ -64,38 +73,79 @@ export function Sidebar() {
   );
 }
 
-import { useEffect, useState } from "react";
-import { fetchTestIds } from "../lib/api";
-
-function EvalLinks({ currentPath }: { currentPath: string }) {
-  const [testIds, setTestIds] = useState<string[]>([]);
+function EvalTree({ currentPath }: { currentPath: string }) {
+  const [tree, setTree] = useState<TestTreeNode[]>([]);
 
   useEffect(() => {
-    fetchTestIds().then(setTestIds).catch(console.error);
+    fetchTestTree().then(setTree).catch(console.error);
   }, []);
+
+  if (tree.length === 0) {
+    return <p className="px-3 py-2 text-xs text-txt-muted italic">No evaluations yet</p>;
+  }
 
   return (
     <div className="flex flex-col gap-0.5">
-      {testIds.map((id) => {
-        const to = `/evals/${encodeURIComponent(id)}`;
-        const isActive = currentPath === to;
-        return (
-          <NavLink
-            key={id}
-            to={to}
-            className={`group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-              isActive
-                ? "bg-primary/10 text-primary"
-                : "text-txt-secondary hover:bg-surface-3 hover:text-txt-base"
-            }`}
-          >
-            <FlaskConical size={13} className={isActive ? "text-primary" : "text-txt-muted"} />
-            <span className="truncate">{id}</span>
-          </NavLink>
-        );
-      })}
-      {testIds.length === 0 && (
-        <p className="px-3 py-2 text-xs text-txt-muted italic">No evaluations yet</p>
+      {tree.map((node, i) => (
+        <TreeNode key={`${node.name}-${i}`} node={node} currentPath={currentPath} depth={0} />
+      ))}
+    </div>
+  );
+}
+
+function TreeNode({
+  node,
+  currentPath,
+  depth,
+}: {
+  node: TestTreeNode;
+  currentPath: string;
+  depth: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  if (node.type === "test") {
+    const to = `/evals/${encodeURIComponent(node.testId ?? node.name)}`;
+    const isActive = currentPath === to;
+    return (
+      <NavLink
+        to={to}
+        className={`group flex items-center gap-2 rounded-lg py-1.5 text-xs font-medium transition-all ${
+          isActive
+            ? "bg-primary/10 text-primary"
+            : "text-txt-secondary hover:bg-surface-3 hover:text-txt-base"
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 12}px` }}
+      >
+        <FlaskConical size={13} className={isActive ? "text-primary" : "text-txt-muted"} />
+        <span className="truncate">{node.name}</span>
+      </NavLink>
+    );
+  }
+
+  // Suite node
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="group flex w-full items-center gap-2 rounded-lg py-1.5 text-xs font-semibold text-txt-muted transition-all hover:bg-surface-3 hover:text-txt-base"
+        style={{ paddingLeft: `${depth * 12 + 12}px` }}
+      >
+        <ChevronRight size={12} className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
+        <Folder size={13} />
+        <span className="truncate">{node.name}</span>
+      </button>
+      {expanded && node.children && (
+        <div>
+          {node.children.map((child, i) => (
+            <TreeNode
+              key={`${child.name}-${i}`}
+              node={child}
+              currentPath={currentPath}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

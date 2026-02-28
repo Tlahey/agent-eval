@@ -39,9 +39,30 @@ Browse and filter all evaluation runs:
 
 Drill into a specific evaluation to see:
 
+- **Suite path breadcrumbs** showing the full `describe()` hierarchy
 - **Score over time** chart per runner
 - **Runner breakdown** cards showing averages
 - **All runs** for that evaluation in a sortable table
+
+### Suite Tree Navigation
+
+When tests are organized with `describe()`, the sidebar displays a **collapsible tree view**:
+
+```mermaid
+flowchart TD
+    UI["📁 UI Components"] --> BANNER["📁 Banner"]
+    UI --> SEARCH["📁 Search"]
+    BANNER --> T1["🧪 Add close button"]
+    BANNER --> T2["🧪 Add animation"]
+    SEARCH --> T3["🧪 Add debounce"]
+    TOP["🧪 refactor API service layer"]
+
+    style UI fill:#6366f1,color:#fff
+    style BANNER fill:#6366f1,color:#fff
+    style SEARCH fill:#6366f1,color:#fff
+```
+
+Suite nodes can be collapsed/expanded. Tests without a `describe()` wrapper appear at the top level.
 
 ### Run Detail Panel
 
@@ -82,12 +103,13 @@ flowchart LR
 
 ### API Endpoints
 
-| Endpoint                 | Description                         |
-| ------------------------ | ----------------------------------- |
-| `GET /api/runs`          | All runs                            |
-| `GET /api/runs?testId=X` | Runs filtered by evaluation         |
-| `GET /api/tests`         | List of unique test IDs             |
-| `GET /api/stats`         | Aggregate stats per runner per test |
+| Endpoint                 | Description                             |
+| ------------------------ | --------------------------------------- |
+| `GET /api/runs`          | All runs                                |
+| `GET /api/runs?testId=X` | Runs filtered by evaluation             |
+| `GET /api/tests`         | List of unique test IDs                 |
+| `GET /api/tree`          | Hierarchical test tree (suites + tests) |
+| `GET /api/stats`         | Aggregate stats per runner per test     |
 
 ### Tech Stack
 

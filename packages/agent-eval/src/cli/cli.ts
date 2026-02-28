@@ -13,6 +13,7 @@ import {
   readLedger,
   readLedgerByTestId,
   getTestIds,
+  getTestTree,
   getRunnerStats,
   getAllRunnerStats,
 } from "../ledger/ledger.js";
@@ -211,6 +212,8 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
         res.end(JSON.stringify(entries));
       } else if (url.pathname === "/api/tests") {
         res.end(JSON.stringify(getTestIds(outputDir)));
+      } else if (url.pathname === "/api/tree") {
+        res.end(JSON.stringify(getTestTree(outputDir)));
       } else if (url.pathname === "/api/stats") {
         const testId = url.searchParams.get("testId");
         const stats = testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir);
@@ -230,6 +233,7 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
     console.log(chalk.dim(`\n  Endpoints:`));
     console.log(chalk.dim(`    GET /api/runs          All runs (or ?testId=...)`));
     console.log(chalk.dim(`    GET /api/tests         List of test IDs`));
+    console.log(chalk.dim(`    GET /api/tree          Hierarchical test tree`));
     console.log(chalk.dim(`    GET /api/stats         Aggregate stats per runner`));
     console.log(chalk.dim(`\n  Press Ctrl+C to stop.\n`));
   });

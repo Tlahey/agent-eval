@@ -1,9 +1,11 @@
 import type { LedgerRun, CommandResult, RunnerStats } from "../lib/api";
+import type { TestTreeNode } from "../lib/api";
 
 export function createMockRun(overrides: Partial<LedgerRun> = {}): LedgerRun {
   return {
     id: 1,
     testId: "add close button to Banner",
+    suitePath: ["UI Components", "Banner"],
     timestamp: "2026-02-20T10:00:00.000Z",
     agentRunner: "copilot",
     judgeModel: "gpt-4o",
@@ -96,5 +98,39 @@ export function createMockCommands(): CommandResult[] {
       exitCode: 1,
       durationMs: 2000,
     },
+  ];
+}
+
+export function createMockTree(): TestTreeNode[] {
+  return [
+    {
+      name: "UI Components",
+      type: "suite",
+      children: [
+        {
+          name: "Banner",
+          type: "suite",
+          children: [
+            {
+              name: "add close button to Banner",
+              type: "test",
+              testId: "add close button to Banner",
+            },
+          ],
+        },
+        {
+          name: "Search",
+          type: "suite",
+          children: [
+            {
+              name: "implement search with debounce",
+              type: "test",
+              testId: "implement search with debounce",
+            },
+          ],
+        },
+      ],
+    },
+    { name: "refactor API service layer", type: "test", testId: "refactor API service layer" },
   ];
 }

@@ -160,6 +160,100 @@ This file tracks the implementation progress of the AgentEval framework. It is u
 - [x] Model matrix — `matrix.runners` to filter which runners execute
 - [x] Per-test model override — Override judge model in `toPassJudge()`
 
+## Phase 8 — Test Suites & Hierarchical Dashboard (`describe`)
+
+- [x] **Core API (`core/index.ts`)**
+  - [x] Implement and export the `describe(name, fn)` function
+  - [x] Handle nested scoping context to allow `describe` blocks inside `describe` blocks
+  - [x] Update test registration to capture the full namespace path (e.g., `['UI Components', 'Banner']`)
+  - [x] Add `suitePath?: string[]` to `TestDefinition` and `LedgerEntry` types
+
+- [x] **Ledger & Database (`ledger/ledger.ts`)**
+  - [x] Update SQLite schema — added `suite_path TEXT NOT NULL DEFAULT '[]'` column
+  - [x] Backward compatibility with migration for older databases
+  - [x] `getTestTree()` function — builds hierarchical tree structure from flat suite paths
+  - [x] Updated `appendLedgerEntry` and `rowToEntry` for suite_path JSON serialization
+
+- [x] **Visual Dashboard (`apps/eval-ui`)**
+  - [x] New `/api/tree` endpoint returns hierarchical `TestTreeNode[]` structure
+  - [x] **Sidebar:** Collapsible tree view with suite folders and test leaves
+  - [x] **Breadcrumbs:** Suite path segments shown in EvalDetail breadcrumb navigation
+  - [x] Updated seed data with suite paths for testing
+
+- [x] **Tests**
+  - [x] 9 new `describe()` tests (nested scoping, error recovery, tagged tests inside suites)
+  - [x] 3 new ledger tests (suitePath storage, getTestTree hierarchy)
+  - [x] Updated Sidebar tests for tree view (collapse/expand, suite nodes, test links)
+  - [x] New `fetchTestTree` API tests
+  - [x] Updated EvalDetail tests for breadcrumb suite paths
+
+- [x] **Documentation (`apps/docs`)**
+  - [x] `describe()` API reference in `api/test.md` with Mermaid diagram
+  - [x] "Grouping Tests with describe()" section in `guide/writing-tests.md`
+  - [x] Updated ER diagrams in `architecture.md` and `ledger.md` with `suite_path`
+  - [x] Suite tree navigation docs in `guide/dashboard.md`
+  - [x] Updated CLI and ledger API endpoint tables with `/api/tree`
+
+## Phase 9 — Human-in-the-Loop (HITL) Score Overrides
+
+- [ ] **Database & Ledger (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema to support audit trails (e.g., create a `score_overrides` table linked to `runs`, or add `manual_score`, `override_reason`, and `override_timestamp` columns to the `runs` table)
+  - [ ] Implement `overrideRunScore(runId, newScore, reason)` function
+  - [ ] Ensure the original LLM-generated score and reasoning are strictly preserved and never overwritten
+  - [ ] Update aggregation queries to prioritize the manual score over the LLM score in the overall stats
+
+- [ ] **API & Backend (`cli/server.ts`)**
+  - [ ] Add `PATCH /api/runs/:id/override` endpoint to handle score adjustment requests
+  - [ ] Implement strict validation (ensure the new score is between 0.0 and 1.0, and that the `reason` string is not empty)
+  - [ ] Add `GET /api/runs/:id/history` endpoint to fetch the audit trail of a specific run
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **RunDetailPanel:** Add an "Edit Score" action button next to the current LLM score
+  - [ ] **Override Modal:** Create a form component requiring the user to input the new score and a mandatory text area for the justification
+  - [ ] **Audit Trail View:** Add a "History" or "Changelog" section in the run details, displaying the original LLM score and a chronological list of all human adjustments
+  - [ ] **Visual Indicators:** Add a "Manually Adjusted" badge or icon in the `RunsTable` to easily identify evaluations that were corrected by a human
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Document the Human-in-the-Loop (HITL) workflow and the importance of tracking LLM mistakes
+  - [ ] Update the SQLite ER (Entity-Relationship) diagram to include the new override/history tables
+
+## Phase 10 — Custom Scoring Thresholds (Warn / Error)
+
+- [ ] **Core API (`core/index.ts` & `core/expect.ts`)**
+  - [ ] Extend test configuration or `toPassJudge()` options to accept `thresholds: { warn: number, fail: number }`
+  - [ ] Implement logic to compute the final test status (`PASS`, `WARN`, `FAIL`) based on the LLM's raw score and the custom thresholds
+  - [ ] Allow setting global default thresholds in `agenteval.config.ts`
+
+- [ ] **Database & Ledger (`ledger/ledger.ts`)**
+  - [ ] Update SQLite schema: migrate the boolean `pass` column to a `status` enum (`'PASS' | 'WARN' | 'FAIL'`)
+  - [ ] Store the applied `warn_threshold` and `fail_threshold` in the `runs` table to preserve historical context (if thresholds change in the codebase later, old runs remain accurate)
+
+- [ ] **Visual Dashboard (`apps/eval-ui`)**
+  - [ ] **Status Badges:** Introduce a yellow/orange "Warning" badge across the UI (RunsTable, Overview)
+  - [ ] **Score Gauge:** Update the circular `ScoreRing` component to visually indicate the threshold markers (e.g., red zone, yellow zone, green zone) based on the test's specific config
+  - [ ] **Metrics:** Include "Warnings" in the aggregate statistics (e.g., "Pass Rate" vs "Warn Rate")
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Add a guide on "Fuzzy Evaluation & Thresholds" explaining how to handle non-binary LLM scores
+  - [ ] Update API references for `test()`, `expect()`, and the configuration object
+
+## Phase 11 — Dynamic CLI Reporter & Summary Table
+
+- [ ] **CLI & UI Engine (`cli/reporter.ts`)**
+  - [ ] Integrate a terminal UI library (e.g., `ora`, `@clack/prompts`, or `picocolors`) to handle dynamic console output
+  - [ ] Implement real-time test progress indicators (spinners for running tests, `✓` for PASS, `⚠` for WARN, `✗` for FAIL)
+  - [ ] Build a final summary table output (displaying Test ID, Agent Model, Score, Status, and Duration) at the end of the execution suite
+  - [ ] Add support for CLI verbosity flags (e.g., `--silent` for CI environments, `--verbose` for detailed execution logs)
+
+- [ ] **Core Runner Integration (`core/runner.ts`)**
+  - [ ] Refactor the runner loop to decouple execution logic from standard `console.log` outputs (emit events or use a Reporter interface)
+  - [ ] Track precise execution time per test (and per agent runner) to feed the summary table
+  - [ ] Gracefully handle multi-line error outputs and LLM reasoning directly in the terminal without breaking the layout
+
+- [ ] **Documentation (`apps/docs`)**
+  - [ ] Update the CLI Reference page with examples of the new terminal output
+  - [ ] Document the new CLI flags (`--silent`, `--reporter`, etc.)
+
 ---
 
 ## Future — Planned

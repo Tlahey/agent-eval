@@ -5,6 +5,9 @@ import type { AgentEvalConfig, TestDefinition, TestFn } from "./core/types.js";
 
 const _tests: TestDefinition[] = [];
 
+/** Current describe() scope stack */
+let _suiteStack: string[] = [];
+
 /**
  * Register a test. This is the primary DX API.
  *
@@ -20,14 +23,23 @@ const _tests: TestDefinition[] = [];
  * ```
  */
 export function test(title: string, fn: TestFn): void {
-  _tests.push({ title, fn });
+  _tests.push({
+    title,
+    fn,
+    suitePath: _suiteStack.length > 0 ? [..._suiteStack] : undefined,
+  });
 }
 
 /**
  * Register a tagged test.
  */
 test.tagged = function (tags: string[], title: string, fn: TestFn): void {
-  _tests.push({ title, fn, tags });
+  _tests.push({
+    title,
+    fn,
+    tags,
+    suitePath: _suiteStack.length > 0 ? [..._suiteStack] : undefined,
+  });
 };
 
 /**
@@ -36,6 +48,33 @@ test.tagged = function (tags: string[], title: string, fn: TestFn): void {
 test.skip = function (_title: string, _fn: TestFn): void {
   // no-op: intentionally not registered
 };
+
+/**
+ * Group tests into a named suite. Supports nesting.
+ *
+ * @example
+ * ```ts
+ * import { test, describe, expect } from "agent-eval";
+ *
+ * describe("UI Components", () => {
+ *   describe("Banner", () => {
+ *     test("Add close button", async ({ agent, ctx }) => {
+ *       // suitePath = ["UI Components", "Banner"]
+ *       await agent.run("...");
+ *       await expect(ctx).toPassJudge({ criteria: "..." });
+ *     });
+ *   });
+ * });
+ * ```
+ */
+export function describe(name: string, fn: () => void): void {
+  _suiteStack.push(name);
+  try {
+    fn();
+  } finally {
+    _suiteStack.pop();
+  }
+}
 
 /**
  * Get all registered tests.
@@ -49,6 +88,7 @@ export function getRegisteredTests(): TestDefinition[] {
  */
 export function clearRegisteredTests(): void {
   _tests.length = 0;
+  _suiteStack = [];
 }
 
 /**
