@@ -10,7 +10,13 @@ vi.mock("../lib/api", async () => {
     ...actual,
     overrideScore: vi
       .fn()
-      .mockResolvedValue({ score: 0.9, pass: true, status: "PASS", reason: "test", timestamp: "2025-01-01" }),
+      .mockResolvedValue({
+        score: 0.9,
+        pass: true,
+        status: "PASS",
+        reason: "test",
+        timestamp: "2025-01-01",
+      }),
     fetchOverrides: vi.fn().mockResolvedValue([]),
   };
 });
@@ -163,7 +169,13 @@ describe("RunDetailPanel", () => {
 
   it("shows Adjusted badge when run has override", () => {
     const run = createMockRun({
-      override: { score: 0.9, pass: true, status: "PASS", reason: "Manual review", timestamp: "2025-01-01" },
+      override: {
+        score: 0.9,
+        pass: true,
+        status: "PASS",
+        reason: "Manual review",
+        timestamp: "2025-01-01",
+      },
     });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
     expect(screen.getByText("Adjusted")).toBeInTheDocument();
@@ -172,7 +184,13 @@ describe("RunDetailPanel", () => {
   it("uses override score for display when present", () => {
     const run = createMockRun({
       score: 0.3,
-      override: { score: 0.95, pass: true, status: "PASS", reason: "Review", timestamp: "2025-01-01" },
+      override: {
+        score: 0.95,
+        pass: true,
+        status: "PASS",
+        reason: "Review",
+        timestamp: "2025-01-01",
+      },
     });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
     // Should show override score (95) not original score (30)

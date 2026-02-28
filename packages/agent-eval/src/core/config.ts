@@ -2,6 +2,7 @@ import { createJiti } from "jiti";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import type { AgentEvalConfig } from "./types.js";
+import { validatePlugins, formatPluginErrors } from "./plugin-validator.js";
 
 const CONFIG_FILENAMES = ["agenteval.config.ts", "agenteval.config.js", "agenteval.config.mjs"];
 
@@ -51,6 +52,19 @@ export async function loadConfig(
     rootDir: cwd,
     ...(raw as Partial<AgentEvalConfig>),
   } as AgentEvalConfig;
+}
+
+/**
+ * Validate all plugins in a loaded config and throw with a descriptive
+ * message if any plugin fails validation.
+ *
+ * Call this after `loadConfig()` to fail fast with actionable errors.
+ */
+export function assertValidPlugins(config: AgentEvalConfig): void {
+  const errors = validatePlugins(config);
+  if (errors.length > 0) {
+    throw new Error(formatPluginErrors(errors));
+  }
 }
 
 /**

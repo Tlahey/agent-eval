@@ -90,7 +90,13 @@ describe("RunsTable", () => {
 
   it("shows Adjusted badge for overridden runs", () => {
     const run = createMockRun({
-      override: { score: 0.9, pass: true, status: "PASS", reason: "Manual", timestamp: "2025-01-01" },
+      override: {
+        score: 0.9,
+        pass: true,
+        status: "PASS",
+        reason: "Manual",
+        timestamp: "2025-01-01",
+      },
     });
     render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
     expect(screen.getByText("Adjusted")).toBeInTheDocument();

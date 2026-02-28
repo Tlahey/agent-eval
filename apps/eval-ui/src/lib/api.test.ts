@@ -161,7 +161,13 @@ describe("API client", () => {
 
   describe("overrideScore", () => {
     it("sends PATCH request with score and reason", async () => {
-      const mockResult = { score: 0.9, pass: true, status: "PASS", reason: "Adjusted", timestamp: "2025-01-01" };
+      const mockResult = {
+        score: 0.9,
+        pass: true,
+        status: "PASS",
+        reason: "Adjusted",
+        timestamp: "2025-01-01",
+      };
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue(mockResult),
@@ -197,7 +203,9 @@ describe("API client", () => {
     });
 
     it("returns parsed override array", async () => {
-      const mockData = [{ score: 0.8, pass: true, status: "PASS", reason: "test", timestamp: "2025-01-01" }];
+      const mockData = [
+        { score: 0.8, pass: true, status: "PASS", reason: "test", timestamp: "2025-01-01" },
+      ];
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue(mockData),

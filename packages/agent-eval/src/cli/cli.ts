@@ -8,7 +8,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { glob } from "glob";
 import { createJiti } from "jiti";
-import { loadConfig } from "../core/config.js";
+import { loadConfig, assertValidPlugins } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
 import { runTest } from "../core/runner.js";
 import { DefaultReporter, SilentReporter, VerboseReporter } from "../core/reporter.js";
@@ -37,6 +37,7 @@ function resolveLedger(
   outputDir: string,
   plugin?: ILedgerPlugin,
 ): {
+  name: string;
   getRuns: (testId?: string) => Promise<unknown[]> | unknown[];
   getTestIds: () => Promise<string[]> | string[];
   getTestTree: () => Promise<unknown[]> | unknown[];
@@ -46,6 +47,7 @@ function resolveLedger(
 } {
   if (plugin) {
     return {
+      name: plugin.name,
       getRuns: (testId) => plugin.getRuns(testId),
       getTestIds: () => plugin.getTestIds(),
       getTestTree: () => plugin.getTestTree(),
@@ -55,6 +57,7 @@ function resolveLedger(
     };
   }
   return {
+    name: "sqlite (built-in)",
     getRuns: (testId) => (testId ? readLedgerByTestId(outputDir, testId) : readLedger(outputDir)),
     getTestIds: () => getTestIds(outputDir),
     getTestTree: () => getTestTree(outputDir),
@@ -89,6 +92,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
 
   try {
     const config = await loadConfig(cwd, opts.config);
+    assertValidPlugins(config);
     if (opts.output) {
       config.outputDir = opts.output;
     }
@@ -199,6 +203,7 @@ program
       outputDir = resolve(cwd, opts.output);
     } else {
       const config = await loadConfig(cwd);
+      assertValidPlugins(config);
       outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
       ledgerPlugin = config.ledger;
     }
@@ -257,6 +262,7 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
     outputDir = resolve(cwd, opts.output);
   } else {
     const config = await loadConfig(cwd);
+    assertValidPlugins(config);
     outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
     ledgerPlugin = config.ledger;
   }
@@ -319,7 +325,9 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
       });
 
     const handleRequest = async (): Promise<void> => {
-      if (url.pathname === "/api/runs") {
+      if (url.pathname === "/api/health") {
+        res.end(JSON.stringify({ status: "ok", ledger: ledger.name }));
+      } else if (url.pathname === "/api/runs") {
         const testId = url.searchParams.get("testId");
         const entries = await ledger.getRuns(testId ?? undefined);
         res.end(JSON.stringify(entries));

@@ -103,7 +103,7 @@ export function initSession(config: AgentEvalConfig): void {
 // ─── Re-exports ───
 
 export { expect } from "./core/expect.js";
-export { defineConfig } from "./core/config.js";
+export { defineConfig, assertValidPlugins } from "./core/config.js";
 export { DefaultReporter, SilentReporter, VerboseReporter } from "./core/reporter.js";
 export type { Reporter, TestEvent, TestResultEvent } from "./core/reporter.js";
 export type {
@@ -142,3 +142,11 @@ export { BaseLLMPlugin } from "./llm/base-plugin.js";
 export { AnthropicLLM } from "./llm/anthropic-plugin.js";
 export { OpenAILLM } from "./llm/openai-plugin.js";
 export { OllamaLLM } from "./llm/ollama-plugin.js";
+export {
+  validatePlugins,
+  validateLedgerPlugin,
+  validateLLMPlugin,
+  validateJudgePlugin,
+  formatPluginErrors,
+} from "./core/plugin-validator.js";
+export type { PluginValidationError } from "./core/plugin-validator.js";
