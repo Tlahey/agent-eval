@@ -100,6 +100,34 @@ export interface AgentEvalConfig {
    * Defaults to { warn: 0.8, fail: 0.5 }.
    */
   thresholds?: Thresholds;
+  /**
+   * Ledger plugin instance for result storage.
+   * If not provided, defaults to the built-in SQLite ledger.
+   *
+   * @example
+   * ```ts
+   * import { SqliteLedger } from "agent-eval";
+   * export default defineConfig({
+   *   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
+   *   // ...
+   * });
+   * ```
+   */
+  ledger?: import("./interfaces.js").ILedgerPlugin;
+  /**
+   * LLM plugins for judge evaluation and API runners.
+   * When provided, these are used instead of the built-in Vercel AI SDK integrations.
+   *
+   * @example
+   * ```ts
+   * import { AnthropicLLM } from "agent-eval";
+   * export default defineConfig({
+   *   llm: new AnthropicLLM({ model: "claude-sonnet-4-20250514" }),
+   *   // ...
+   * });
+   * ```
+   */
+  llm?: import("./interfaces.js").ILLMPlugin;
 }
 
 export interface AfterEachCommand {
@@ -138,8 +166,8 @@ export interface TestContext {
 export interface JudgeResult {
   /** Whether the test passed the judge evaluation (PASS or WARN = true, FAIL = false) */
   pass: boolean;
-  /** Rich status: PASS, WARN, or FAIL */
-  status: TestStatus;
+  /** Rich status: PASS, WARN, or FAIL — computed by the runner using thresholds */
+  status?: TestStatus;
   /** Score from 0.0 to 1.0 */
   score: number;
   /** Markdown-formatted reason / explanation */

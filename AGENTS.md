@@ -37,11 +37,13 @@ agent-eval/
 │       ├── src/
 │       │   ├── core/      ← Core modules
 │       │   │   ├── types.ts       ← All TypeScript interfaces
+│       │   │   ├── interfaces.ts  ← Plugin contracts (ILedgerPlugin, ILLMPlugin, IJudgePlugin)
+│       │   │   ├── interfaces.test.ts
 │       │   │   ├── config.ts      ← Config file loader (jiti)
 │       │   │   ├── config.test.ts
 │       │   │   ├── context.ts     ← TestContext (storeDiff, runCommand)
 │       │   │   ├── context.test.ts
-│       │   │   ├── runner.ts      ← Sequential test execution engine
+│       │   │   ├── runner.ts      ← Sequential test execution engine (DI-ready)
 │       │   │   ├── runner.test.ts
 │       │   │   ├── expect.ts      ← Fluent assertion API
 │       │   │   └── index.test.ts  ← test() registration tests
@@ -50,12 +52,22 @@ agent-eval/
 │       │   │   └── git.test.ts
 │       │   ├── judge/     ← LLM-as-a-Judge
 │       │   │   └── judge.ts       ← Vercel AI SDK + Zod structured output
-│       │   ├── ledger/    ← SQLite result storage
-│       │   │   ├── ledger.ts      ← node:sqlite DatabaseSync
-│       │   │   └── ledger.test.ts
+│       │   ├── ledger/    ← Result storage plugins
+│       │   │   ├── ledger.ts        ← Built-in SQLite (node:sqlite DatabaseSync)
+│       │   │   ├── ledger.test.ts
+│       │   │   ├── sqlite-plugin.ts ← SqliteLedger (ILedgerPlugin wrapper)
+│       │   │   ├── json-plugin.ts   ← JsonLedger (JSONL-based, no SQLite)
+│       │   │   └── json-plugin.test.ts
+│       │   ├── llm/       ← LLM provider plugins
+│       │   │   ├── base-plugin.ts     ← BaseLLMPlugin abstract class
+│       │   │   ├── anthropic-plugin.ts ← AnthropicLLM
+│       │   │   ├── openai-plugin.ts    ← OpenAILLM
+│       │   │   ├── ollama-plugin.ts    ← OllamaLLM
+│       │   │   ├── index.ts           ← Barrel exports
+│       │   │   └── llm-plugins.test.ts
 │       │   ├── cli/       ← CLI binary
-│       │   │   └── cli.ts         ← agenteval run|ledger|ui
-│       │   └── index.ts   ← Public API (test, describe, expect, defineConfig)
+│       │   │   └── cli.ts         ← agenteval run|ledger|ui (DI-ready)
+│       │   └── index.ts   ← Public API (test, describe, expect, defineConfig, plugins)
 │       ├── tsup.config.ts ← Build config (ESM + CJS + DTS)
 │       └── tsconfig.json
 └── docs/adrs/             ← Architecture Decision Records
@@ -369,21 +381,25 @@ flowchart TD
 
 ### Code → Documentation Cross-Reference
 
-| Code file changed  | Documentation files to update                                                    |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `core/types.ts`    | `api/define-config.md`, `api/test.md`, `api/expect.md`, `api/context.md`         |
-| `core/config.ts`   | `guide/configuration.md`, `api/define-config.md`                                 |
-| `core/context.ts`  | `api/context.md`, `guide/writing-tests.md`                                       |
-| `core/runner.ts`   | `guide/runners.md`, `guide/architecture.md`                                      |
-| `core/expect.ts`   | `api/expect.md`, `guide/writing-tests.md`                                        |
-| `git/git.ts`       | `guide/architecture.md`                                                          |
-| `judge/judge.ts`   | `guide/judges.md`, `api/expect.md`                                               |
-| `ledger/ledger.ts` | `api/ledger.md`, `guide/architecture.md`                                         |
-| `cli/cli.ts`       | `guide/cli.md`                                                                   |
-| `apps/eval-ui/**`  | `guide/dashboard.md`                                                             |
-| Any new feature    | `guide/getting-started.md` (if user-facing), `README.md`, `AGENTS.md`            |
-| Any config option  | `guide/configuration.md`, `api/define-config.md`, examples in `guide/runners.md` |
-| Any new provider   | `guide/runners.md` or `guide/judges.md`, `guide/configuration.md`                |
+| Code file changed    | Documentation files to update                                                    |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `core/types.ts`      | `api/define-config.md`, `api/test.md`, `api/expect.md`, `api/context.md`         |
+| `core/interfaces.ts` | `guide/plugin-architecture.md`, `api/define-config.md`                           |
+| `core/config.ts`     | `guide/configuration.md`, `api/define-config.md`                                 |
+| `core/context.ts`    | `api/context.md`, `guide/writing-tests.md`                                       |
+| `core/runner.ts`     | `guide/runners.md`, `guide/architecture.md`                                      |
+| `core/expect.ts`     | `api/expect.md`, `guide/writing-tests.md`                                        |
+| `git/git.ts`         | `guide/architecture.md`                                                          |
+| `judge/judge.ts`     | `guide/judges.md`, `api/expect.md`                                               |
+| `ledger/ledger.ts`   | `api/ledger.md`, `guide/architecture.md`                                         |
+| `ledger/*-plugin.ts` | `guide/plugin-architecture.md`, `guide/configuration.md`                         |
+| `llm/*-plugin.ts`    | `guide/plugin-architecture.md`, `guide/configuration.md`                         |
+| `cli/cli.ts`         | `guide/cli.md`                                                                   |
+| `apps/eval-ui/**`    | `guide/dashboard.md`                                                             |
+| Any new feature      | `guide/getting-started.md` (if user-facing), `README.md`, `AGENTS.md`            |
+| Any config option    | `guide/configuration.md`, `api/define-config.md`, examples in `guide/runners.md` |
+| Any new provider     | `guide/runners.md` or `guide/judges.md`, `guide/configuration.md`                |
+| Any new plugin       | `guide/plugin-architecture.md`, `api/define-config.md`                           |
 
 ### Mermaid Diagram Guidelines
 
@@ -435,10 +451,21 @@ All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:
 
 Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM directly). API runners:
 
-- Use Vercel AI SDK `generateObject()` with a Zod schema
+- Use `config.llm.generate()` when an `ILLMPlugin` is configured
+- Fall back to Vercel AI SDK `generateObject()` with built-in `resolveRunnerModel()`
 - Support providers: `anthropic`, `openai`, `ollama`
 - Output structured `files[]` array with `{ path, content }` written to disk
 - Dynamic provider import (unused providers are never bundled)
+
+### Plugin Architecture (SOLID)
+
+The framework uses Dependency Inversion for storage and LLM operations:
+
+- **`ILedgerPlugin`** — Storage backend abstraction. Built-in: `SqliteLedger`, `JsonLedger`
+- **`ILLMPlugin`** — LLM provider abstraction. Built-in: `AnthropicLLM`, `OpenAILLM`, `OllamaLLM`
+- **`IJudgePlugin`** — Judge abstraction for custom evaluation logic
+- Runner and CLI use `config.ledger` / `config.llm` when provided, fallback to built-in implementations
+- All interfaces are in `core/interfaces.ts`, exported from `index.ts`
 
 ---
 
@@ -476,7 +503,23 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 
 > **Remember:** Every code change requires a corresponding documentation update. See [📖 Mandatory Documentation Updates](#📖-mandatory-documentation-updates) above.
 
-### Adding a new Judge provider
+### Adding a new LLM plugin
+
+1. Create `llm/<provider>-plugin.ts` extending `BaseLLMPlugin`
+2. Implement `createModel()` returning the AI SDK model instance
+3. Export from `llm/index.ts` and `index.ts`
+4. Add tests in `llm/llm-plugins.test.ts`
+5. **Update docs:** `guide/plugin-architecture.md` (LLM plugins table), `guide/configuration.md`
+
+### Adding a new Ledger plugin
+
+1. Create `ledger/<name>-plugin.ts` implementing `ILedgerPlugin`
+2. Implement all interface methods
+3. Export from `index.ts`
+4. Add tests in `ledger/<name>-plugin.test.ts`
+5. **Update docs:** `guide/plugin-architecture.md` (ledger plugins table), `guide/configuration.md`
+
+### Adding a new Judge provider (legacy)
 
 1. Add the provider type to `JudgeConfig.provider` in `core/types.ts`
 2. Add a new `case` in `resolveModel()` in `judge/judge.ts`
@@ -484,7 +527,7 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 4. Add tests in `judge/judge.test.ts`
 5. **Update docs:** `guide/judges.md` (provider section + table), `guide/configuration.md` (judge config table)
 
-### Adding a new Agent runner provider
+### Adding a new Agent runner provider (legacy)
 
 1. Add the provider type to `AgentRunnerConfig.api.provider` in `core/types.ts`
 2. Add a new `case` in `resolveRunnerModel()` in `core/runner.ts`

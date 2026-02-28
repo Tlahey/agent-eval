@@ -433,6 +433,58 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [x] Add `pnpm run release` scripts to the root `package.json` to streamline the local version bumping and tagging process
   - [x] Ensure the `apps/eval-ui` static assets are properly bundled and distributed within the CLI package before the NPM release
 
+## Phase 19 — SOLID Plugin Architecture (Ledger & LLM)
+
+- [x] **Core Interfaces & Contracts (`core/interfaces.ts`)**
+  - [x] Define the `ILedgerPlugin` interface (contracts for `initialize()`, `recordRun()`, `getRuns()`, `getRunById()`, `getStats()`, `overrideRunScore()`, `getRunOverrides()`, `getTestTree()`, `getTestIds()`, `getLatestEntries()`, `close()`)
+  - [x] Define the `ILLMPlugin` interface (contracts for `evaluate()`, `generate()`)
+  - [x] Define the `IJudgePlugin` interface (contracts for `judge()`)
+  - [x] Define shared types: `RunnerStats`, `TestTreeNode`, `LLMEvaluationOptions`, `LLMGenerationOptions`, `AgentFileOutput`
+  - [x] Refactor `Runner` to use `config.ledger.recordRun()` via injected `ILedgerPlugin` (Dependency Inversion)
+  - [x] Refactor `Runner` to use `config.llm.generate()` for API runners when plugin is available
+  - [x] Fix pre-existing type issues (`JudgeResult.status` made optional, `Reporter` method signatures)
+
+- [x] **Configuration Engine (`core/types.ts`)**
+  - [x] Add optional `ledger?: ILedgerPlugin` to `AgentEvalConfig`
+  - [x] Add optional `llm?: ILLMPlugin` to `AgentEvalConfig`
+  - [x] Backward-compatible: falls back to built-in SQLite + Vercel AI SDK when plugins not configured
+
+- [x] **Ledger Plugins (in-package)**
+  - [x] `ledger/sqlite-plugin.ts` — `SqliteLedger` wrapping existing `ledger.ts` functions (facade pattern)
+  - [x] `ledger/json-plugin.ts` — `JsonLedger` using JSONL files (lightweight, no SQLite dependency)
+  - [x] `ledger/json-plugin.test.ts` — 12 tests for JsonLedger
+
+- [x] **LLM Plugins (in-package)**
+  - [x] `llm/base-plugin.ts` — `BaseLLMPlugin` abstract class (shared Vercel AI SDK logic)
+  - [x] `llm/anthropic-plugin.ts` — `AnthropicLLM` (extends BaseLLMPlugin, uses `@ai-sdk/anthropic`)
+  - [x] `llm/openai-plugin.ts` — `OpenAILLM` (extends BaseLLMPlugin, uses `@ai-sdk/openai`)
+  - [x] `llm/ollama-plugin.ts` — `OllamaLLM` (extends BaseLLMPlugin, uses OpenAI-compatible endpoint)
+  - [x] `llm/llm-plugins.test.ts` — 12 tests with mocked AI SDK
+  - [x] `llm/index.ts` — Barrel exports
+
+- [x] **CLI & API Decoupling (`cli/cli.ts`)**
+  - [x] `resolveLedger()` helper — uses `ILedgerPlugin` from config or falls back to built-in functions
+  - [x] Ledger command refactored to use `resolveLedger()`
+  - [x] Dashboard API server refactored with async `handleRequest()` supporting plugin promises
+  - [x] Dashboard is now fully agnostic to storage backend
+
+- [x] **Public API (`index.ts`)**
+  - [x] Export all plugin interfaces: `ILedgerPlugin`, `ILLMPlugin`, `IJudgePlugin`, `RunnerStats`, `TestTreeNode`
+  - [x] Export all plugin implementations: `SqliteLedger`, `JsonLedger`, `BaseLLMPlugin`, `AnthropicLLM`, `OpenAILLM`, `OllamaLLM`
+
+- [x] **Tests**
+  - [x] `core/interfaces.test.ts` — 6 tests for plugin contracts and types
+  - [x] `ledger/json-plugin.test.ts` — 12 tests for JsonLedger
+  - [x] `llm/llm-plugins.test.ts` — 12 tests for LLM plugins (mocked)
+  - [x] All 302 tests passing (174 core + 128 UI)
+
+- [x] **Documentation**
+  - [x] `guide/plugin-architecture.md` — Full guide with Mermaid diagrams
+  - [x] `guide/configuration.md` — Added `ledger` and `llm` plugin options
+  - [x] `api/define-config.md` — Added plugin config fields
+  - [x] `guide/architecture.md` — Updated extending table and structure
+  - [x] `AGENTS.md` — Updated structure, doc map, feature guide, architecture section
+
 ---
 
 ## Future — Planned

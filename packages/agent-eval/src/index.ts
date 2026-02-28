@@ -125,3 +125,20 @@ export type {
   Thresholds,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
+
+// ─── Plugin interfaces & implementations ───
+
+export type {
+  ILedgerPlugin,
+  ILLMPlugin,
+  IJudgePlugin,
+  RunnerStats,
+  TestTreeNode,
+} from "./core/interfaces.js";
+
+export { SqliteLedger } from "./ledger/sqlite-plugin.js";
+export { JsonLedger } from "./ledger/json-plugin.js";
+export { BaseLLMPlugin } from "./llm/base-plugin.js";
+export { AnthropicLLM } from "./llm/anthropic-plugin.js";
+export { OpenAILLM } from "./llm/openai-plugin.js";
+export { OllamaLLM } from "./llm/ollama-plugin.js";

@@ -15,7 +15,8 @@ flowchart TD
     PKG --> CORE["core/\ntypes, config, runner,\ncontext, expect"]
     PKG --> GIT["git/\nisolation (reset, clean, diff)"]
     PKG --> JUDGE["judge/\nLLM-as-a-Judge"]
-    PKG --> LEDGER["ledger/\nSQLite persistence"]
+    PKG --> LEDGER["ledger/\nSQLite + JSON persistence"]
+    PKG --> LLM["llm/\nLLM provider plugins"]
     PKG --> CLI["cli/\ncommand parsing + API server"]
 
     style ROOT fill:#4f46e5,color:#fff
@@ -265,12 +266,16 @@ erDiagram
 
 ## Extending the Framework
 
-| What                | Where              | How                                                  |
-| ------------------- | ------------------ | ---------------------------------------------------- |
-| New runner provider | `core/runner.ts`   | Add a `case` in `resolveRunnerModel()`               |
-| New judge provider  | `judge/judge.ts`   | Add a `case` in `resolveModel()`                     |
-| New CLI command     | `cli/cli.ts`       | Add `program.command()`                              |
-| New context method  | `core/context.ts`  | Add to `TestContext` interface + `EvalContext` class |
-| New ledger query    | `ledger/ledger.ts` | Add a new exported function                          |
+With the plugin architecture, extending AgentEval no longer requires modifying core code:
+
+| What                | How                                                  |
+| ------------------- | ---------------------------------------------------- |
+| New storage backend | Implement `ILedgerPlugin` interface                  |
+| New LLM provider    | Extend `BaseLLMPlugin` or implement `ILLMPlugin`     |
+| New judge type      | Implement `IJudgePlugin` interface                   |
+| New CLI command     | Add `program.command()` in `cli/cli.ts`              |
+| New context method  | Add to `TestContext` interface + `EvalContext` class |
+
+See the [Plugin Architecture](/guide/plugin-architecture) guide for full details.
 
 See ADR-007 (`docs/adrs/007-solid-architecture.md`) for the full decision record.
