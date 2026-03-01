@@ -118,9 +118,15 @@ This keeps the bundle small and avoids forcing users to install SDKs they don't 
 
 All tests run **sequentially** (no concurrency). This is intentional — agents mutate the filesystem and Git state. See ADR-003 (`docs/adrs/003-sequential-execution.md`) for details.
 
-## Git Isolation
+## Workspace Isolation
 
-Before each test iteration: `git reset --hard HEAD && git clean -fd`. This guarantees a pristine working directory. This logic is encapsulated in the `IEnvironmentPlugin.setup()` method — `LocalEnvironment` uses Git directly, while `DockerEnvironment` creates a fresh container. See the [Environments guide](/guide/environments).
+Before each test iteration, the **environment plugin** prepares a clean workspace. This logic is encapsulated in `IEnvironmentPlugin.setup()`:
+
+- **`LocalEnvironment`** (default): runs `git reset --hard HEAD && git clean -fd` on the host
+- **`DockerEnvironment`**: creates a fresh container with the project files
+- **Custom environments**: implement `IEnvironmentPlugin` for your own setup logic (cloud VMs, remote agents, etc.)
+
+After the test completes, `env.teardown()` is called to clean up resources (no-op for local, container removal for Docker). See the [Environments guide](/guide/environments).
 
 ## Data Flow
 
@@ -133,13 +139,16 @@ flowchart TB
     C --> D["Import files\n(registers tests via test())"]
     D --> E{"For each\ntest × runner"}
 
-    E --> F["🔄 Environment Setup\nenv.setup(cwd)"]
-    F --> G["🤖 Agent Execution\nagent.run(prompt)"]
-    G --> H["📸 Auto storeDiff()\ncaptures git diff"]
-    H --> I["⚙️ afterEach Commands\npnpm test, tsc, lint..."]
-    I --> J["⚖️ Judge Evaluation\nexpect(ctx).toPassJudge()"]
-    J --> K["💾 Append to SQLite Ledger\nscore, reason, improvement, diff, commands"]
-    K --> L{"More\nrunners?"}
+    E --> F["🔧 Environment Setup\nenv.setup(cwd)"]
+    F --> F2["📋 Lifecycle Hooks\nconfig.beforeEach + DSL beforeEach"]
+    F2 --> G["🤖 Agent Execution\nagent.run/instruct(prompt)"]
+    G --> H["📸 Auto storeDiff()\ncaptures changes via env plugin"]
+    H --> I["⚙️ afterEach Commands\nfrom config + tasks"]
+    I --> J["⚖️ Judge Evaluation\nauto-judge or manual expect"]
+    J --> K["💾 Append to Ledger\nscore, reason, diff, commands"]
+    K --> K2["📋 afterEach Hooks\nDSL afterEach"]
+    K2 --> K3["🔧 env.teardown(cwd)"]
+    K3 --> L{"More\nrunners?"}
     L -- Yes --> E
     L -- No --> M["📊 Print Summary"]
 
@@ -169,35 +178,53 @@ sequenceDiagram
     rect rgb(240, 240, 255)
         Note over Runner,Git: 1. Environment Setup
         Runner->>Git: env.setup(cwd)
-        Git-->>Runner: clean working directory
+        Git-->>Runner: clean workspace (git reset, docker create, etc.)
+    end
+
+    rect rgb(235, 235, 255)
+        Note over Runner,Ctx: 2. Lifecycle Hooks
+        Runner->>Runner: config.beforeEach(ctx)
+        Runner->>Runner: DSL beforeEach hooks (scoped)
     end
 
     rect rgb(255, 248, 230)
-        Note over Runner,Ctx: 2. Agent Execution + Context Capture
-        Runner->>Agent: agent.run(prompt)
+        Note over Runner,Ctx: 3. Agent Execution + Context Capture
+        Runner->>Agent: agent.run(prompt) / instruct(prompt)
         Agent-->>Runner: files modified on disk
         Runner->>Ctx: storeDiffAsync() [automatic]
         Ctx->>Git: env.getDiff(cwd)
         Git-->>Ctx: diff string stored
 
-        loop afterEach commands
+        loop afterEach commands (from config)
             Runner->>Ctx: runCommand(name, cmd)
             Ctx-->>Runner: { stdout, stderr, exitCode }
+        end
+
+        loop Tasks (declarative only)
+            Runner->>Ctx: task.action()
+            Ctx-->>Runner: CommandResult
         end
     end
 
     rect rgb(230, 255, 240)
-        Note over Runner,Judge: 3. Judge Evaluation
-        Runner->>Judge: expect(ctx).toPassJudge({ criteria })
-        Judge->>Judge: buildJudgePrompt(criteria, ctx, expectedFiles)
+        Note over Runner,Judge: 4. Judge Evaluation
+        Runner->>Judge: auto-judge or expect(ctx).toPassJudge()
+        Judge->>Judge: buildJudgePrompt(criteria, ctx, tasks)
         Note right of Judge: Prompt includes:<br/>- Evaluation criteria<br/>- Git diff<br/>- Command outputs<br/>- File scope analysis
         Judge-->>Runner: { pass, score, reason, improvement }
     end
 
     rect rgb(240, 235, 255)
-        Note over Runner,Ledger: 4. Persist Results
+        Note over Runner,Ledger: 5. Persist Results
         Runner->>Ledger: appendLedgerEntry(entry)
         Note right of Ledger: Stores: score, reason,<br/>improvement, diff,<br/>commands[], durationMs
+    end
+
+    rect rgb(245, 240, 250)
+        Note over Runner,Git: 6. Cleanup
+        Runner->>Runner: DSL afterEach hooks
+        Runner->>Git: env.teardown(cwd)
+        Note over Git: LocalEnvironment: no-op<br/>DockerEnvironment: remove container
     end
 
     Runner-->>CLI: RunResult { passed, score }
