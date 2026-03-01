@@ -106,7 +106,10 @@ pnpm format
 pnpm format:check
 
 # Run the docs site locally
-pnpm dev
+pnpm dev:docs
+
+# Run the ui site locally
+pnpm dev:ui
 
 # Type-check the core package
 pnpm --filter agent-eval typecheck
@@ -660,7 +663,7 @@ The `agenteval ui` CLI command serves a bundled copy of the React dashboard:
 pnpm build:all    # builds eval-ui → builds agent-eval → copies UI dist to agent-eval/dist/ui
 
 # For development, run the UI dev server separately
-cd apps/eval-ui && pnpm dev   # Vite dev server on :5173, proxies API to :4747
+pnpm dev:ui   # Vite dev server on :5173, proxies API to :4747
 agenteval ui                   # API server on :4747
 ```
 

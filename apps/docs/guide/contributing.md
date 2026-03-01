@@ -71,7 +71,8 @@ The pre-commit hook will run all gates automatically. If everything passes, the 
 | `pnpm lint:fix`     | ESLint with auto-fix                 |
 | `pnpm format`       | Format all files with Prettier       |
 | `pnpm format:check` | Check formatting without writing     |
-| `pnpm dev`          | Start VitePress docs locally         |
+| `pnpm dev:docs`     | Start VitePress docs locally         |
+| `pnpm dev:ui`       | Start the UI site locally            |
 
 ## Commit Convention
 
