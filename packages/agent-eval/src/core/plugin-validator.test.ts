@@ -241,7 +241,7 @@ describe("validatePlugins - runners and judge.llm", () => {
       runners: [{ name: "ok", model: "test", execute: async () => ({}) }, { name: "bad" }],
     });
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].plugin).toContain("RunnerPlugin[1]");
+    expect(errors[0].plugin).toContain("RunnerConfig[1]");
   });
 
   it("validates judge.llm when present", () => {

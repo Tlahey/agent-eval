@@ -156,16 +156,44 @@ export function validatePlugins(config: {
     errors.push(...validateEnvironmentPlugin(config.environment));
   }
 
-  // Validate each runner plugin
+  // Validate each runner (plain objects or full plugins)
   if (config.runners) {
     for (let i = 0; i < config.runners.length; i++) {
-      const runner = config.runners[i];
-      const runnerErrors = validateRunnerPlugin(runner);
-      // Prefix errors with runner index for clarity
-      for (const err of runnerErrors) {
-        err.plugin = `RunnerPlugin[${i}]`;
+      const runner = config.runners[i] as Record<string, unknown>;
+      if (!runner || typeof runner !== "object") {
+        errors.push({
+          plugin: `RunnerConfig[${i}]`,
+          member: "(self)",
+          expected: "property",
+          message: `RunnerConfig[${i}] must be a non-null object`,
+        });
+        continue;
       }
-      errors.push(...runnerErrors);
+
+      // All runner configs must have a name
+      if (!runner.name || typeof runner.name !== "string") {
+        errors.push({
+          plugin: `RunnerConfig[${i}]`,
+          member: "name",
+          expected: "property",
+          message: `RunnerConfig[${i}] is missing required property 'name' (string)`,
+        });
+      }
+
+      // Must have at least one of: command (CLI), model (API), or execute (custom plugin)
+      const hasCommand = "command" in runner && typeof runner.command === "string";
+      const hasModel =
+        "model" in runner && typeof runner.model === "object" && runner.model !== null;
+      const hasExecute = "execute" in runner && typeof runner.execute === "function";
+
+      if (!hasCommand && !hasModel && !hasExecute) {
+        errors.push({
+          plugin: `RunnerConfig[${i}]`,
+          member: "command|model|execute",
+          expected: "property",
+          message: `RunnerConfig[${i}] must have 'command' (string), 'model' (IModelPlugin), or 'execute' (function)`,
+        });
+      }
     }
   }
 

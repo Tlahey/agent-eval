@@ -14,14 +14,13 @@ function defineConfig(config: AgentEvalConfig): AgentEvalConfig;
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
   runners: [
-    new CLIRunner({
+    {
       name: "copilot",
       command: 'gh copilot suggest "{{prompt}}"',
-    }),
+    },
   ],
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
@@ -39,7 +38,7 @@ export default defineConfig({
 interface AgentEvalConfig {
   rootDir?: string; // Project root (default: cwd)
   testFiles?: string | string[]; // Glob patterns for test discovery
-  runners: IRunnerPlugin[]; // Agent runner plugins to evaluate
+  runners: RunnerConfig[]; // Runner configs (plain objects or IRunnerPlugin instances)
   judge: JudgeConfig; // LLM judge configuration
   beforeEach?: HookFn; // Config-level hook before each test
   afterEach?: AfterEachCommand[]; // Auto commands after each agent run
@@ -49,6 +48,21 @@ interface AgentEvalConfig {
   thresholds?: Thresholds; // Scoring thresholds { warn, fail }
   ledger?: ILedgerPlugin; // Custom storage plugin
   environment?: IEnvironmentPlugin; // Execution environment plugin
+}
+
+// Runner config — plain objects or IRunnerPlugin instances
+// Type is inferred from shape: { name, command } → CLI, { name, model } → API
+// Each runner must have a unique `name` — duplicates throw at startup
+type RunnerConfig = CLIRunnerConfig | APIRunnerConfig | IRunnerPlugin;
+
+interface CLIRunnerConfig {
+  name: string; // Unique runner identifier
+  command: string; // Shell command with {{prompt}} placeholder
+}
+
+interface APIRunnerConfig {
+  name: string; // Unique runner identifier
+  model: IModelPlugin; // LLM model plugin
 }
 
 interface JudgeConfig {
@@ -82,7 +96,7 @@ interface AfterEachCommand {
 | ------------- | ------------------------ | ---------------------------------------- | ----------------------------------------------------------- |
 | `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                      |
 | `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
-| `runners`     | `IRunnerPlugin[]`        | _required_                               | Agent runner plugins to evaluate                            |
+| `runners`     | `RunnerConfig[]`         | _required_                               | Runner configs (plain objects or `IRunnerPlugin` instances) |
 | `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                     |
 | `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                          |
 | `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)     |

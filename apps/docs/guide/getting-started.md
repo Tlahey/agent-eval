@@ -29,14 +29,13 @@ flowchart LR
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
   runners: [
-    new CLIRunner({
+    {
       name: "copilot",
       command: 'gh copilot suggest "{{prompt}}"',
-    }),
+    },
   ],
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),

@@ -88,7 +88,6 @@ pnpm add -D agent-eval
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
 import { OpenAIModel } from "agent-eval/providers/openai";
-import { CLIRunner } from "agent-eval/runner/cli";
 import { LocalEnvironment } from "agent-eval/environment/local";
 import { DockerEnvironment } from "agent-eval/environment/docker";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
@@ -98,12 +97,12 @@ const useDocker = process.env.AGENTEVAL_ENV === "docker";
 const useJsonLedger = process.env.AGENTEVAL_LEDGER === "json";
 
 export default defineConfig({
-  // Agent runners (CLI or API)
+  // Agent runners — plain objects, type inferred from shape
   runners: [
-    new CLIRunner({
+    {
       name: "copilot",
       command: 'gh copilot suggest "{{prompt}}"',
-    }),
+    },
   ],
 
   // Judge — LLM model used to score every test

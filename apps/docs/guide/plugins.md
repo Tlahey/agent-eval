@@ -26,8 +26,8 @@ flowchart TB
     MODEL --> OL["OllamaModel"]
     MODEL --> CM["Custom Model"]
 
-    RUN --> CR["CLIRunner"]
-    RUN --> AR["APIRunner"]
+    RUN --> CR["CLI Runner Config"]
+    RUN --> AR["API Runner Config"]
     RUN --> CRU["Custom Runner"]
 
     LEDGER --> SQ["SqliteLedger"]
@@ -57,12 +57,12 @@ flowchart TB
 
 ## Plugin Categories
 
-| Plugin          | Interface            | Purpose                           | Built-in                                       |
-| --------------- | -------------------- | --------------------------------- | ---------------------------------------------- |
-| **Model**       | `IModelPlugin`       | Wraps LLM providers (judge + API) | `AnthropicModel`, `OpenAIModel`, `OllamaModel` |
-| **Runner**      | `IRunnerPlugin`      | Executes agents (CLI or API)      | `CLIRunner`, `APIRunner`                       |
-| **Ledger**      | `ILedgerPlugin`      | Result storage and querying       | `SqliteLedger`, `JsonLedger`                   |
-| **Environment** | `IEnvironmentPlugin` | Workspace setup, exec, diffs      | `LocalEnvironment`, `DockerEnvironment`        |
+| Plugin          | Interface            | Purpose                           | Built-in                                                                       |
+| --------------- | -------------------- | --------------------------------- | ------------------------------------------------------------------------------ |
+| **Model**       | `IModelPlugin`       | Wraps LLM providers (judge + API) | `AnthropicModel`, `OpenAIModel`, `OllamaModel`                                 |
+| **Runner**      | `IRunnerPlugin`      | Executes agents (CLI or API)      | Plain objects (`CLIRunnerConfig`, `APIRunnerConfig`) or custom `IRunnerPlugin` |
+| **Ledger**      | `ILedgerPlugin`      | Result storage and querying       | `SqliteLedger`, `JsonLedger`                                                   |
+| **Environment** | `IEnvironmentPlugin` | Workspace setup, exec, diffs      | `LocalEnvironment`, `DockerEnvironment`                                        |
 
 ## Import Map
 
@@ -74,8 +74,8 @@ Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each p
 | `agent-eval/providers/openai`    | `OpenAIModel`                                                         |
 | `agent-eval/providers/anthropic` | `AnthropicModel`                                                      |
 | `agent-eval/providers/ollama`    | `OllamaModel`                                                         |
-| `agent-eval/runner/cli`          | `CLIRunner`                                                           |
-| `agent-eval/runner/api`          | `APIRunner`                                                           |
+| `agent-eval/runner/cli`          | `CLIRunner` (advanced use — most users use plain objects instead)     |
+| `agent-eval/runner/api`          | `APIRunner` (advanced use — most users use plain objects instead)     |
 | `agent-eval/ledger/sqlite`       | `SqliteLedger`                                                        |
 | `agent-eval/ledger/json`         | `JsonLedger`                                                          |
 | `agent-eval/environment/local`   | `LocalEnvironment`                                                    |
@@ -90,17 +90,16 @@ Each provider plugin dynamically imports its AI SDK package (`@ai-sdk/openai`, `
 ```ts
 import { defineConfig } from "agent-eval";
 import { OpenAIModel } from "agent-eval/providers/openai";
-import { CLIRunner } from "agent-eval/runner/cli";
-import { APIRunner } from "agent-eval/runner/api";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { LocalEnvironment } from "agent-eval/environment/local";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
+  // Runner configs are plain objects — type inferred from shape
   runners: [
-    new CLIRunner({ name: "copilot", command: "gh copilot -p '{{prompt}}'" }),
-    new APIRunner({ name: "gpt-4o", model: gpt4o }),
+    { name: "copilot", command: "gh copilot -p '{{prompt}}'" },
+    { name: "gpt-4o", model: gpt4o },
   ],
   judge: { llm: gpt4o },
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
@@ -176,8 +175,8 @@ flowchart TB
     RUNNER -->|"config.environment"| ENV["IEnvironmentPlugin"]
     CLI -->|"config.ledger"| LEDGER
 
-    RP -->|"CLIRunner"| CLIR["Shell command"]
-    RP -->|"APIRunner"| APIR["LLM API call"]
+    RP -->|"CLI config"| CLIR["Shell command"]
+    RP -->|"API config"| APIR["LLM API call"]
     LEDGER -->|"fallback"| SQLITE["Built-in SqliteLedger"]
     ENV -->|"fallback"| LOCAL["Built-in LocalEnvironment"]
 

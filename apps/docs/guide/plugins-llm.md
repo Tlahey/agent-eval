@@ -26,10 +26,9 @@ Uses Anthropic's Claude models via `@ai-sdk/anthropic`.
 ```ts
 import { defineConfig } from "agent-eval";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
-  runners: [new CLIRunner({ name: "copilot", command: "gh copilot -p '{{prompt}}'" })],
+  runners: [{ name: "copilot", command: "gh copilot -p '{{prompt}}'" }],
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
@@ -56,12 +55,11 @@ Uses OpenAI's GPT models via `@ai-sdk/openai`.
 ```ts
 import { defineConfig } from "agent-eval";
 import { OpenAIModel } from "agent-eval/providers/openai";
-import { APIRunner } from "agent-eval/runner/api";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
-  runners: [new APIRunner({ name: "gpt-4o", model: gpt4o })],
+  runners: [{ name: "gpt-4o", model: gpt4o }],
   judge: { llm: gpt4o },
 });
 ```
@@ -100,12 +98,11 @@ Run models **locally** with [Ollama](https://ollama.ai/). No API key required.
 ```ts
 import { defineConfig } from "agent-eval";
 import { OllamaModel } from "agent-eval/providers/ollama";
-import { APIRunner } from "agent-eval/runner/api";
 
 const llama = new OllamaModel({ model: "llama3" });
 
 export default defineConfig({
-  runners: [new APIRunner({ name: "llama3", model: llama })],
+  runners: [{ name: "llama3", model: llama }],
   judge: { llm: llama },
 });
 ```
@@ -157,7 +154,7 @@ The returned object must be a Vercel AI SDK `LanguageModel` instance (or any obj
 ```mermaid
 flowchart LR
     MP["IModelPlugin<br/>(createModel())"] --> |"LanguageModel"| J["Judge<br/>generateObject()"]
-    MP --> |"LanguageModel"| AR["APIRunner<br/>generateObject()"]
+    MP --> |"LanguageModel"| AR["API Runner<br/>generateObject()"]
     J --> R["JudgeResult<br/>{pass, score, reason}"]
     AR --> F["Files written<br/>to disk"]
 
@@ -169,4 +166,4 @@ flowchart LR
 ```
 
 - The **judge** calls `config.judge.llm.createModel()` to get the model, then uses `generateObject()` with a Zod schema to get structured `{ pass, score, reason }`.
-- The **APIRunner** calls its model plugin's `createModel()` to get the model, then uses `generateObject()` with a file schema to generate code files.
+- The **API runner** calls its model plugin's `createModel()` to get the model, then uses `generateObject()` with a file schema to generate code files.

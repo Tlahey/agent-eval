@@ -158,10 +158,9 @@ flowchart TD
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
 import { OpenAIModel } from "agent-eval/providers/openai";
-import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
-  runners: [new CLIRunner({ name: "copilot", command: 'gh copilot "{{prompt}}"' })],
+  runners: [{ name: "copilot", command: 'gh copilot "{{prompt}}"' }],
   judge: { llm: new OpenAIModel({ model: "gpt-4o" }) },
 
   beforeEach: ({ ctx }) => {

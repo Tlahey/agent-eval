@@ -1,7 +1,8 @@
 import { createJiti } from "jiti";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
-import type { AgentEvalConfig } from "./types.js";
+import type { AgentEvalConfig, RunnerConfig } from "./types.js";
+import type { IRunnerPlugin } from "./interfaces.js";
 import { validatePlugins, formatPluginErrors } from "./plugin-validator.js";
 
 const CONFIG_FILENAMES = ["agenteval.config.ts", "agenteval.config.js", "agenteval.config.mjs"];
@@ -11,6 +12,81 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
   outputDir: ".agenteval",
   timeout: 300_000,
 };
+
+/**
+ * Check if a runner config is a plain CLI runner object: { name, command }.
+ */
+function isCLIRunnerConfig(r: RunnerConfig): r is import("./types.js").CLIRunnerConfig {
+  const obj = r as unknown as Record<string, unknown>;
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    "command" in obj &&
+    typeof obj.command === "string" &&
+    !("execute" in obj)
+  );
+}
+
+/**
+ * Check if a runner config is a plain API runner object: { name, model }.
+ */
+function isAPIRunnerConfig(r: RunnerConfig): r is import("./types.js").APIRunnerConfig {
+  const obj = r as unknown as Record<string, unknown>;
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    "model" in obj &&
+    typeof obj.model === "object" &&
+    !("execute" in obj)
+  );
+}
+
+/**
+ * Resolve runner configs (plain objects) into IRunnerPlugin instances.
+ * Also validates that all runner names are unique.
+ *
+ * - `{ name, command }` → CLIRunner
+ * - `{ name, model }` → APIRunner
+ * - IRunnerPlugin → used as-is
+ *
+ * @throws Error if duplicate runner names are found
+ */
+export async function resolveRunners(configs: RunnerConfig[]): Promise<IRunnerPlugin[]> {
+  const resolved: IRunnerPlugin[] = [];
+  const names = new Set<string>();
+
+  for (const cfg of configs) {
+    let plugin: IRunnerPlugin;
+
+    if (isCLIRunnerConfig(cfg)) {
+      const { CLIRunner } = (await import("../runner/plugins/cli.js")) as {
+        CLIRunner: new (opts: { name: string; command: string }) => IRunnerPlugin;
+      };
+      plugin = new CLIRunner({ name: cfg.name, command: cfg.command });
+    } else if (isAPIRunnerConfig(cfg)) {
+      const { APIRunner } = (await import("../runner/plugins/api.js")) as {
+        APIRunner: new (opts: {
+          name: string;
+          model: import("./interfaces.js").IModelPlugin;
+        }) => IRunnerPlugin;
+      };
+      plugin = new APIRunner({ name: cfg.name, model: cfg.model });
+    } else {
+      // Already an IRunnerPlugin instance
+      plugin = cfg as IRunnerPlugin;
+    }
+
+    if (names.has(plugin.name)) {
+      throw new Error(
+        `Duplicate runner name "${plugin.name}". Each runner must have a unique name.`,
+      );
+    }
+    names.add(plugin.name);
+    resolved.push(plugin);
+  }
+
+  return resolved;
+}
 
 /**
  * Resolve and load the agenteval config file from the given directory.

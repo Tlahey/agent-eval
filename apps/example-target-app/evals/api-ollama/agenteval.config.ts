@@ -1,5 +1,4 @@
 import { defineConfig } from "agent-eval";
-import { APIRunner } from "agent-eval/runner/api";
 import { OllamaModel } from "agent-eval/providers/ollama";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
@@ -23,10 +22,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new APIRunner({
+    {
       name: "ollama-llama3",
       model: new OllamaModel({ model: "llama3" }),
-    }),
+    },
   ],
 
   // ⚠️ Always use a strong cloud model as judge, even with local runners.

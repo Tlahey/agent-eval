@@ -53,6 +53,57 @@ export function computeStatus(
   return "FAIL";
 }
 
+// ─── Runner Configuration ───
+
+/**
+ * CLI runner config — the simplest form: a name + command template.
+ * Automatically resolved to a CLIRunner plugin at startup.
+ *
+ * @example
+ * ```ts
+ * runners: [
+ *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
+ * ]
+ * ```
+ */
+export interface CLIRunnerConfig {
+  /** Unique runner name (used in ledger and logs) */
+  name: string;
+  /** CLI command template. Use {{prompt}} as placeholder for the instruction. */
+  command: string;
+}
+
+/**
+ * API runner config — a name + model plugin.
+ * Automatically resolved to an APIRunner plugin at startup.
+ *
+ * @example
+ * ```ts
+ * import { AnthropicModel } from "agent-eval/providers/anthropic";
+ * runners: [
+ *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+ * ]
+ * ```
+ */
+export interface APIRunnerConfig {
+  /** Unique runner name (used in ledger and logs) */
+  name: string;
+  /** LLM model plugin for API-based generation */
+  model: import("./interfaces.js").IModelPlugin;
+}
+
+/**
+ * Runner configuration — plain objects OR custom IRunnerPlugin instances.
+ *
+ * - `{ name, command }` → CLI runner (resolved automatically)
+ * - `{ name, model }` → API runner (resolved automatically)
+ * - Custom IRunnerPlugin → used as-is (must implement `execute()`)
+ */
+export type RunnerConfig =
+  | CLIRunnerConfig
+  | APIRunnerConfig
+  | import("./interfaces.js").IRunnerPlugin;
+
 // ─── Main Configuration ───
 
 export interface AgentEvalConfig {
@@ -62,20 +113,19 @@ export interface AgentEvalConfig {
   testFiles?: string | string[];
   /**
    * Agent runners to test against.
-   * Each runner is an IRunnerPlugin instance (CLIRunner, APIRunner, or custom).
+   * Use plain objects for built-in runners, or IRunnerPlugin instances for custom ones.
+   * Each runner must have a unique `name`.
    *
    * @example
    * ```ts
-   * import { CLIRunner } from "agent-eval/runner/cli";
-   * import { APIRunner } from "agent-eval/runner/api";
    * import { AnthropicModel } from "agent-eval/providers/anthropic";
    * runners: [
-   *   new CLIRunner({ name: "copilot", command: "gh copilot suggest {{prompt}}" }),
-   *   new APIRunner({ name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) }),
+   *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
+   *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
    * ]
    * ```
    */
-  runners: import("./interfaces.js").IRunnerPlugin[];
+  runners: RunnerConfig[];
   /** Judge configuration for LLM-as-a-Judge evaluation */
   judge: JudgeConfig;
   /** Model matrix: override which models to test per-run */

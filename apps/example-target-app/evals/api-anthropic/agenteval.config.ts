@@ -1,5 +1,4 @@
 import { defineConfig } from "agent-eval";
-import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
@@ -21,10 +20,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new APIRunner({
+    {
       name: "claude-sonnet",
       model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-    }),
+    },
   ],
 
   // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.

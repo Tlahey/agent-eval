@@ -1,5 +1,4 @@
 import { defineConfig } from "agent-eval";
-import { CLIRunner } from "agent-eval/runner/cli";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
 /**
@@ -21,10 +20,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new CLIRunner({
+    {
       name: "claude-code",
       command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-    }),
+    },
   ],
 
   // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.

@@ -1,15 +1,17 @@
 # Runners
 
-Runners define **how** AgentEval triggers an AI coding agent. There are two built-in runner plugins: **CLIRunner** (spawn a shell command) and **APIRunner** (call an LLM directly via the Vercel AI SDK).
+Runners define **how** AgentEval triggers an AI coding agent. There are two built-in runner types: **CLI runners** (spawn a shell command) and **API runners** (call an LLM directly via the Vercel AI SDK).
+
+Runner configs are **plain objects** — the type is inferred from the shape. No class imports needed for most users. Each runner must have a **unique `name`** — duplicate names throw an error at startup.
 
 You can mix both types in the same config to compare CLI agents against API agents on identical tasks.
 
-## Runner Plugins at a Glance
+## Runner Types at a Glance
 
-| Plugin      | How it works                                         | Best for                              |
-| ----------- | ---------------------------------------------------- | ------------------------------------- |
-| `CLIRunner` | Spawns a shell command with `{{prompt}}` placeholder | IDE agents, CLI tools, custom scripts |
-| `APIRunner` | Calls an LLM via Vercel AI SDK `generateObject()`    | Direct model comparison, headless CI  |
+| Type       | How it works                                         | Best for                              |
+| ---------- | ---------------------------------------------------- | ------------------------------------- |
+| CLI runner | Spawns a shell command with `{{prompt}}` placeholder | IDE agents, CLI tools, custom scripts |
+| API runner | Calls an LLM via Vercel AI SDK `generateObject()`    | Direct model comparison, headless CI  |
 
 Both implement the `IRunnerPlugin` interface:
 
@@ -23,17 +25,18 @@ interface IRunnerPlugin {
 
 ---
 
-## CLIRunner
+## CLI Runners
 
 CLI runners execute a shell command. The `{{prompt}}` placeholder is replaced with the test instruction at runtime. The agent is expected to modify files on disk.
 
-```ts
-import { CLIRunner } from "agent-eval/runner/cli";
+A CLI runner config is any object with `name` and `command` properties:
 
-new CLIRunner({
+```ts
+// No imports needed — just a plain object
+{
   name: "my-agent",
   command: 'my-agent-cli "{{prompt}}"',
-});
+}
 ```
 
 ### Available CLI Agent Examples
@@ -41,10 +44,10 @@ new CLIRunner({
 #### GitHub Copilot CLI
 
 ```ts
-new CLIRunner({
+{
   name: "copilot-cli",
   command: 'gh copilot suggest -t shell "{{prompt}}"',
-});
+}
 ```
 
 ::: info Prerequisites
@@ -56,10 +59,10 @@ Install the [GitHub CLI](https://cli.github.com/) and authenticate with `gh auth
 [Aider](https://aider.chat/) is an AI pair programming tool that works in your terminal.
 
 ```ts
-new CLIRunner({
+{
   name: "aider-sonnet",
   command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
-});
+}
 ```
 
 ::: tip
@@ -71,10 +74,10 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 [Cursor](https://cursor.sh/) can be invoked via its CLI for headless agent runs.
 
 ```ts
-new CLIRunner({
+{
   name: "cursor",
   command: 'cursor --agent "{{prompt}}"',
-});
+}
 ```
 
 #### Cline (VS Code Extension CLI)
@@ -82,10 +85,10 @@ new CLIRunner({
 [Cline](https://github.com/cline/cline) can be triggered headlessly via its CLI mode.
 
 ```ts
-new CLIRunner({
+{
   name: "cline",
   command: 'cline --task "{{prompt}}"',
-});
+}
 ```
 
 #### Claude Code (Anthropic CLI)
@@ -93,19 +96,19 @@ new CLIRunner({
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's official agentic coding tool.
 
 ```ts
-new CLIRunner({
+{
   name: "claude-code",
   command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-});
+}
 ```
 
 #### OpenAI Codex CLI
 
 ```ts
-new CLIRunner({
+{
   name: "codex",
   command: 'codex "{{prompt}}" --approval-mode full-auto',
-});
+}
 ```
 
 #### Custom Script
@@ -113,17 +116,17 @@ new CLIRunner({
 You can wrap any logic in a script and use it as a runner:
 
 ```ts
-new CLIRunner({
+{
   name: "custom-agent",
   command: 'node ./scripts/my-agent.mjs "{{prompt}}"',
-});
+}
 ```
 
 Your script receives the prompt as a CLI argument and should modify files in the current working directory. See `apps/example-target-app/scripts/mock-agent.mjs` for an example.
 
 ---
 
-## APIRunner
+## API Runners
 
 API runners call an LLM directly using the [Vercel AI SDK](https://sdk.vercel.ai/). The model returns a structured `files[]` array, and AgentEval writes them to disk.
 
@@ -133,28 +136,28 @@ This is useful when you want to:
 - Run evaluations in CI without installing CLI agents
 - Benchmark different models on the same task
 
+An API runner config is any object with `name` and `model` properties:
+
 ```ts
-import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
-new APIRunner({
+{
   name: "claude-api",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-});
+}
 ```
 
-### APIRunner with Different Providers
+### API Runners with Different Providers
 
 #### Anthropic
 
 ```ts
-import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
-new APIRunner({
+{
   name: "claude-sonnet",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-});
+}
 ```
 
 | Model                      | Notes                |
@@ -166,13 +169,12 @@ new APIRunner({
 #### OpenAI
 
 ```ts
-import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
-new APIRunner({
+{
   name: "gpt-4o",
   model: new OpenAIModel({ model: "gpt-4o" }),
-});
+}
 ```
 
 | Model           | Notes                |
@@ -186,13 +188,12 @@ new APIRunner({
 Run models locally with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
-import { APIRunner } from "agent-eval/runner/api";
 import { OllamaModel } from "agent-eval/providers/ollama";
 
-new APIRunner({
+{
   name: "llama3-local",
   model: new OllamaModel({ model: "llama3" }),
-});
+}
 ```
 
 | Model            | Notes                  |
@@ -211,17 +212,16 @@ Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama
 Any OpenAI-compatible API can be used via `OpenAIModel` with a custom `baseURL`:
 
 ```ts
-import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
-new APIRunner({
+{
   name: "company-llm",
   model: new OpenAIModel({
     model: "internal-model-v2",
     baseURL: "https://llm.internal.company.com/v1",
     apiKey: process.env.INTERNAL_LLM_KEY,
   }),
-});
+}
 ```
 
 This works with Azure OpenAI, Together AI, Fireworks, Groq, and any provider exposing an OpenAI-compatible API.
@@ -257,16 +257,16 @@ sequenceDiagram
 
 ---
 
-## CLIRunner vs APIRunner Comparison
+## CLI vs API Runner Comparison
 
 ```mermaid
 flowchart LR
-    subgraph CLI["CLIRunner"]
+    subgraph CLI["CLI Runner"]
         A["env.execute(command)"] --> B["Agent modifies files"]
         B --> C["storeDiff()"]
     end
 
-    subgraph API["APIRunner"]
+    subgraph API["API Runner"]
         D["model.createModel()"] --> E["generateObject(prompt)"]
         E --> F["Write files to disk"]
         F --> G["storeDiff()"]
@@ -280,7 +280,7 @@ flowchart LR
 Both CLI and API runners execute within the configured [environment plugin](/guide/plugins-environments). By default, the **LocalEnvironment** is used (git reset + local exec). You can configure Docker or custom environments — see [Environments](/guide/plugins-environments).
 :::
 
-| Aspect        | CLIRunner                | APIRunner                     |
+| Aspect        | CLI Runner               | API Runner                    |
 | ------------- | ------------------------ | ----------------------------- |
 | **Execution** | Spawns shell command     | HTTP API call                 |
 | **Agent**     | IDE agents, CLI tools    | Raw LLM models                |
@@ -345,25 +345,23 @@ Use the `matrix` option to select which runners to execute per run:
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { CLIRunner } from "agent-eval/runner/cli";
-import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
 export default defineConfig({
   runners: [
-    new APIRunner({
+    {
       name: "claude-api",
       model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-    }),
-    new APIRunner({
+    },
+    {
       name: "gpt-4o",
       model: new OpenAIModel({ model: "gpt-4o" }),
-    }),
-    new CLIRunner({
+    },
+    {
       name: "aider",
       command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
-    }),
+    },
   ],
 
   // Run all three on every test
