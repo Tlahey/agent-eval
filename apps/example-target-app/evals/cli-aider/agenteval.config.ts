@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
  * CLI Runner — Aider
@@ -25,7 +26,6 @@ export default defineConfig({
   runners: [
     {
       name: "aider-sonnet",
-      type: "cli",
       command:
         'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
     },
@@ -34,8 +34,7 @@ export default defineConfig({
   // ⚠️ The judge must be a capable model. It reads git diffs, test output,
   // and build logs to make nuanced pass/fail decisions.
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.

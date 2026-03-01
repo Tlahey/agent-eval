@@ -49,6 +49,16 @@
       "types": "./dist/ledger/json.d.ts",
       "import": "./dist/ledger/json.js",
       "require": "./dist/ledger/json.cjs"
+    },
+    "./runner/cli": {
+      "types": "./dist/runner/cli.d.ts",
+      "import": "./dist/runner/cli.js",
+      "require": "./dist/runner/cli.cjs"
+    },
+    "./runner/api": {
+      "types": "./dist/runner/api.d.ts",
+      "import": "./dist/runner/api.js",
+      "require": "./dist/runner/api.cjs"
     }
   },
   "files": [

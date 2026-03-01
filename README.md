@@ -25,7 +25,7 @@
 - **Declarative Pipeline** — `agent.instruct()` + `ctx.addTask()` for zero-boilerplate evaluations
 - **Config-level Hooks** — `beforeEach` at config, file, or describe level for shared verification tasks
 - **Git Isolation** — automatic `git reset --hard` between runs for pristine environments
-- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, Ollama, or any CLI tool
+- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, Ollama, or any custom `IModelPlugin`
 - **Model Matrix** — compare multiple agents/models on the same test suite
 - **Weighted Scoring** — tasks with weights for nuanced, multi-criteria evaluation
 - **Expected Files** — scope analysis detects agents that modify too many files
@@ -86,38 +86,29 @@ pnpm add -D agent-eval
 
 ```ts
 // agenteval.config.ts
-import {
-  defineConfig,
-  OpenAILLM,
-  LocalEnvironment,
-  DockerEnvironment,
-  SqliteLedger,
-  JsonLedger,
-} from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { LocalEnvironment } from "agent-eval/environment/local";
+import { DockerEnvironment } from "agent-eval/environment/docker";
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { JsonLedger } from "agent-eval/ledger/json";
 
 const useDocker = process.env.AGENTEVAL_ENV === "docker";
 const useJsonLedger = process.env.AGENTEVAL_LEDGER === "json";
 
 export default defineConfig({
-  // Agent runners (CLI or API)
+  // Agent runners — plain objects, type inferred from shape
   runners: [
     {
       name: "copilot",
-      type: "cli",
       command: 'gh copilot suggest "{{prompt}}"',
     },
   ],
 
-  // Judge used to score every test
+  // Judge — LLM model used to score every test
   judge: {
-    provider: "openai",
-    model: "gpt-5-mini",
+    llm: new OpenAIModel({ model: "gpt-4o" }),
   },
-
-  // LLM plugin (used by API runners for model calls)
-  llm: new OpenAILLM({
-    defaultModel: "gpt-5-mini",
-  }),
 
   // Execution environment plugin: local git workspace OR docker sandbox
   environment: useDocker ? new DockerEnvironment({ image: "node:22" }) : new LocalEnvironment(),

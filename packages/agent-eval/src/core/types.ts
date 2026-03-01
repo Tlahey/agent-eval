@@ -1,42 +1,20 @@
-// ─── Agent Configuration ───
-
-export interface AgentRunnerConfig {
-  /** Unique name for the agent (e.g., "copilot", "cursor") */
-  name: string;
-  /** Type of runner: CLI command or API call */
-  type: "cli" | "api";
-  /** CLI command template. Use {{prompt}} as placeholder for the instruction. */
-  command?: string;
-  /** API configuration for direct model calls */
-  api?: {
-    provider: "anthropic" | "openai" | "ollama";
-    model: string;
-    baseURL?: string;
-    apiKey?: string;
-  };
-}
-
 // ─── Judge Configuration ───
 
 export interface JudgeConfig {
-  /** Type of judge: API call (default) or CLI command */
-  type?: "api" | "cli";
-  /** Provider for API judges */
-  provider?: "anthropic" | "openai" | "ollama";
-  /** Model name for API judges */
-  model?: string;
-  baseURL?: string;
-  apiKey?: string;
   /**
-   * CLI command template for CLI judges.
-   * Use {{prompt}} as placeholder for the judge prompt,
-   * or {{prompt_file}} for a temp file containing the prompt.
-   * The command must output JSON: { "pass": boolean, "score": number, "reason": string }
+   * LLM plugin used for evaluation.
+   *
+   * @example
+   * ```ts
+   * import { OpenAIModel } from "agent-eval/providers/openai";
+   * judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }
+   * ```
    */
-  command?: string;
+  llm?: import("./interfaces.js").IModelPlugin;
   /**
-   * Number of retry attempts if the CLI judge returns invalid JSON.
-   * Each retry re-executes the command. Defaults to 2.
+   * Maximum retry attempts if the judge LLM returns an invalid or unparseable response.
+   * The judge **must** return valid structured data — retries ensure reliability.
+   * Defaults to 2.
    */
   maxRetries?: number;
 }
@@ -69,6 +47,57 @@ export function computeStatus(
   return "FAIL";
 }
 
+// ─── Runner Configuration ───
+
+/**
+ * CLI runner config — the simplest form: a name + command template.
+ * Automatically resolved to a CLIRunner plugin at startup.
+ *
+ * @example
+ * ```ts
+ * runners: [
+ *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
+ * ]
+ * ```
+ */
+export interface CLIRunnerConfig {
+  /** Unique runner name (used in ledger and logs) */
+  name: string;
+  /** CLI command template. Use {{prompt}} as placeholder for the instruction. */
+  command: string;
+}
+
+/**
+ * API runner config — a name + model plugin.
+ * Automatically resolved to an APIRunner plugin at startup.
+ *
+ * @example
+ * ```ts
+ * import { AnthropicModel } from "agent-eval/providers/anthropic";
+ * runners: [
+ *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+ * ]
+ * ```
+ */
+export interface APIRunnerConfig {
+  /** Unique runner name (used in ledger and logs) */
+  name: string;
+  /** LLM model plugin for API-based generation */
+  model: import("./interfaces.js").IModelPlugin;
+}
+
+/**
+ * Runner configuration — plain objects OR custom IRunnerPlugin instances.
+ *
+ * - `{ name, command }` → CLI runner (resolved automatically)
+ * - `{ name, model }` → API runner (resolved automatically)
+ * - Custom IRunnerPlugin → used as-is (must implement `execute()`)
+ */
+export type RunnerConfig =
+  | CLIRunnerConfig
+  | APIRunnerConfig
+  | import("./interfaces.js").IRunnerPlugin;
+
 // ─── Main Configuration ───
 
 export interface AgentEvalConfig {
@@ -76,8 +105,21 @@ export interface AgentEvalConfig {
   rootDir?: string;
   /** Glob pattern(s) to discover test files */
   testFiles?: string | string[];
-  /** Agent runners to test against */
-  runners: AgentRunnerConfig[];
+  /**
+   * Agent runners to test against.
+   * Use plain objects for built-in runners, or IRunnerPlugin instances for custom ones.
+   * Each runner must have a unique `name`.
+   *
+   * @example
+   * ```ts
+   * import { AnthropicModel } from "agent-eval/providers/anthropic";
+   * runners: [
+   *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
+   *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+   * ]
+   * ```
+   */
+  runners: RunnerConfig[];
   /** Judge configuration for LLM-as-a-Judge evaluation */
   judge: JudgeConfig;
   /** Model matrix: override which models to test per-run */
@@ -126,7 +168,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { SqliteLedger } from "agent-eval";
+   * import { SqliteLedger } from "agent-eval/ledger/sqlite";
    * export default defineConfig({
    *   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
    *   // ...
@@ -141,7 +183,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { DockerEnvironment } from "agent-eval";
+   * import { DockerEnvironment } from "agent-eval/environment/docker";
    * export default defineConfig({
    *   environment: new DockerEnvironment({ image: "node:22" }),
    *   // ...
@@ -158,6 +200,113 @@ export interface AfterEachCommand {
   command: string;
 }
 
+// ─── Token Usage ───
+
+/** Token usage from an LLM call (agent or judge) */
+export interface TokenUsage {
+  /** Number of input/prompt tokens consumed */
+  inputTokens: number;
+  /** Number of output/completion tokens generated */
+  outputTokens: number;
+  /** Total tokens (input + output). May differ from sum if provider counts differently. */
+  totalTokens: number;
+}
+
+// ─── Task Result ───
+
+/** A task definition paired with its execution result */
+export interface TaskResult {
+  task: TaskDefinition;
+  result: CommandResult;
+}
+
+// ─── Execution Data (what the agent did) ───
+
+/** Timing breakdown per phase of a test execution */
+export interface TimingData {
+  /** Total wall-clock time for the entire test iteration (ms) */
+  totalMs: number;
+  /** Time spent in environment setup — git reset, docker create (ms) */
+  setupMs?: number;
+  /** Time spent executing the agent instruction (ms) */
+  agentMs?: number;
+  /** Time spent running afterEach commands (ms) */
+  afterEachMs?: number;
+  /** Time spent executing registered tasks (ms) */
+  tasksMs?: number;
+  /** Time spent on judge evaluation (ms) */
+  judgeMs?: number;
+}
+
+/**
+ * All data collected during the agent execution phase.
+ * This is the single source of truth passed to the judge for evaluation.
+ */
+export interface ExecutionData {
+  /** The instruction/prompt given to the agent */
+  instruction: string;
+  /** Runner metadata */
+  runner: { name: string; model: string };
+  /** Git diff captured after agent execution */
+  diff: string | null;
+  /** Files changed (extracted from diff) */
+  changedFiles: string[];
+  /** All command results (afterEach + runCommand + task actions) */
+  commands: CommandResult[];
+  /** Task definitions paired with their execution results */
+  taskResults: TaskResult[];
+  /** Token usage from the agent's LLM call (if available, API runners only) */
+  tokenUsage?: TokenUsage;
+  /** Per-phase timing breakdown */
+  timing: TimingData;
+  /** Raw agent output (stdout for CLI runners, LLM response for API runners) */
+  agentOutput?: string;
+  /** Formatted logs (diff + command outputs as readable text) */
+  logs: string;
+}
+
+// ─── Judgment Data (how the judge evaluated) ───
+
+/**
+ * All data from the judge evaluation phase.
+ */
+export interface JudgmentData {
+  /** Judge model identifier */
+  model: string;
+  /** Score from 0.0 to 1.0 */
+  score: number;
+  /** Whether the test passed (PASS or WARN = true, FAIL = false) */
+  pass: boolean;
+  /** Rich status: PASS, WARN, or FAIL */
+  status: TestStatus;
+  /** Markdown-formatted evaluation explanation */
+  reason: string;
+  /** Markdown-formatted improvement suggestions */
+  improvement: string;
+  /** Token usage from the judge's LLM call (if available) */
+  tokenUsage?: TokenUsage;
+  /** Evaluation criteria used by the judge */
+  criteria: string;
+  /** Expected files (for scope analysis) */
+  expectedFiles?: string[];
+  /** Scoring thresholds used for this evaluation */
+  thresholds: Thresholds;
+}
+
+// ─── Run Report ───
+
+/**
+ * Unified report for a single test × runner execution.
+ * Contains ALL data from both the execution and judgment phases.
+ * This is the canonical structure stored in the ledger.
+ */
+export interface RunReport {
+  /** Everything about what the agent did */
+  execution: ExecutionData;
+  /** Everything about how the judge evaluated the result */
+  judgment: JudgmentData;
+}
+
 // ─── Test Context ───
 
 export interface CommandResult {
@@ -170,14 +319,29 @@ export interface CommandResult {
 }
 
 /**
+ * Minimal result from a task action. The runner enriches this into a full CommandResult.
+ */
+export interface TaskActionResult {
+  stdout: string;
+  stderr?: string;
+  exitCode: number;
+  /** Optional: filled automatically by ctx.exec() */
+  name?: string;
+  /** Optional: filled automatically by ctx.exec() */
+  command?: string;
+  /** Optional: filled automatically by ctx.exec() */
+  durationMs?: number;
+}
+
+/**
  * A task registered via `ctx.addTask()` in declarative pipeline mode.
  * Tasks execute after the agent instruction and are evaluated by the judge.
  */
 export interface TaskDefinition {
   /** Human-readable name for the task (used in logs and judge prompt) */
   name: string;
-  /** Action to execute after the agent runs. Returns a CommandResult for the judge. */
-  action: () => CommandResult | Promise<CommandResult>;
+  /** Action to execute after the agent runs. Returns a result for the judge. */
+  action: () => TaskActionResult | Promise<TaskActionResult>;
   /** Evaluation criteria for the judge to assess this task's outcome */
   criteria: string;
   /** Weight for scoring (default: 1). Higher weight = more impact on final score. */
@@ -237,8 +401,6 @@ export interface JudgeResult {
 export interface JudgeOptions {
   /** Evaluation criteria (Markdown) */
   criteria: string;
-  /** Optional model override for this specific judgment */
-  model?: string;
   /**
    * Expected files that should be modified by the agent.
    * The judge will verify these files were changed and flag
@@ -263,8 +425,32 @@ export interface LedgerEntry {
   suitePath: string[];
   /** ISO timestamp */
   timestamp: string;
+
+  // ─── Execution data (what the agent did) ───
+
   /** Agent model / runner name */
   agentRunner: string;
+  /** The instruction given to the agent */
+  instruction?: string;
+  /** Git diff captured after execution */
+  diff: string | null;
+  /** Files changed (extracted from diff) */
+  changedFiles: string[];
+  /** All command results */
+  commands: CommandResult[];
+  /** Task definitions paired with their results */
+  taskResults: TaskResult[];
+  /** Token usage from the agent's LLM call */
+  agentTokenUsage?: TokenUsage;
+  /** Per-phase timing breakdown */
+  timing: TimingData;
+  /** Raw agent output (stdout for CLI, response for API) */
+  agentOutput?: string;
+  /** Formatted logs */
+  logs: string;
+
+  // ─── Judgment data (how the judge evaluated) ───
+
   /** Judge model used */
   judgeModel: string;
   /** Score from 0.0 to 1.0 */
@@ -277,15 +463,26 @@ export interface LedgerEntry {
   reason: string;
   /** Judge's markdown improvement suggestions */
   improvement: string;
-  /** Raw context: diff + command logs */
-  context: {
+  /** Token usage from the judge's LLM call */
+  judgeTokenUsage?: TokenUsage;
+  /** Evaluation criteria used */
+  criteria: string;
+  /** Expected files for scope analysis */
+  expectedFiles?: string[];
+  /** Thresholds used for this run (preserved for historical accuracy) */
+  thresholds: Thresholds;
+
+  /** Duration of the agent run in ms (alias for timing.totalMs, kept for backward compat) */
+  durationMs: number;
+
+  /**
+   * @deprecated Use top-level fields instead. Kept for backward compatibility with older ledger DBs.
+   */
+  context?: {
     diff: string | null;
     commands: CommandResult[];
   };
-  /** Duration of the agent run in ms */
-  durationMs: number;
-  /** Thresholds used for this run (preserved for historical accuracy) */
-  thresholds: Thresholds;
+
   /** Human override (if any). Present only when reading from DB. */
   override?: ScoreOverride;
 }

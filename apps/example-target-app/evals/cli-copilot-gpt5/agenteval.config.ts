@@ -1,35 +1,35 @@
 import { defineConfig } from "agent-eval";
-import { OllamaModel } from "agent-eval/providers/ollama";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
- * API Runner — Ollama (Local)
+ * CLI Runner — GitHub Copilot with GPT-5
  *
- * Runs a local model via Ollama. Privacy-first: no code leaves your machine.
+ * Uses `copilot` CLI with a specific model flag. The agent output
+ * is captured from stdout — AgentEval records whatever the CLI
+ * prints to the terminal, which the judge then evaluates.
  *
- * The judge uses Anthropic Claude because local models are generally not
- * capable enough to act as reliable judges for code evaluation.
+ * This is the simplest integration pattern: any CLI tool that
+ * accepts a prompt and writes to stdout can be used as a runner.
  *
  * Prerequisites:
- *   - Ollama running: `ollama serve`
- *   - Model pulled: `ollama pull llama3` or `ollama pull codellama`
+ *   - GitHub Copilot CLI installed
  *   - ANTHROPIC_API_KEY for the judge
  *
  * Usage:
- *   agenteval run --config evals/api-ollama/agenteval.config.ts
+ *   agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts
  */
 export default defineConfig({
   rootDir: "../..",
 
   runners: [
     {
-      name: "ollama-llama3",
-      model: new OllamaModel({ model: "llama3" }),
+      name: "copilot-gpt5",
+      command: "copilot --model=gpt-5 --prompt={{prompt}}",
     },
   ],
 
-  // ⚠️ Always use a strong cloud model as judge, even with local runners.
-  // Local models lack the reasoning depth to reliably evaluate code quality.
+  // ⚠️ Use a strong model for the judge — it needs to understand code,
+  // diffs, test output, and make nuanced pass/fail decisions.
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
@@ -51,7 +51,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/api-ollama/**/*.eval.ts",
+  testFiles: "evals/cli-copilot-gpt5/**/*.eval.ts",
   outputDir: ".agenteval",
-  timeout: 300_000, // Local models can be slower
+  timeout: 120_000,
 });

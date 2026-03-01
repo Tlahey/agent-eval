@@ -255,10 +255,11 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { OpenAIModel } from "agent-eval/providers/openai";
 
 export default defineConfig({
-  runners: [{ name: "copilot", type: "cli", command: 'gh copilot "{{prompt}}"' }],
-  judge: { provider: "openai", model: "gpt-4o" },
+  runners: [{ name: "copilot", command: 'gh copilot "{{prompt}}"' }],
+  judge: { llm: new OpenAIModel({ model: "gpt-4o" }) },
 
   // Runs before every test — great for common verification tasks
   beforeEach: ({ ctx }) => {

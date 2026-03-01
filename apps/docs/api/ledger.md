@@ -14,28 +14,72 @@ Results are persisted in a `runs` SQLite table. The database location is configu
 
 ## Entry Schema
 
-Each ledger entry contains:
+Each ledger entry captures the complete lifecycle of a test run — **execution data** (what the agent did) and **judgment data** (how the judge evaluated):
 
 ```json
 {
+  "id": 1,
   "testId": "Add a Close button to the Banner",
   "suitePath": ["UI Components", "Banner"],
   "timestamp": "2025-03-15T10:30:00.000Z",
   "agentRunner": "copilot",
+
+  "instruction": "Add a close button to the Banner component",
+  "diff": "diff --git a/...",
+  "changedFiles": ["src/components/Banner.tsx"],
+  "commands": [
+    {
+      "name": "test",
+      "command": "pnpm test",
+      "stdout": "...",
+      "stderr": "",
+      "exitCode": 0,
+      "durationMs": 3200
+    },
+    {
+      "name": "typecheck",
+      "command": "pnpm build",
+      "stdout": "...",
+      "stderr": "",
+      "exitCode": 0,
+      "durationMs": 1500
+    }
+  ],
+  "taskResults": [
+    {
+      "task": { "name": "Build", "criteria": "Build succeeds", "weight": 2 },
+      "result": {
+        "name": "Build",
+        "command": "pnpm build",
+        "stdout": "...",
+        "stderr": "",
+        "exitCode": 0,
+        "durationMs": 1500
+      }
+    }
+  ],
+  "agentTokenUsage": { "inputTokens": 1200, "outputTokens": 800, "totalTokens": 2000 },
+  "timing": {
+    "totalMs": 45000,
+    "setupMs": 200,
+    "agentMs": 40000,
+    "afterEachMs": 3000,
+    "tasksMs": 1500,
+    "judgeMs": 3200
+  },
+  "agentOutput": "I'll add a close button...",
+  "logs": "## Diff\n...\n## Commands\n...",
+  "durationMs": 45000,
+
   "judgeModel": "claude-sonnet-4-20250514",
   "score": 0.85,
   "pass": true,
   "status": "PASS",
   "reason": "The agent correctly added a close button with proper aria-label...",
   "improvement": "Consider adding keyboard event handling for Escape key",
-  "context": {
-    "diff": "diff --git a/...",
-    "commands": [
-      { "name": "test", "stdout": "...", "exitCode": 0, "durationMs": 3200 },
-      { "name": "typecheck", "stdout": "...", "exitCode": 0, "durationMs": 1500 }
-    ]
-  },
-  "durationMs": 45000,
+  "judgeTokenUsage": { "inputTokens": 2500, "outputTokens": 600, "totalTokens": 3100 },
+  "criteria": "Close button with aria-label, click handler, no TS errors",
+  "expectedFiles": ["src/components/Banner.tsx"],
   "thresholds": { "warn": 0.8, "fail": 0.5 }
 }
 ```
@@ -103,16 +147,26 @@ erDiagram
         text suite_path "JSON array of suite names"
         text timestamp "indexed, ISO 8601"
         text agent_runner "runner name"
-        text judge_model "model or CLI"
+        text instruction "agent instruction"
+        text diff "raw git diff"
+        text changed_files "JSON: string[]"
+        text commands "JSON: CommandResult[]"
+        text task_results "JSON: TaskResult[]"
+        text agent_token_usage "JSON: TokenUsage"
+        text timing "JSON: TimingData"
+        text agent_output "raw agent output"
+        text logs "formatted log string"
+        int duration_ms "agent run time"
+        text judge_model "LLM model used"
         real score "0.0 – 1.0"
         int pass "0 or 1"
         text status "PASS, WARN, or FAIL"
         text reason "judge explanation"
         text improvement "judge suggestions"
-        text diff "raw git diff"
-        text commands "JSON array"
-        int duration_ms "agent run time"
-        text thresholds "JSON: {warn, fail}"
+        text judge_token_usage "JSON: TokenUsage"
+        text criteria "evaluation criteria"
+        text expected_files "JSON: string[]"
+        text thresholds "JSON: Thresholds"
     }
     SCORE_OVERRIDES {
         int id PK "auto-increment"
@@ -126,23 +180,40 @@ erDiagram
     RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
 ```
 
-| Column         | Type      | Description                                       |
-| -------------- | --------- | ------------------------------------------------- |
-| `id`           | `INTEGER` | Auto-increment primary key                        |
-| `test_id`      | `TEXT`    | Test title (indexed)                              |
-| `suite_path`   | `TEXT`    | JSON array of suite names (from `describe()`)     |
-| `timestamp`    | `TEXT`    | ISO 8601 timestamp (indexed)                      |
-| `agent_runner` | `TEXT`    | Runner name                                       |
-| `judge_model`  | `TEXT`    | Judge model used                                  |
-| `score`        | `REAL`    | 0.0 to 1.0                                        |
-| `pass`         | `INTEGER` | 1 = passed, 0 = failed                            |
-| `status`       | `TEXT`    | `PASS`, `WARN`, or `FAIL`                         |
-| `reason`       | `TEXT`    | Judge's markdown explanation                      |
-| `improvement`  | `TEXT`    | Judge's improvement suggestions                   |
-| `diff`         | `TEXT`    | Raw git diff                                      |
-| `commands`     | `TEXT`    | JSON-encoded CommandResult[]                      |
-| `duration_ms`  | `INTEGER` | Total duration in ms                              |
-| `thresholds`   | `TEXT`    | JSON-encoded thresholds `{ warn, fail }` snapshot |
+### `runs` Table — Execution Data
+
+| Column              | Type      | Description                                     |
+| ------------------- | --------- | ----------------------------------------------- |
+| `id`                | `INTEGER` | Auto-increment primary key                      |
+| `test_id`           | `TEXT`    | Test title (indexed)                            |
+| `suite_path`        | `TEXT`    | JSON array of suite names (from `describe()`)   |
+| `timestamp`         | `TEXT`    | ISO 8601 timestamp (indexed)                    |
+| `agent_runner`      | `TEXT`    | Runner name                                     |
+| `instruction`       | `TEXT`    | Instruction given to the agent                  |
+| `diff`              | `TEXT`    | Raw git diff                                    |
+| `changed_files`     | `TEXT`    | JSON-encoded string array of changed file paths |
+| `commands`          | `TEXT`    | JSON-encoded `CommandResult[]`                  |
+| `task_results`      | `TEXT`    | JSON-encoded `TaskResult[]`                     |
+| `agent_token_usage` | `TEXT`    | JSON-encoded `TokenUsage` (agent LLM usage)     |
+| `timing`            | `TEXT`    | JSON-encoded `TimingData` (per-phase breakdown) |
+| `agent_output`      | `TEXT`    | Raw agent output text                           |
+| `logs`              | `TEXT`    | Formatted log string (diff + commands)          |
+| `duration_ms`       | `INTEGER` | Total duration in ms                            |
+
+### `runs` Table — Judgment Data
+
+| Column              | Type      | Description                                       |
+| ------------------- | --------- | ------------------------------------------------- |
+| `judge_model`       | `TEXT`    | Judge model used                                  |
+| `score`             | `REAL`    | 0.0 to 1.0                                        |
+| `pass`              | `INTEGER` | 1 = passed, 0 = failed                            |
+| `status`            | `TEXT`    | `PASS`, `WARN`, or `FAIL`                         |
+| `reason`            | `TEXT`    | Judge's markdown explanation                      |
+| `improvement`       | `TEXT`    | Judge's improvement suggestions                   |
+| `judge_token_usage` | `TEXT`    | JSON-encoded `TokenUsage` (judge LLM usage)       |
+| `criteria`          | `TEXT`    | Evaluation criteria used                          |
+| `expected_files`    | `TEXT`    | JSON-encoded expected file list                   |
+| `thresholds`        | `TEXT`    | JSON-encoded thresholds `{ warn, fail }` snapshot |
 
 Indexes on `test_id` and `timestamp` for fast queries.
 

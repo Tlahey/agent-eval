@@ -1,34 +1,45 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { TestContext, JudgeConfig } from "../core/types.js";
+import type { TestContext, JudgeConfig, ExecutionData } from "../core/types.js";
+import type { IModelPlugin } from "../core/interfaces.js";
 
 // Mock the AI SDK
 vi.mock("ai", () => ({
   generateObject: vi.fn(),
 }));
 
-vi.mock("@ai-sdk/anthropic", () => ({
-  createAnthropic: vi.fn(() => (model: string) => ({ modelId: model, provider: "anthropic" })),
-}));
-
-vi.mock("@ai-sdk/openai", () => ({
-  createOpenAI: vi.fn(() => (model: string) => ({ modelId: model, provider: "openai" })),
-}));
-
-vi.mock("node:child_process", () => ({
-  execSync: vi.fn(),
-}));
-
-vi.mock("node:fs", () => ({
-  writeFileSync: vi.fn(),
-  mkdtempSync: vi.fn(() => "/tmp/agenteval-judge-mock"),
-  rmSync: vi.fn(),
-}));
-
 import { generateObject } from "ai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
-import { execSync } from "node:child_process";
-import { judge, extractJudgeJson, buildJudgePrompt, extractChangedFiles } from "./judge.js";
+import { judge, buildJudgePrompt, extractChangedFiles } from "./judge.js";
+
+function createMockModel(modelId = "test-model"): IModelPlugin {
+  return {
+    name: "mock",
+    modelId,
+    createModel: vi.fn().mockResolvedValue({ modelId, provider: "mock" }),
+  };
+}
+
+function createMockExecution(overrides: Partial<ExecutionData> = {}): ExecutionData {
+  return {
+    instruction: "",
+    runner: { name: "test", model: "test" },
+    diff: "diff --git a/test.ts b/test.ts\n+const x = 1;",
+    changedFiles: ["test.ts"],
+    commands: [
+      {
+        name: "test",
+        command: "pnpm test",
+        stdout: "Tests passed",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 500,
+      },
+    ],
+    taskResults: [],
+    timing: { totalMs: 0 },
+    logs: "=== Diff ===\ndiff content\n=== test ===\nTests passed",
+    ...overrides,
+  };
+}
 
 function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
   return {
@@ -73,11 +84,14 @@ describe("judge", () => {
       finishReason: "stop",
     } as never);
 
-    const config: JudgeConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+    const config: JudgeConfig = { llm: createMockModel("claude-sonnet-4-20250514") };
     const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "has close button", ctx });
+    const prompt = buildJudgePrompt({
+      criteria: "has close button",
+      execution: createMockExecution(),
+    });
 
-    const result = await judge(ctx, prompt, config);
+    const { result } = await judge(ctx, prompt, config);
 
     expect(result).toEqual(mockResult);
     expect(generateObject).toHaveBeenCalledOnce();
@@ -88,62 +102,17 @@ describe("judge", () => {
     expect(callArgs.prompt).toContain("Diff");
   });
 
-  it("resolves anthropic provider", async () => {
+  it("resolves model from IModelPlugin", async () => {
+    const mockModel = createMockModel("gpt-4o");
     vi.mocked(generateObject).mockResolvedValue({
       object: { pass: true, score: 1, reason: "ok", improvement: "none" },
     } as never);
 
-    const config: JudgeConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+    const config: JudgeConfig = { llm: mockModel };
     await judge(createMockContext(), "criteria", config);
 
-    expect(createAnthropic).toHaveBeenCalled();
-  });
-
-  it("resolves openai provider", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.8, reason: "good", improvement: "none" },
-    } as never);
-
-    const config: JudgeConfig = { provider: "openai", model: "gpt-4o" };
-    await judge(createMockContext(), "criteria", config);
-
-    expect(createOpenAI).toHaveBeenCalled();
-  });
-
-  it("resolves ollama provider with default baseURL", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.7, reason: "decent", improvement: "none" },
-    } as never);
-
-    const config: JudgeConfig = { provider: "ollama", model: "llama3" };
-    await judge(createMockContext(), "criteria", config);
-
-    expect(createOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: "http://localhost:11434/v1",
-        apiKey: "ollama",
-      }),
-    );
-  });
-
-  it("uses model override when provided", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.85, reason: "nice", improvement: "none" },
-    } as never);
-
-    const config: JudgeConfig = { provider: "openai", model: "gpt-4o" };
-    await judge(createMockContext(), "criteria", config, "gpt-4o-mini");
-
-    // Since our mock returns a function, it was called — we verify generateObject was called
+    expect(mockModel.createModel).toHaveBeenCalledOnce();
     expect(generateObject).toHaveBeenCalledOnce();
-  });
-
-  it("throws for unsupported provider", async () => {
-    const config = { provider: "unsupported" as never, model: "test" };
-
-    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "Unsupported judge provider",
-    );
   });
 
   it("handles empty context logs", async () => {
@@ -152,224 +121,62 @@ describe("judge", () => {
     } as never);
 
     const ctx = createMockContext({ logs: "", diff: null, commands: [] });
-    const config: JudgeConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const config: JudgeConfig = { llm: createMockModel() };
+    const prompt = buildJudgePrompt({
+      criteria: "criteria",
+      execution: createMockExecution({ logs: "", diff: null, changedFiles: [], commands: [] }),
+    });
 
-    const result = await judge(ctx, prompt, config);
+    const { result } = await judge(ctx, prompt, config);
     expect(result.pass).toBe(false);
 
     const callArgs = vi.mocked(generateObject).mock.calls[0][0];
     expect(callArgs.prompt).toContain("(no logs captured)");
   });
 
-  it("passes custom apiKey and baseURL to provider", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: { pass: true, score: 0.9, reason: "ok", improvement: "none" },
-    } as never);
-
-    const config: JudgeConfig = {
-      provider: "openai",
-      model: "gpt-4o",
-      apiKey: "sk-custom",
-      baseURL: "https://custom.api.com/v1",
-    };
-    await judge(createMockContext(), "criteria", config);
-
-    expect(createOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        apiKey: "sk-custom",
-        baseURL: "https://custom.api.com/v1",
-      }),
-    );
-  });
-
-  it("throws when API judge missing provider or model", async () => {
-    const config: JudgeConfig = { type: "api" };
+  it("throws when judge has no llm plugin", async () => {
+    const config: JudgeConfig = {};
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      'API judge requires "provider" and "model"',
+      'Judge requires an "llm" plugin',
     );
   });
-});
 
-describe("judge - CLI mode", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("retries on generateObject failure and succeeds", async () => {
+    const mockResult = { pass: true, score: 0.8, reason: "ok", improvement: "none" };
+    vi.mocked(generateObject)
+      .mockRejectedValueOnce(new Error("Invalid response format"))
+      .mockResolvedValueOnce({ object: mockResult } as never);
+
+    const config: JudgeConfig = { llm: createMockModel(), maxRetries: 2 };
+    const { result } = await judge(createMockContext(), "criteria", config);
+
+    expect(result).toEqual(mockResult);
+    expect(generateObject).toHaveBeenCalledTimes(2);
   });
 
-  it("executes CLI command and parses JSON result", async () => {
-    const mockResult = JSON.stringify({
-      pass: true,
-      score: 0.85,
-      reason: "looks good",
-      improvement: "none",
-    });
-    vi.mocked(execSync).mockReturnValue(mockResult);
+  it("throws after exhausting all retries", async () => {
+    vi.mocked(generateObject).mockRejectedValue(new Error("Schema validation failed"));
 
-    const config: JudgeConfig = {
-      type: "cli",
-      command: 'claude -p "{{prompt}}" --output-format json',
-    };
-
-    const result = await judge(createMockContext(), "has unit tests", config);
-
-    expect(result).toEqual({ pass: true, score: 0.85, reason: "looks good", improvement: "none" });
-    expect(execSync).toHaveBeenCalledOnce();
-  });
-
-  it("extracts JSON from mixed CLI output", async () => {
-    const output = `Thinking...\n{"pass": false, "score": 0.3, "reason": "missing tests", "improvement": "add tests"}\nDone.`;
-    vi.mocked(execSync).mockReturnValue(output);
-
-    const config: JudgeConfig = {
-      type: "cli",
-      command: "some-cli evaluate",
-    };
-
-    const result = await judge(createMockContext(), "criteria", config);
-
-    expect(result.pass).toBe(false);
-    expect(result.score).toBe(0.3);
-    expect(result.reason).toBe("missing tests");
-  });
-
-  it("replaces {{prompt_file}} with temp file path", async () => {
-    vi.mocked(execSync).mockReturnValue(
-      JSON.stringify({ pass: true, score: 1, reason: "perfect", improvement: "none" }),
-    );
-
-    const config: JudgeConfig = {
-      type: "cli",
-      command: "judge-cli --input {{prompt_file}}",
-    };
-
-    await judge(createMockContext(), "criteria", config);
-
-    const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
-    expect(calledCmd).toContain("/tmp/agenteval-judge-mock/prompt.txt");
-    expect(calledCmd).not.toContain("{{prompt_file}}");
-  });
-
-  it("throws when CLI judge has no command", async () => {
-    const config: JudgeConfig = { type: "cli" };
+    const config: JudgeConfig = { llm: createMockModel(), maxRetries: 1 };
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      'CLI judge requires a "command" field',
+      "Judge failed after 2 attempts",
     );
-  });
-
-  it("throws after all retries when CLI output has no valid JSON", async () => {
-    vi.mocked(execSync).mockReturnValue("I could not evaluate this code.");
-
-    const config: JudgeConfig = {
-      type: "cli",
-      command: "bad-cli evaluate",
-      maxRetries: 1,
-    };
-
-    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "does not contain valid JSON",
-    );
-
-    // 1 initial attempt + 1 retry = 2 calls
-    expect(execSync).toHaveBeenCalledTimes(2);
-  });
-
-  it("retries on invalid JSON then succeeds", async () => {
-    vi.mocked(execSync)
-      .mockReturnValueOnce("Not JSON at all")
-      .mockReturnValueOnce(
-        JSON.stringify({ pass: true, score: 0.9, reason: "ok on retry", improvement: "none" }),
-      );
-
-    const config: JudgeConfig = {
-      type: "cli",
-      command: "flaky-cli evaluate",
-      maxRetries: 2,
-    };
-
-    const result = await judge(createMockContext(), "criteria", config);
-
-    expect(result).toEqual({ pass: true, score: 0.9, reason: "ok on retry", improvement: "none" });
-    expect(execSync).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not retry on command execution failure", async () => {
-    vi.mocked(execSync).mockImplementation(() => {
-      throw new Error("Command not found: bad-cli");
-    });
-
-    const config: JudgeConfig = {
-      type: "cli",
-      command: "bad-cli evaluate",
-      maxRetries: 3,
-    };
-
-    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "Command not found",
-    );
-
-    // No retry — command failure, not JSON validation
-    expect(execSync).toHaveBeenCalledTimes(1);
+    // 1 initial + 1 retry = 2 calls
+    expect(generateObject).toHaveBeenCalledTimes(2);
   });
 
   it("defaults to 2 retries when maxRetries is not set", async () => {
-    vi.mocked(execSync).mockReturnValue("garbage output");
+    vi.mocked(generateObject).mockRejectedValue(new Error("bad response"));
 
-    const config: JudgeConfig = {
-      type: "cli",
-      command: "cli evaluate",
-    };
+    const config: JudgeConfig = { llm: createMockModel() };
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "does not contain valid JSON",
+      "Judge failed after 3 attempts",
     );
-
     // 1 initial + 2 default retries = 3 calls
-    expect(execSync).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe("extractJudgeJson", () => {
-  it("parses clean JSON", () => {
-    const result = extractJudgeJson(
-      '{"pass": true, "score": 0.9, "reason": "good", "improvement": "none"}',
-    );
-    expect(result).toEqual({ pass: true, score: 0.9, reason: "good", improvement: "none" });
-  });
-
-  it("strips markdown code fences", () => {
-    const output =
-      '```json\n{"pass": false, "score": 0.2, "reason": "bad", "improvement": "fix it"}\n```';
-    const result = extractJudgeJson(output);
-    expect(result).toEqual({ pass: false, score: 0.2, reason: "bad", improvement: "fix it" });
-  });
-
-  it("extracts JSON from preamble text", () => {
-    const output =
-      'Here is my evaluation:\n{"pass": true, "score": 0.8, "reason": "decent", "improvement": "none"}\nEnd.';
-    const result = extractJudgeJson(output);
-    expect(result.score).toBe(0.8);
-  });
-
-  it("throws on missing JSON", () => {
-    expect(() => extractJudgeJson("No JSON here")).toThrow("does not contain valid JSON");
-  });
-
-  it("throws on malformed JSON", () => {
-    expect(() =>
-      extractJudgeJson('{"pass": true, "score": bad, "reason": "x", "improvement": "y"}'),
-    ).toThrow("malformed JSON");
-  });
-
-  it("throws on invalid schema (score out of range)", () => {
-    expect(() =>
-      extractJudgeJson('{"pass": true, "score": 5.0, "reason": "too high", "improvement": "none"}'),
-    ).toThrow();
-  });
-
-  it("throws on missing required field", () => {
-    expect(() => extractJudgeJson('{"pass": true, "score": 0.5}')).toThrow();
+    expect(generateObject).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -398,11 +205,15 @@ index 123..456 100644`;
 
 describe("buildJudgePrompt - expectedFiles", () => {
   it("includes file scope section when expectedFiles are provided", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code",
+    const diff = "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code";
+    const prompt = buildJudgePrompt({
+      criteria: "criteria",
+      execution: createMockExecution({
+        diff,
+        changedFiles: ["src/Banner.tsx"],
+      }),
+      expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
     });
-
-    const prompt = buildJudgePrompt("criteria", ctx, ["src/Banner.tsx", "src/Banner.test.tsx"]);
 
     expect(prompt).toContain("File Scope Analysis");
     expect(prompt).toContain("src/Banner.tsx");
@@ -411,28 +222,37 @@ describe("buildJudgePrompt - expectedFiles", () => {
   });
 
   it("does not include file scope when no expectedFiles", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt("criteria", ctx);
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution() });
     expect(prompt).not.toContain("File Scope Analysis");
   });
 
   it("flags unexpected file changes", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep",
+    const diff =
+      "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep";
+    const prompt = buildJudgePrompt({
+      criteria: "criteria",
+      execution: createMockExecution({
+        diff,
+        changedFiles: ["src/Banner.tsx", "package.json"],
+      }),
+      expectedFiles: ["src/Banner.tsx"],
     });
-
-    const prompt = buildJudgePrompt("criteria", ctx, ["src/Banner.tsx"]);
 
     expect(prompt).toContain("Unexpected file changes");
     expect(prompt).toContain("package.json");
   });
 
   it("shows no warnings when all expected files match", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code",
+    const diff =
+      "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code";
+    const prompt = buildJudgePrompt({
+      criteria: "criteria",
+      execution: createMockExecution({
+        diff,
+        changedFiles: ["src/A.tsx", "src/B.tsx"],
+      }),
+      expectedFiles: ["src/A.tsx", "src/B.tsx"],
     });
-
-    const prompt = buildJudgePrompt("criteria", ctx, ["src/A.tsx", "src/B.tsx"]);
 
     expect(prompt).toContain("File Scope Analysis");
     expect(prompt).not.toContain("⚠️ **Missing expected files:**");
@@ -442,11 +262,11 @@ describe("buildJudgePrompt - expectedFiles", () => {
 
 describe("buildJudgePrompt - unified adaptive prompt", () => {
   it("includes instruction section when provided", () => {
-    const ctx = createMockContext();
     const prompt = buildJudgePrompt({
       criteria: "test criteria",
-      ctx,
-      instruction: "Add a close button to the Banner component",
+      execution: createMockExecution({
+        instruction: "Add a close button to the Banner component",
+      }),
     });
 
     expect(prompt).toContain("## Agent Instruction");
@@ -455,14 +275,12 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
   });
 
   it("excludes instruction section when not provided", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution() });
 
     expect(prompt).not.toContain("## Agent Instruction");
   });
 
   it("includes task results section with weights when tasks provided", () => {
-    const ctx = createMockContext();
     const taskAction = async () => ({
       name: "x",
       command: "x",
@@ -473,31 +291,32 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
     });
     const prompt = buildJudgePrompt({
       criteria: "criteria",
-      ctx,
-      taskResults: [
-        {
-          task: { name: "Tests", action: taskAction, criteria: "All tests pass", weight: 3 },
-          result: {
-            name: "Tests",
-            command: "pnpm test",
-            stdout: "All tests passed",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 100,
+      execution: createMockExecution({
+        taskResults: [
+          {
+            task: { name: "Tests", action: taskAction, criteria: "All tests pass", weight: 3 },
+            result: {
+              name: "Tests",
+              command: "pnpm test",
+              stdout: "All tests passed",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 100,
+            },
           },
-        },
-        {
-          task: { name: "Build", action: taskAction, criteria: "Build succeeds", weight: 1 },
-          result: {
-            name: "Build",
-            command: "pnpm build",
-            stdout: "Build succeeded",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 200,
+          {
+            task: { name: "Build", action: taskAction, criteria: "Build succeeds", weight: 1 },
+            result: {
+              name: "Build",
+              command: "pnpm build",
+              stdout: "Build succeeded",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 200,
+            },
           },
-        },
-      ],
+        ],
+      }),
     });
 
     expect(prompt).toContain("## Task Results (2 tasks, total weight: 4)");
@@ -508,17 +327,14 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
   });
 
   it("excludes task section when no tasks provided", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution() });
 
     expect(prompt).not.toContain("## Task Results");
     expect(prompt).not.toContain("Weight the scores accordingly");
   });
 
   it("includes all sections when fully populated", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code",
-    });
+    const diff = "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code";
     const taskAction = async () => ({
       name: "x",
       command: "x",
@@ -530,21 +346,24 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
 
     const prompt = buildJudgePrompt({
       criteria: "component quality",
-      ctx,
-      instruction: "Add close button",
-      taskResults: [
-        {
-          task: { name: "Tests", action: taskAction, criteria: "pass", weight: 2 },
-          result: {
-            name: "Tests",
-            command: "test",
-            stdout: "ok",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 0,
+      execution: createMockExecution({
+        instruction: "Add close button",
+        diff,
+        changedFiles: ["src/Banner.tsx"],
+        taskResults: [
+          {
+            task: { name: "Tests", action: taskAction, criteria: "pass", weight: 2 },
+            result: {
+              name: "Tests",
+              command: "test",
+              stdout: "ok",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 0,
+            },
           },
-        },
-      ],
+        ],
+      }),
       expectedFiles: ["src/Banner.tsx"],
     });
 
@@ -557,19 +376,10 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
   });
 
   it("works with the object overload", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "test", ctx });
+    const prompt = buildJudgePrompt({ criteria: "test", execution: createMockExecution() });
 
     expect(prompt).toContain("## Evaluation Criteria");
     expect(prompt).toContain("test");
-    expect(prompt).toContain("## Scoring Instructions");
-  });
-
-  it("backward-compatible string overload still works", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt("legacy criteria", ctx);
-
-    expect(prompt).toContain("legacy criteria");
     expect(prompt).toContain("## Scoring Instructions");
   });
 });

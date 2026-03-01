@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import type { ILedgerPlugin, IJudgePlugin, RunnerStats, TestTreeNode } from "./interfaces.js";
+import type {
+  ILedgerPlugin,
+  IJudgePlugin,
+  IModelPlugin,
+  IRunnerPlugin,
+  RunnerStats,
+  TestTreeNode,
+  RunnerContext,
+  RunnerExecResult,
+} from "./interfaces.js";
 
 describe("Plugin Interfaces", () => {
   describe("ILedgerPlugin contract", () => {
@@ -110,6 +119,64 @@ describe("Plugin Interfaces", () => {
       expect(tree[0].type).toBe("suite");
       expect(tree[0].children?.[0].type).toBe("test");
       expect(tree[0].children?.[0].testId).toBe("Add close button");
+    });
+  });
+
+  describe("IModelPlugin contract", () => {
+    it("defines the required shape for a model plugin", () => {
+      const mockModel: IModelPlugin = {
+        name: "openai",
+        modelId: "gpt-4o",
+        createModel: () => ({ type: "mock-model" }),
+      };
+      expect(mockModel.name).toBe("openai");
+      expect(mockModel.modelId).toBe("gpt-4o");
+      expect(typeof mockModel.createModel).toBe("function");
+    });
+
+    it("allows async createModel", async () => {
+      const asyncModel: IModelPlugin = {
+        name: "anthropic",
+        modelId: "claude-sonnet-4-20250514",
+        createModel: async () => ({ type: "async-model" }),
+      };
+      const result = await asyncModel.createModel();
+      expect(result).toEqual({ type: "async-model" });
+    });
+  });
+
+  describe("IRunnerPlugin contract", () => {
+    it("defines the required shape for a runner plugin", () => {
+      const mockRunner: IRunnerPlugin = {
+        name: "copilot",
+        model: "gh copilot suggest",
+        execute: async (_prompt: string, _ctx: RunnerContext): Promise<RunnerExecResult> => ({
+          stdout: "done",
+          exitCode: 0,
+        }),
+      };
+      expect(mockRunner.name).toBe("copilot");
+      expect(mockRunner.model).toBe("gh copilot suggest");
+      expect(typeof mockRunner.execute).toBe("function");
+    });
+
+    it("execute returns RunnerExecResult with optional fields", async () => {
+      const runner: IRunnerPlugin = {
+        name: "api",
+        model: "gpt-4o",
+        execute: async () => ({ filesWritten: ["src/file.ts"] }),
+      };
+      const result = await runner.execute("prompt", {
+        cwd: "/tmp",
+        env: {
+          name: "mock",
+          setup: () => {},
+          execute: () => ({ stdout: "", stderr: "", exitCode: 0 }),
+          getDiff: () => "",
+        },
+      });
+      expect(result.filesWritten).toEqual(["src/file.ts"]);
+      expect(result.exitCode).toBeUndefined();
     });
   });
 });

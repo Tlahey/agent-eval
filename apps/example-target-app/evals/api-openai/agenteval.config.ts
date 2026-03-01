@@ -1,4 +1,6 @@
 import { defineConfig } from "agent-eval";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
  * API Runner — OpenAI GPT-4o
@@ -25,18 +27,13 @@ export default defineConfig({
   runners: [
     {
       name: "gpt-4o",
-      type: "api",
-      api: {
-        provider: "openai",
-        model: "gpt-4o",
-      },
+      model: new OpenAIModel({ model: "gpt-4o" }),
     },
   ],
 
   // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.

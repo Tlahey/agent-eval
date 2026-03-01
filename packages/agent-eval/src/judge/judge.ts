@@ -1,15 +1,13 @@
-import { execSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { generateObject } from "ai";
+import { generateObject, type LanguageModelV1 } from "ai";
 import { z } from "zod";
 import type {
   CommandResult,
+  ExecutionData,
   JudgeConfig,
   JudgeResult,
   TaskDefinition,
   TestContext,
+  TokenUsage,
 } from "../core/types.js";
 
 const JudgeResultSchema = z.object({
@@ -22,39 +20,17 @@ const JudgeResultSchema = z.object({
 });
 
 /**
- * Resolve the AI SDK model instance from provider + model name.
+ * Resolve the AI SDK model instance from judge config.
+ * Requires the `llm` plugin field.
  */
-async function resolveModel(config: JudgeConfig, modelOverride?: string) {
-  const modelName = modelOverride ?? config.model!;
-
-  switch (config.provider) {
-    case "anthropic": {
-      const { createAnthropic } = await import("@ai-sdk/anthropic");
-      const provider = createAnthropic({
-        apiKey: config.apiKey ?? process.env.ANTHROPIC_API_KEY,
-        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
-      });
-      return provider(modelName);
-    }
-    case "openai": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        apiKey: config.apiKey ?? process.env.OPENAI_API_KEY,
-        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
-      });
-      return provider(modelName);
-    }
-    case "ollama": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        baseURL: config.baseURL ?? "http://localhost:11434/v1",
-        apiKey: "ollama",
-      });
-      return provider(modelName);
-    }
-    default:
-      throw new Error(`Unsupported judge provider: ${config.provider}`);
+async function resolveModel(config: JudgeConfig): Promise<LanguageModelV1> {
+  if (!config.llm) {
+    throw new Error(
+      'Judge requires an "llm" plugin in judge config.\n' +
+        'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
+    );
   }
+  return (await config.llm.createModel()) as LanguageModelV1;
 }
 
 /**
@@ -101,64 +77,40 @@ function buildFileScopeSection(changedFiles: string[], expectedFiles?: string[])
 
 /**
  * Options for building the unified judge prompt.
- * All fields except `criteria` and `ctx` are optional — the prompt adapts
- * dynamically based on what is available.
+ * Uses ExecutionData as the single source of truth for all execution context.
  */
 export interface JudgePromptOptions {
   /** Evaluation criteria (from toPassJudge) */
   criteria: string;
-  /** Test context (diff, logs, commands) */
-  ctx: TestContext;
-  /** Agent instruction (from instruct()) — included when available */
-  instruction?: string;
-  /** Task results with definitions — included when tasks were registered */
-  taskResults?: Array<{ task: TaskDefinition; result: CommandResult }>;
+  /** Unified execution data (diff, commands, tasks, timing, tokens, etc.) */
+  execution: ExecutionData;
   /** Expected files — triggers file scope analysis */
   expectedFiles?: string[];
 }
 
 /**
  * Build the single, unified judge prompt.
- * Adapts dynamically based on available context:
+ * Adapts dynamically based on available context in ExecutionData:
  * - Always: role, criteria, code changes, scoring instructions
  * - If instruction provided: agent instruction section
  * - If tasks provided: task results with weighted criteria
  * - If expectedFiles provided: file scope analysis
  */
 export function buildJudgePrompt(opts: JudgePromptOptions): string;
-/**
- * @deprecated Use the single-object overload instead.
- * Kept for backward compatibility with tests.
- */
-export function buildJudgePrompt(
-  criteria: string,
-  ctx: TestContext,
-  expectedFiles?: string[],
-): string;
-export function buildJudgePrompt(
-  criteriaOrOpts: string | JudgePromptOptions,
-  ctx?: TestContext,
-  expectedFiles?: string[],
-): string {
-  // Normalize to JudgePromptOptions
-  const opts: JudgePromptOptions =
-    typeof criteriaOrOpts === "string"
-      ? { criteria: criteriaOrOpts, ctx: ctx!, expectedFiles }
-      : criteriaOrOpts;
-
-  const changedFiles = extractChangedFiles(opts.ctx.diff);
-  const fileScopeSection = buildFileScopeSection(changedFiles, opts.expectedFiles);
+export function buildJudgePrompt(opts: JudgePromptOptions): string {
+  const { execution } = opts;
+  const fileScopeSection = buildFileScopeSection(execution.changedFiles, opts.expectedFiles);
 
   // Build instruction section (only in declarative mode)
-  const instructionSection = opts.instruction
-    ? `\n## Agent Instruction\nThe agent was asked to: "${opts.instruction}"\n`
+  const instructionSection = execution.instruction
+    ? `\n## Agent Instruction\nThe agent was asked to: "${execution.instruction}"\n`
     : "";
 
   // Build task results section (only when tasks are registered)
   let taskSection = "";
-  if (opts.taskResults && opts.taskResults.length > 0) {
-    const totalWeight = opts.taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
-    const taskBlocks = opts.taskResults
+  if (execution.taskResults.length > 0) {
+    const totalWeight = execution.taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
+    const taskBlocks = execution.taskResults
       .map((tr, i) => {
         const weight = tr.task.weight ?? 1;
         return `### Task ${i + 1}: ${tr.task.name} (weight: ${weight})
@@ -171,13 +123,13 @@ ${tr.result.stdout.slice(0, 2000)}${tr.result.stderr ? `\nSTDERR:\n${tr.result.s
       })
       .join("\n\n");
 
-    taskSection = `\n## Task Results (${opts.taskResults.length} tasks, total weight: ${totalWeight})
+    taskSection = `\n## Task Results (${execution.taskResults.length} tasks, total weight: ${totalWeight})
 ${taskBlocks}\n`;
   }
 
   // Build scoring instructions — adapt to task presence
   const taskScoringInstructions =
-    opts.taskResults && opts.taskResults.length > 0
+    execution.taskResults.length > 0
       ? `- For each task, assess whether its criteria were met. Weight the scores accordingly.
 - A task with exit code 0 and output matching its criteria should score positively.
 - A task with non-zero exit code should score negatively unless the criteria explicitly allow it.`
@@ -189,7 +141,7 @@ ${taskBlocks}\n`;
 ${opts.criteria}
 ${instructionSection}${taskSection}
 ## Code Changes
-${opts.ctx.logs || "(no logs captured)"}
+${execution.logs || "(no logs captured)"}
 ${fileScopeSection}
 
 ## Scoring Instructions
@@ -203,124 +155,58 @@ ${taskScoringInstructions}
 - Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string, "improvement": string }`;
 }
 
-/**
- * Extract and validate a JudgeResult JSON from raw CLI output.
- * Handles preamble text, markdown code fences, and nested JSON.
- */
-export function extractJudgeJson(stdout: string): JudgeResult {
-  // Strip markdown code fences if present
-  const stripped = stdout.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "");
-
-  // Try to find a JSON object containing our required fields
-  const jsonMatch = stripped.match(
-    /\{[\s\S]*?"pass"\s*:[\s\S]*?"score"\s*:[\s\S]*?"reason"\s*:[\s\S]*?"improvement"\s*:[\s\S]*?\}/,
-  );
-  if (!jsonMatch) {
-    throw new Error(
-      `CLI judge output does not contain valid JSON with { pass, score, reason, improvement }.\nOutput: ${stdout.slice(0, 500)}`,
-    );
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonMatch[0]);
-  } catch {
-    throw new Error(
-      `CLI judge output contains malformed JSON.\nExtracted: ${jsonMatch[0].slice(0, 300)}`,
-    );
-  }
-
-  // Validate with Zod — throws ZodError with detailed field info on failure
-  return JudgeResultSchema.parse(parsed);
+/** Result from judge() including token usage */
+export interface JudgeCallResult {
+  result: JudgeResult;
+  tokenUsage?: TokenUsage;
 }
 
 const DEFAULT_MAX_RETRIES = 2;
 
 /**
- * Execute a CLI-based judge with retry logic.
- * Writes the prompt to a temp file, passes it to the command,
- * parses the JSON output, and retries on validation failure.
+ * Execute LLM-as-a-Judge evaluation with retry logic.
+ * Retries on invalid/unparseable responses to guarantee valid structured output.
+ * Returns both the judge result and token usage.
  */
-async function judgeCli(prompt: string, config: JudgeConfig): Promise<JudgeResult> {
-  if (!config.command) {
-    throw new Error('CLI judge requires a "command" field in judge config.');
-  }
-
+export async function judge(
+  _ctx: TestContext,
+  prompt: string,
+  config: JudgeConfig,
+): Promise<JudgeCallResult> {
+  const model = await resolveModel(config);
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
 
-  // Write prompt to a temp file to avoid shell escaping issues
-  const tmpDir = mkdtempSync(join(tmpdir(), "agenteval-judge-"));
-  const promptFile = join(tmpDir, "prompt.txt");
-  writeFileSync(promptFile, prompt, "utf-8");
+  let lastError: Error | null = null;
 
-  try {
-    const cmd = config.command
-      .replace("{{prompt}}", prompt.replace(/"/g, '\\"'))
-      .replace("{{prompt_file}}", promptFile);
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await generateObject({
+        model,
+        schema: JudgeResultSchema,
+        prompt,
+      });
 
-    let lastError: Error | null = null;
+      const tokenUsage: TokenUsage | undefined = response.usage
+        ? {
+            inputTokens: response.usage.promptTokens,
+            outputTokens: response.usage.completionTokens,
+            totalTokens: response.usage.totalTokens,
+          }
+        : undefined;
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const stdout = execSync(cmd, {
-          encoding: "utf-8",
-          timeout: 300_000,
-        });
+      return { result: response.object, tokenUsage };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
 
-        return extractJudgeJson(stdout);
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-
-        // Only retry on JSON parsing/validation errors, not on command failures
-        const isValidationError =
-          lastError.message.includes("does not contain valid JSON") ||
-          lastError.message.includes("malformed JSON") ||
-          lastError.name === "ZodError";
-
-        if (!isValidationError || attempt >= maxRetries) {
-          break;
-        }
-
-        // Log retry for visibility
+      if (attempt < maxRetries) {
         console.warn(
-          `⚠️ CLI judge attempt ${attempt + 1}/${maxRetries + 1} failed (invalid JSON), retrying...`,
+          `⚠️ Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying... (${lastError.message.slice(0, 100)})`,
         );
       }
     }
-
-    throw lastError!;
-  } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
-  }
-}
-
-/**
- * Execute LLM-as-a-Judge evaluation (API or CLI).
- * Accepts a pre-built prompt string (from buildJudgePrompt).
- */
-export async function judge(
-  ctx: TestContext,
-  prompt: string,
-  config: JudgeConfig,
-  modelOverride?: string,
-): Promise<JudgeResult> {
-  // CLI judge path
-  if (config.type === "cli") {
-    return judgeCli(prompt, config);
   }
 
-  // API judge path (default)
-  if (!config.provider || !config.model) {
-    throw new Error('API judge requires "provider" and "model" fields in judge config.');
-  }
-
-  const model = await resolveModel(config, modelOverride);
-
-  const { object } = await generateObject({
-    model,
-    schema: JudgeResultSchema,
-    prompt,
-  });
-
-  return object;
+  throw new Error(
+    `Judge failed after ${maxRetries + 1} attempts. Last error: ${lastError!.message}`,
+  );
 }

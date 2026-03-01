@@ -17,7 +17,13 @@ function makeLedgerEntry(overrides?: Partial<LedgerEntry>): LedgerEntry {
     status: "PASS",
     reason: "Good implementation",
     improvement: "",
-    context: { diff: "diff content", commands: [] },
+    diff: null,
+    changedFiles: [],
+    commands: [],
+    taskResults: [],
+    timing: { totalMs: 1234 },
+    logs: "",
+    criteria: "test criteria",
     durationMs: 1234,
     thresholds: { warn: 0.7, fail: 0.5 },
     ...overrides,
@@ -138,5 +144,24 @@ describe("JsonLedger", () => {
 
   it("getRunById returns undefined for invalid id", () => {
     expect(ledger.getRunById(99)).toBeUndefined();
+  });
+
+  it("getTestTree returns root-level test nodes when suitePath is empty", () => {
+    ledger.recordRun(makeLedgerEntry({ testId: "root-test-1", suitePath: [] }));
+    ledger.recordRun(makeLedgerEntry({ testId: "root-test-2", suitePath: [] }));
+
+    const tree = ledger.getTestTree();
+    expect(tree).toHaveLength(2);
+    expect(tree[0].type).toBe("test");
+    expect(tree[0].testId).toBe("root-test-1");
+    expect(tree[1].testId).toBe("root-test-2");
+  });
+
+  it("overrideRunScore attaches override to subsequent getRuns", () => {
+    ledger.recordRun(makeLedgerEntry({ score: 0.5 }));
+    ledger.overrideRunScore(1, 0.9, "Override correction");
+
+    const runs = ledger.getRuns() as Array<LedgerEntry & { override?: unknown }>;
+    expect(runs[0].override).toBeDefined();
   });
 });

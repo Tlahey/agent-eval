@@ -111,4 +111,31 @@ describe("LocalEnvironment", () => {
       expect(diff).toContain("staged content");
     });
   });
+
+  describe("edge cases", () => {
+    it("setup handles non-git directories gracefully", () => {
+      const nonGitDir = join(tmpdir(), `agenteval-nongit-${Date.now()}`);
+      mkdirSync(nonGitDir, { recursive: true });
+      try {
+        expect(() => env.setup(nonGitDir)).not.toThrow();
+      } finally {
+        rmSync(nonGitDir, { recursive: true, force: true });
+      }
+    });
+
+    it("teardown handles patch apply failure gracefully", () => {
+      // Make uncommitted changes to set initialDiff
+      writeFileSync(join(tmpDir, "file.txt"), "user change");
+      env.setup(tmpDir);
+
+      // Delete the file so git apply will fail
+      execSync("git reset --hard HEAD", { cwd: tmpDir, stdio: "pipe" });
+      execSync("git clean -fd", { cwd: tmpDir, stdio: "pipe" });
+      writeFileSync(join(tmpDir, "conflict.txt"), "conflicting file");
+      execSync("git add -A && git commit -m 'conflict'", { cwd: tmpDir, stdio: "pipe" });
+
+      // Teardown should not throw even if apply fails
+      expect(() => env.teardown(tmpDir)).not.toThrow();
+    });
+  });
 });

@@ -73,12 +73,18 @@ Each module has **one reason to change**. The runner orchestrates tests but does
 
 ### Open/Closed (OCP)
 
-Adding a new runner provider means adding a `case` in `resolveRunnerModel()` — the runner engine itself never changes. Same for judges via `resolveModel()`.
+Adding a new LLM provider means implementing `IModelPlugin` — the runner engine and judge never change. Same for runners (`IRunnerPlugin`), storage (`ILedgerPlugin`), and environments (`IEnvironmentPlugin`).
 
 ```typescript
-// To add a new provider, add one case — nothing else changes
-case "mistral":
-  return createMistral({ apiKey })(model);
+// To add a new provider, implement the interface — nothing else changes
+class MistralModel implements IModelPlugin {
+  readonly name = "mistral";
+  readonly modelId = "mistral-large";
+  async createModel() {
+    const { createMistral } = await import("@ai-sdk/mistral");
+    return createMistral({ apiKey: process.env.MISTRAL_API_KEY })(this.modelId);
+  }
+}
 ```
 
 ### Liskov Substitution (LSP)
@@ -97,19 +103,25 @@ interface AgentHandle {
 
 Interfaces are small and focused. Test functions receive only what they need:
 
-| Interface      | Methods/Props                                     | Consumer                 |
-| -------------- | ------------------------------------------------- | ------------------------ |
-| `AgentHandle`  | `run()`, `name`, `model`                          | Test functions           |
-| `TestContext`  | `storeDiff()`, `runCommand()`, `diff`, `commands` | Test functions           |
-| `JudgeOptions` | `criteria`, `model?`, `expectedFiles?`            | `expect().toPassJudge()` |
+| Interface            | Methods/Props                                        | Consumer            |
+| -------------------- | ---------------------------------------------------- | ------------------- |
+| `AgentHandle`        | `run()`, `instruct()`, `name`, `model`               | Test functions      |
+| `TestContext`        | `storeDiff()`, `runCommand()`, `addTask()`, `exec()` | Test functions      |
+| `IModelPlugin`       | `createModel()`, `name`, `modelId`                   | Judge, API runners  |
+| `IRunnerPlugin`      | `execute()`, `name`, `model`                         | Runner engine       |
+| `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.       | Ledger persistence  |
+| `IEnvironmentPlugin` | `setup()`, `execute()`, `getDiff()`, `teardown?()`   | Workspace isolation |
 
 ### Dependency Inversion (DIP)
 
-High-level modules (runner, judge) depend on **abstractions** (`AgentEvalConfig`, `JudgeConfig`), not concrete SDK implementations. Provider SDKs are **dynamically imported** at runtime:
+High-level modules (runner, judge) depend on **abstractions** (`IModelPlugin`, `IRunnerPlugin`, `ILedgerPlugin`, `IEnvironmentPlugin`), not concrete SDK implementations. Provider SDKs are **dynamically imported** at runtime inside plugin implementations:
 
 ```typescript
-// No static import — loaded only when needed
-const { createAnthropic } = await import("@ai-sdk/anthropic");
+// Inside AnthropicModel — no static import at framework level
+async createModel() {
+  const { createAnthropic } = await import("@ai-sdk/anthropic");
+  return createAnthropic({ apiKey: this.apiKey })(this.modelId);
+}
 ```
 
 This keeps the bundle small and avoids forcing users to install SDKs they don't use.
@@ -170,7 +182,7 @@ sequenceDiagram
     participant Git as Environment Plugin
     participant Agent as Agent (CLI/API)
     participant Ctx as TestContext
-    participant Judge as Judge (LLM/CLI)
+    participant Judge as Judge (LLM)
     participant Ledger as SQLite Ledger
 
     CLI->>Runner: runTest(testDef, config)
@@ -210,14 +222,14 @@ sequenceDiagram
         Note over Runner,Judge: 4. Judge Evaluation
         Runner->>Judge: auto-judge or expect(ctx).toPassJudge()
         Judge->>Judge: buildJudgePrompt(criteria, ctx, tasks)
-        Note right of Judge: Prompt includes:<br/>- Evaluation criteria<br/>- Git diff<br/>- Command outputs<br/>- File scope analysis
+        Note right of Judge: Prompt includes:<br/>- Evaluation criteria<br/>- ExecutionData (diff, commands,<br/>tasks, timing, tokens)
         Judge-->>Runner: { pass, score, reason, improvement }
     end
 
     rect rgb(240, 235, 255)
         Note over Runner,Ledger: 5. Persist Results
         Runner->>Ledger: appendLedgerEntry(entry)
-        Note right of Ledger: Stores: score, reason,<br/>improvement, diff,<br/>commands[], durationMs
+        Note right of Ledger: Stores: full LedgerEntry<br/>(execution + judgment data,<br/>timing, tokens, tasks)
     end
 
     rect rgb(245, 240, 250)
@@ -234,15 +246,8 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A["Build Prompt"] --> B{"Judge Type?"}
-    B -- API --> C["generateObject()<br/>Vercel AI SDK<br/>+ Zod schema"]
-    B -- CLI --> D["execSync(command)<br/>parse JSON output"]
-    D --> E{"Valid JSON?"}
-    E -- No --> F{"Retries<br/>left?"}
-    F -- Yes --> D
-    F -- No --> G["❌ Throw Error"]
-    E -- Yes --> H["Zod Validation"]
-    C --> H
+    A["Build Prompt"] --> C["generateObject()<br/>Vercel AI SDK<br/>+ Zod schema"]
+    C --> H["Zod Validation"]
     H --> I{"score ≥ 0.7?"}
     I -- Yes --> J["✅ PASS"]
     I -- No --> K["❌ FAIL"]
@@ -251,28 +256,46 @@ flowchart LR
 
     style J fill:#10b981,color:#fff
     style K fill:#ef4444,color:#fff
-    style G fill:#ef4444,color:#fff
 ```
 
 ### Ledger Data Model
 
+Each `LedgerEntry` captures the full lifecycle of a test run, organized into **execution data** (what the agent did) and **judgment data** (how the judge evaluated it):
+
 ```mermaid
 erDiagram
-    RUNS {
+    LEDGER_ENTRY {
         int id PK "auto-increment"
-        text test_id "test title"
-        text suite_path "JSON array of suite names"
+        text testId "test title"
+        text suitePath "JSON array of suite names"
         text timestamp "ISO 8601"
-        text agent_runner "runner name"
-        text agent_model "runner model"
-        text judge_model "model or CLI command"
+        text agentRunner "runner name"
+    }
+
+    EXECUTION_DATA {
+        text instruction "agent instruction"
+        text diff "git diff"
+        text changedFiles "JSON: string[]"
+        text commands "JSON: CommandResult[]"
+        text taskResults "JSON: TaskResult[]"
+        text agentTokenUsage "JSON: TokenUsage"
+        text timing "JSON: TimingData"
+        text agentOutput "raw agent output"
+        text logs "formatted log string"
+        int durationMs "total agent time"
+    }
+
+    JUDGMENT_DATA {
+        text judgeModel "judge LLM used"
         real score "0.0 – 1.0"
         int pass "0 or 1"
+        text status "PASS, WARN, FAIL"
         text reason "judge explanation"
         text improvement "judge suggestions"
-        text diff "raw git diff"
-        text commands "JSON: CommandResult[]"
-        int duration_ms "agent run time"
+        text judgeTokenUsage "JSON: TokenUsage"
+        text criteria "evaluation criteria"
+        text expectedFiles "JSON: string[]"
+        text thresholds "JSON: Thresholds"
     }
 
     SCORE_OVERRIDES {
@@ -284,15 +307,9 @@ erDiagram
         text timestamp "ISO 8601"
     }
 
-    RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
-    RUNS ||--o{ COMMANDS : "stored as JSON"
-    COMMANDS {
-        text name "command label"
-        text stdout "captured stdout"
-        text stderr "captured stderr"
-        int exitCode "0 = success"
-        int durationMs "execution time"
-    }
+    LEDGER_ENTRY ||--|| EXECUTION_DATA : "contains"
+    LEDGER_ENTRY ||--|| JUDGMENT_DATA : "contains"
+    LEDGER_ENTRY ||--o{ SCORE_OVERRIDES : "has overrides"
 ```
 
 ## Extending the Framework
@@ -301,10 +318,11 @@ With the plugin architecture, extending AgentEval no longer requires modifying c
 
 | What                 | How                                                  |
 | -------------------- | ---------------------------------------------------- |
+| New LLM provider     | Implement `IModelPlugin` interface                   |
+| New runner           | Implement `IRunnerPlugin` or use plain object config |
 | New storage backend  | Implement `ILedgerPlugin` interface                  |
-| New LLM provider     | Extend `BaseLLMPlugin` or implement `ILLMPlugin`     |
-| New judge type       | Implement `IJudgePlugin` interface                   |
 | New exec environment | Implement `IEnvironmentPlugin` interface             |
+| New judge type       | Implement `IJudgePlugin` interface                   |
 | New CLI command      | Add `program.command()` in `cli/cli.ts`              |
 | New context method   | Add to `TestContext` interface + `EvalContext` class |
 

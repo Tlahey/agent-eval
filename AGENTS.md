@@ -37,7 +37,7 @@ agent-eval/
 │       ├── src/
 │       │   ├── core/      ← Core modules
 │       │   │   ├── types.ts       ← All TypeScript interfaces
-│       │   │   ├── interfaces.ts  ← Plugin contracts (ILedgerPlugin, ILLMPlugin, IJudgePlugin, IEnvironmentPlugin)
+│       │   │   ├── interfaces.ts  ← Plugin contracts (IModelPlugin, IRunnerPlugin, ILedgerPlugin, IJudgePlugin, IEnvironmentPlugin)
 │       │   │   ├── interfaces.test.ts
 │       │   │   ├── config.ts      ← Config file loader (jiti)
 │       │   │   ├── config.test.ts
@@ -58,13 +58,19 @@ agent-eval/
 │       │   │   ├── sqlite-plugin.ts ← SqliteLedger (ILedgerPlugin wrapper)
 │       │   │   ├── json-plugin.ts   ← JsonLedger (JSONL-based, no SQLite)
 │       │   │   └── json-plugin.test.ts
-│       │   ├── llm/       ← LLM provider plugins
-│       │   │   ├── base-plugin.ts     ← BaseLLMPlugin abstract class
-│       │   │   ├── anthropic-plugin.ts ← AnthropicLLM
-│       │   │   ├── openai-plugin.ts    ← OpenAILLM
-│       │   │   ├── ollama-plugin.ts    ← OllamaLLM
-│       │   │   ├── index.ts           ← Barrel exports
-│       │   │   └── llm-plugins.test.ts
+│       │   ├── llm/       ← Model plugins (IModelPlugin implementations)
+│       │   │   └── plugins/
+│       │   │       ├── anthropic.ts       ← AnthropicModel
+│       │   │       ├── openai.ts          ← OpenAIModel
+│       │   │       ├── ollama.ts          ← OllamaModel
+│       │   │       └── model-plugins.test.ts
+│       │   ├── runner/    ← Runner plugins (IRunnerPlugin implementations)
+│       │   │   ├── index.ts              ← Barrel exports
+│       │   │   └── plugins/
+│       │   │       ├── cli.ts            ← CLIRunner (advanced use)
+│       │   │       ├── cli.test.ts
+│       │   │       ├── api.ts            ← APIRunner (advanced use)
+│       │   │       └── api.test.ts
 │       │   ├── environment/ ← Execution environment plugins
 │       │   │   ├── local-environment.ts   ← Default: host + git
 │       │   │   ├── local-environment.test.ts
@@ -454,24 +460,24 @@ All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:
 - Indexed queries on `test_id` and `timestamp`
 - **Note:** Requires Node.js 22+. The `node:sqlite` module is experimental and produces `ExperimentalWarning`.
 
-### API-Based Runners
+### Runner Plugins
 
-Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM directly). API runners:
+Runners implement **`IRunnerPlugin`** and come in two flavors:
 
-- Use `config.llm.generate()` when an `ILLMPlugin` is configured
-- Fall back to Vercel AI SDK `generateObject()` with built-in `resolveRunnerModel()`
-- Support providers: `anthropic`, `openai`, `ollama`
-- Output structured `files[]` array with `{ path, content }` written to disk
-- Dynamic provider import (unused providers are never bundled)
+- **CLI runners** — Plain objects with `{ name, command }` that spawn a CLI command (e.g., `gh copilot suggest "{{prompt}}"`)
+- **API runners** — Plain objects with `{ name, model }` that call an LLM via an `IModelPlugin`, generate structured `files[]` output, and write files to disk
+
+Runner configs are plain objects passed to the `runners` array — the type is inferred from shape. Each runner must have a **unique `name`** (duplicates throw at startup). The `CLIRunner` and `APIRunner` classes are still available via sub-path imports for advanced use. Custom `IRunnerPlugin` instances (duck-typed by having an `execute()` method) also work.
 
 ### Plugin Architecture (SOLID)
 
-The framework uses Dependency Inversion for storage and LLM operations:
+The framework uses Dependency Inversion for all extensible operations:
 
+- **`IModelPlugin`** — LLM model abstraction. Built-in: `AnthropicModel`, `OpenAIModel`, `OllamaModel`
+- **`IRunnerPlugin`** — Agent execution abstraction. Built-in: `CLIRunner`, `APIRunner` (most users use plain-object configs instead)
 - **`ILedgerPlugin`** — Storage backend abstraction. Built-in: `SqliteLedger`, `JsonLedger`
-- **`ILLMPlugin`** — LLM provider abstraction. Built-in: `AnthropicLLM`, `OpenAILLM`, `OllamaLLM`
+- **`IEnvironmentPlugin`** — Execution environment abstraction. Built-in: `LocalEnvironment`, `DockerEnvironment`
 - **`IJudgePlugin`** — Judge abstraction for custom evaluation logic
-- Runner and CLI use `config.ledger` / `config.llm` when provided, fallback to built-in implementations
 - All interfaces are in `core/interfaces.ts`, exported from `index.ts`
 
 ---
@@ -510,13 +516,13 @@ The framework uses Dependency Inversion for storage and LLM operations:
 
 > **Remember:** Every code change requires a corresponding documentation update. See [📖 Mandatory Documentation Updates](#📖-mandatory-documentation-updates) above.
 
-### Adding a new LLM plugin
+### Adding a new Model plugin (IModelPlugin)
 
-1. Create `llm/<provider>-plugin.ts` extending `BaseLLMPlugin`
-2. Implement `createModel()` returning the AI SDK model instance
-3. Export from `llm/index.ts` and `index.ts`
-4. Add tests in `llm/llm-plugins.test.ts`
-5. **Update docs:** `guide/plugin-architecture.md` (LLM plugins table), `guide/configuration.md`
+1. Create `llm/plugins/<provider>.ts` implementing `IModelPlugin`
+2. Implement `name`, `modelId`, and `createModel()` returning a Vercel AI SDK model
+3. Export from `index.ts`
+4. Add tests in `llm/plugins/model-plugins.test.ts`
+5. **Update docs:** `guide/plugins-llm.md`, `guide/configuration.md`
 
 ### Adding a new Ledger plugin
 
@@ -534,21 +540,21 @@ The framework uses Dependency Inversion for storage and LLM operations:
 4. Add tests in `environment/<name>-environment.test.ts`
 5. **Update docs:** `guide/environments.md`, `guide/plugin-architecture.md`, `guide/configuration.md`
 
-### Adding a new Judge provider (legacy)
+### Adding a new Model plugin
 
-1. Add the provider type to `JudgeConfig.provider` in `core/types.ts`
-2. Add a new `case` in `resolveModel()` in `judge/judge.ts`
-3. Install the AI SDK provider package if needed
-4. Add tests in `judge/judge.test.ts`
-5. **Update docs:** `guide/judges.md` (provider section + table), `guide/configuration.md` (judge config table)
+1. Create `llm/plugins/<provider>.ts` implementing `IModelPlugin`
+2. Implement `name`, `modelId`, and `createModel()` returning a Vercel AI SDK model
+3. Export from `index.ts`
+4. Add tests in `llm/plugins/model-plugins.test.ts`
+5. **Update docs:** `guide/plugins-llm.md`, `guide/configuration.md`
 
-### Adding a new Agent runner provider (legacy)
+### Adding a new Runner plugin
 
-1. Add the provider type to `AgentRunnerConfig.api.provider` in `core/types.ts`
-2. Add a new `case` in `resolveRunnerModel()` in `core/runner.ts`
-3. Install the AI SDK provider package if needed
-4. Add tests in `core/runner.test.ts`
-5. **Update docs:** `guide/runners.md` (provider section + table), `guide/configuration.md` (runner config example)
+1. Create `runner/plugins/<name>.ts` implementing `IRunnerPlugin`
+2. Implement `name`, `model`, and `execute(prompt, context)` returning `RunnerExecResult`
+3. Export from `runner/index.ts` and `index.ts`
+4. Add tests in `runner/plugins/<name>.test.ts`
+5. **Update docs:** `guide/runners.md`, `guide/configuration.md`
 
 ### Adding a new CLI command
 
@@ -664,7 +670,7 @@ agenteval ui                   # API server on :4747
 5. **The judge prompt is critical** – changes to `buildJudgePrompt()` in `judge/judge.ts` affect all evaluations.
 6. **Node 22 required** – `node:sqlite` (DatabaseSync) is only available in Node 22+.
 7. **`@ts-expect-error`** is needed on `import { DatabaseSync } from "node:sqlite"` (no stable types yet).
-8. **API runner providers are dynamically imported** – ensure the SDK package is installed before using a provider.
+8. **Model plugins use dynamic imports** – ensure the AI SDK provider package (e.g., `@ai-sdk/anthropic`) is installed when using a model plugin.
 
 ---
 

@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
  * CLI Runner — GitHub Copilot
@@ -21,7 +22,6 @@ export default defineConfig({
   runners: [
     {
       name: "copilot",
-      type: "cli",
       command: 'gh copilot suggest -t shell "{{prompt}}"',
     },
   ],
@@ -29,8 +29,7 @@ export default defineConfig({
   // ⚠️ Use a strong model for the judge — it needs to understand code,
   // diffs, test output, and make nuanced pass/fail decisions.
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.

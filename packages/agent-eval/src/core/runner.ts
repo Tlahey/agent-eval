@@ -1,5 +1,3 @@
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
 import { getGlobalThresholds } from "./expect.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
@@ -12,136 +10,65 @@ import {
 import type {
   AgentEvalConfig,
   AgentHandle,
-  AgentRunnerConfig,
   CommandResult,
+  ExecutionData,
   JudgeOptions,
   JudgeResult,
   LedgerEntry,
   TaskDefinition,
+  TaskResult,
   TestDefinition,
+  TimingData,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
-import type { ILedgerPlugin, IEnvironmentPlugin } from "./interfaces.js";
+import type { ILedgerPlugin, IEnvironmentPlugin, IRunnerPlugin } from "./interfaces.js";
+import { resolveRunners } from "./config.js";
 import { LocalEnvironment } from "../environment/plugins/local.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 
-// ─── File operation types for API runner structured output ───
-
-interface FileOperation {
-  path: string;
-  content: string;
-}
-
-interface ApiAgentResponse {
-  files: FileOperation[];
-}
-
 /**
- * Resolve the AI SDK model for an API runner.
- */
-async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
-  switch (api.provider) {
-    case "anthropic": {
-      const { createAnthropic } = await import("@ai-sdk/anthropic");
-      const provider = createAnthropic({
-        apiKey: api.apiKey ?? process.env.ANTHROPIC_API_KEY,
-        ...(api.baseURL ? { baseURL: api.baseURL } : {}),
-      });
-      return provider(api.model);
-    }
-    case "openai": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        apiKey: api.apiKey ?? process.env.OPENAI_API_KEY,
-        ...(api.baseURL ? { baseURL: api.baseURL } : {}),
-      });
-      return provider(api.model);
-    }
-    case "ollama": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        baseURL: api.baseURL ?? "http://localhost:11434/v1",
-        apiKey: "ollama",
-      });
-      return provider(api.model);
-    }
-    default:
-      throw new Error(`Unsupported API runner provider: ${api.provider}`);
-  }
-}
-
-/**
- * Create the raw AgentHandle for a given runner config.
- * Uses built-in resolveRunnerModel for API runners.
- * CLI runners delegate to the environment plugin for command execution.
+ * Create the raw AgentHandle for a given runner plugin.
+ * Delegates execution entirely to the IRunnerPlugin.
+ * Captures agent output and token usage into context.
  */
 function createRawAgent(
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   reporter: Reporter,
   testId: string,
-  config: AgentEvalConfig,
   env: IEnvironmentPlugin,
+  ctx: EvalContext,
 ): Omit<AgentHandle, "instruct"> {
   return {
     name: runner.name,
-    model: runner.api?.model ?? runner.command ?? "unknown",
+    model: runner.model,
 
     async run(prompt: string) {
-      if (runner.type === "cli") {
-        if (!runner.command) {
-          throw new Error(`Runner "${runner.name}" has type "cli" but no command defined`);
+      const result = await runner.execute(prompt, { cwd, env, timeout: 600_000 });
+
+      // Capture agent output into context
+      if (result.stdout) {
+        ctx.setAgentOutput(result.stdout);
+      } else if (result.output) {
+        ctx.setAgentOutput(result.output);
+      }
+
+      // Capture token usage (API runners)
+      if (result.tokenUsage) {
+        ctx.setAgentTokenUsage(result.tokenUsage);
+      }
+
+      // Report errors from CLI execution
+      if (result.exitCode !== undefined && result.exitCode !== 0 && result.stderr) {
+        reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
+      }
+
+      // Report files written by API runners
+      if (result.filesWritten) {
+        for (const filePath of result.filesWritten) {
+          reporter.onFileWrite({ testId, runner: runner.name }, filePath);
         }
-        const cmd = runner.command.replace("{{prompt}}", prompt);
-        // Use environment plugin for CLI execution
-        const result = await env.execute(cmd, cwd, { timeout: 600_000 });
-        if (result.exitCode !== 0 && result.stderr) {
-          // Log stderr but don't throw — agent may produce partial output
-          reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
-        }
-      } else if (runner.type === "api") {
-        if (!runner.api) {
-          throw new Error(`Runner "${runner.name}" has type "api" but no api config defined`);
-        }
-
-        const { generateObject } = await import("ai");
-        const { z } = await import("zod");
-
-        const model = await resolveRunnerModel(runner.api);
-
-        const FileOperationSchema = z.object({
-          files: z
-            .array(
-              z.object({
-                path: z.string().describe("Relative file path from project root"),
-                content: z.string().describe("Full file content to write"),
-              }),
-            )
-            .describe("Files to create or modify"),
-        });
-
-        const { object } = await generateObject({
-          model,
-          schema: FileOperationSchema,
-          prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
-
-Task: ${prompt}
-
-Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
-        });
-
-        const response = object as ApiAgentResponse;
-
-        // Write files to disk
-        for (const file of response.files) {
-          const fullPath = resolve(cwd, file.path);
-          mkdirSync(dirname(fullPath), { recursive: true });
-          writeFileSync(fullPath, file.content, "utf-8");
-          reporter.onFileWrite({ testId, runner: runner.name }, file.path);
-        }
-      } else {
-        throw new Error(`Unknown runner type: ${(runner as AgentRunnerConfig).type}`);
       }
     },
   };
@@ -162,7 +89,7 @@ interface AgentState {
  * Enforces the Single-Instruct Policy and mutual exclusivity of the two modes.
  */
 function createAgent(
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
@@ -170,7 +97,11 @@ function createAgent(
   testId: string,
   env: IEnvironmentPlugin,
 ): { agent: AgentHandle; state: AgentState } {
-  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
+  const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
+
+  // Store runner info into context
+  ctx.setRunnerInfo({ name: runner.name, model: runner.model });
+
   const state: AgentState = {
     instruction: null,
     isDeclarative: false,
@@ -192,6 +123,7 @@ function createAgent(
       }
       state.instruction = prompt;
       state.isDeclarative = true;
+      ctx.setInstruction(prompt);
     },
 
     async run(prompt: string) {
@@ -199,6 +131,7 @@ function createAgent(
         throw new Error("Cannot use run() after instruct(). Choose one API style per test.");
       }
       state.isImperative = true;
+      ctx.setInstruction(prompt);
 
       // Execute the agent
       await raw.run(prompt);
@@ -223,15 +156,15 @@ function createAgent(
  * Used by the declarative pipeline where the runner controls the full lifecycle.
  */
 async function executeRawAgent(
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   prompt: string,
   reporter: Reporter,
   testId: string,
-  config: AgentEvalConfig,
   env: IEnvironmentPlugin,
+  ctx: EvalContext,
 ): Promise<void> {
-  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
+  const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
   await raw.run(prompt);
 }
 
@@ -250,7 +183,6 @@ export interface DryRunPlan {
   suitePath?: string[];
   runners: Array<{
     name: string;
-    type: string;
     model: string;
   }>;
   mode: "declarative" | "imperative" | "unknown";
@@ -268,9 +200,10 @@ export async function dryRunTest(
   testDef: TestDefinition,
   config: AgentEvalConfig,
 ): Promise<DryRunPlan> {
+  const resolvedRunners = await resolveRunners(config.runners);
   const runners = config.matrix?.runners
-    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
-    : config.runners;
+    ? resolvedRunners.filter((r) => config.matrix!.runners!.includes(r.name))
+    : resolvedRunners;
 
   // Create a mock context that captures addTask calls but does nothing
   const tasks: Array<{ name: string; criteria: string; weight: number }> = [];
@@ -351,8 +284,7 @@ export async function dryRunTest(
     suitePath: testDef.suitePath,
     runners: runners.map((r) => ({
       name: r.name,
-      type: r.type,
-      model: r.api?.model ?? r.command ?? "unknown",
+      model: r.model,
     })),
     mode,
     instruction,
@@ -379,9 +311,10 @@ export async function runTest(
   const outputDir = config.outputDir ?? ".agenteval";
   const ledger: ILedgerPlugin | null = config.ledger ?? null;
   const env: IEnvironmentPlugin = config.environment ?? new LocalEnvironment();
+  const resolvedRunners = await resolveRunners(config.runners);
   const runners = config.matrix?.runners
-    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
-    : config.runners;
+    ? resolvedRunners.filter((r) => config.matrix!.runners!.includes(r.name))
+    : resolvedRunners;
 
   /** Record entry via plugin or fallback */
   const record = (entry: LedgerEntry): void | Promise<void> => {
@@ -404,10 +337,12 @@ export async function runTest(
     rep.onTestStart(event);
 
     // Setup workspace via environment plugin (git reset, docker create, etc.)
+    const setupStart = Date.now();
     rep.onPipelineStep(event, "setup", "running");
     rep.onGitReset(event);
     await env.setup(cwd);
     rep.onPipelineStep(event, "setup", "done");
+    const setupMs = Date.now() - setupStart;
 
     const ctx = new EvalContext(cwd, env);
     const { agent, state } = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
@@ -442,6 +377,7 @@ export async function runTest(
           testDef,
           env,
           start,
+          setupMs,
           thresholds,
         );
       } else {
@@ -459,7 +395,7 @@ export async function runTest(
               `Add a toPassJudge() call after agent.run() with your evaluation criteria.`,
           );
         }
-        entry = buildImperativeEntry(testDef, runner, ctx, config, start, thresholds);
+        entry = buildImperativeEntry(testDef, runner, ctx, config, start, setupMs, thresholds);
       }
 
       await record(entry);
@@ -494,19 +430,27 @@ export async function runTest(
         testId: testDef.title,
         suitePath: testDef.suitePath ?? [],
         timestamp: new Date().toISOString(),
+        // Execution data
         agentRunner: runner.name,
-        judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+        instruction: ctx.instruction || undefined,
+        diff: ctx.diff,
+        changedFiles: [],
+        commands: ctx.commands,
+        taskResults: [],
+        agentTokenUsage: ctx.agentTokenUsage,
+        timing: { totalMs: durationMs, setupMs },
+        agentOutput: ctx.agentOutput,
+        logs: ctx.logs,
+        // Judgment data (error case)
+        judgeModel: config.judge.llm?.modelId ?? "unknown",
         score: 0,
         pass: false,
         status: "FAIL",
         reason: `Execution error: ${errorMsg}`,
         improvement: "",
-        context: {
-          diff: ctx.diff,
-          commands: ctx.commands,
-        },
-        durationMs,
+        criteria: "",
         thresholds,
+        durationMs,
       };
 
       await record(entry);
@@ -545,10 +489,12 @@ export async function runTest(
  * 3. Run config afterEach commands
  * 4. Execute registered tasks
  * 5. Judge evaluation using required expect(ctx).toPassJudge() criteria
+ *
+ * Tracks per-phase timing and builds a complete LedgerEntry with all execution + judgment data.
  */
 async function executeDeclarativePipeline(
   instruction: string,
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
@@ -556,6 +502,7 @@ async function executeDeclarativePipeline(
   testDef: TestDefinition,
   env: IEnvironmentPlugin,
   start: number,
+  setupMs: number,
   thresholds: import("./types.js").Thresholds,
 ): Promise<LedgerEntry> {
   const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
@@ -570,9 +517,11 @@ async function executeDeclarativePipeline(
   }
 
   // 1. Execute the agent instruction
+  const agentStart = Date.now();
   reporter.onPipelineStep(event, "agent", "running");
-  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, config, env);
+  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, env, ctx);
   reporter.onPipelineStep(event, "agent", "done");
+  const agentMs = Date.now() - agentStart;
 
   // 2. Auto storeDiff
   reporter.onPipelineStep(event, "diff", "running");
@@ -580,35 +529,66 @@ async function executeDeclarativePipeline(
   reporter.onPipelineStep(event, "diff", "done");
 
   // 3. Run config afterEach commands
+  let afterEachMs: number | undefined;
   if (config.afterEach) {
+    const afterEachStart = Date.now();
     reporter.onPipelineStep(event, "afterEach", "running");
     for (const cmd of config.afterEach) {
       await ctx.runCommand(cmd.name, cmd.command);
     }
     reporter.onPipelineStep(event, "afterEach", "done");
+    afterEachMs = Date.now() - afterEachStart;
   }
 
   // 4. Execute registered tasks and collect results
-  const taskResults: Array<{ task: TaskDefinition; result: CommandResult }> = [];
+  const tasksStart = Date.now();
+  const taskResults: TaskResult[] = [];
   for (const task of ctx.tasks) {
     reporter.onPipelineStep(event, "task", "running", task.name);
-    const result = await task.action();
+    const actionResult = await task.action();
+    // Enrich partial action result into a full CommandResult
+    const result: CommandResult = {
+      name: actionResult.name ?? task.name,
+      command: actionResult.command ?? "",
+      stdout: actionResult.stdout,
+      stderr: actionResult.stderr ?? "",
+      exitCode: actionResult.exitCode,
+      durationMs: actionResult.durationMs ?? 0,
+    };
     taskResults.push({ task, result });
     reporter.onPipelineStep(event, "task", "done", task.name);
   }
+  const tasksMs = taskResults.length > 0 ? Date.now() - tasksStart : undefined;
 
-  // 5. Judge evaluation (criteria from expect().toPassJudge + optional task evidence)
-  const durationMs = Date.now() - start;
+  // 5. Build execution data
+  const timing: TimingData = {
+    totalMs: Date.now() - start,
+    setupMs,
+    agentMs,
+    afterEachMs,
+    tasksMs,
+  };
+  const executionData = ctx.buildExecutionData(taskResults, timing);
+
+  // 6. Judge evaluation
+  const judgeStart = Date.now();
   reporter.onPipelineStep(event, "judge", "running");
   const prompt = buildJudgePrompt({
     criteria: judgeOptions.criteria,
-    ctx,
-    instruction,
-    taskResults,
+    execution: executionData,
     expectedFiles: judgeOptions.expectedFiles,
   });
-  const judgeResult = await runJudge(ctx, prompt, config.judge, judgeOptions.model);
+  const { result: judgeResult, tokenUsage: judgeTokenUsage } = await runJudge(
+    ctx,
+    prompt,
+    config.judge,
+  );
   reporter.onPipelineStep(event, "judge", "done");
+  const judgeMs = Date.now() - judgeStart;
+
+  // Update timing with judge phase
+  timing.judgeMs = judgeMs;
+  timing.totalMs = Date.now() - start;
 
   const effectiveThresholds = judgeOptions.thresholds ?? thresholds;
   const status = computeStatus(judgeResult.score, effectiveThresholds);
@@ -619,19 +599,29 @@ async function executeDeclarativePipeline(
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
+    // Execution data
     agentRunner: runner.name,
-    judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+    instruction,
+    diff: ctx.diff,
+    changedFiles: executionData.changedFiles,
+    commands: ctx.commands,
+    taskResults,
+    agentTokenUsage: ctx.agentTokenUsage,
+    timing,
+    agentOutput: ctx.agentOutput,
+    logs: ctx.logs,
+    // Judgment data
+    judgeModel: config.judge.llm?.modelId ?? "unknown",
     score: judgeResult.score,
     pass: status !== "FAIL",
     status,
     reason: judgeResult.reason,
     improvement: judgeResult.improvement,
-    context: {
-      diff: ctx.diff,
-      commands: ctx.commands,
-    },
-    durationMs,
+    judgeTokenUsage,
+    criteria: judgeOptions.criteria,
+    expectedFiles: judgeOptions.expectedFiles,
     thresholds: effectiveThresholds,
+    durationMs: timing.totalMs,
   };
 }
 
@@ -641,10 +631,11 @@ async function executeDeclarativePipeline(
  */
 function buildImperativeEntry(
   testDef: TestDefinition,
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   ctx: EvalContext,
   config: AgentEvalConfig,
   start: number,
+  setupMs: number,
   thresholds: import("./types.js").Thresholds,
 ): LedgerEntry {
   const durationMs = Date.now() - start;
@@ -654,23 +645,38 @@ function buildImperativeEntry(
   clearLastJudgeResult();
   clearLastJudgeOptions();
 
+  const timing: TimingData = {
+    totalMs: durationMs,
+    setupMs,
+  };
+  const executionData = ctx.buildExecutionData([], timing);
+
   return {
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
+    // Execution data
     agentRunner: runner.name,
-    judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+    instruction: ctx.instruction,
+    diff: ctx.diff,
+    changedFiles: executionData.changedFiles,
+    commands: ctx.commands,
+    taskResults: [],
+    agentTokenUsage: ctx.agentTokenUsage,
+    timing,
+    agentOutput: ctx.agentOutput,
+    logs: ctx.logs,
+    // Judgment data
+    judgeModel: config.judge.llm?.modelId ?? "unknown",
     score: judgeResult.score,
     pass: judgeResult.pass,
     status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
     reason: judgeResult.reason,
     improvement: judgeResult.improvement,
-    context: {
-      diff: ctx.diff,
-      commands: ctx.commands,
-    },
-    durationMs,
+    criteria: judgeOptions?.criteria ?? "",
+    expectedFiles: judgeOptions?.expectedFiles,
     thresholds: effectiveThresholds,
+    durationMs,
   };
 }
 

@@ -1,15 +1,27 @@
 # Runners
 
-Runners define **how** AgentEval triggers an AI coding agent. There are two types: **CLI runners** (spawn a shell command) and **API runners** (call an LLM directly via the Vercel AI SDK).
+Runners define **how** AgentEval triggers an AI coding agent. There are two built-in runner types: **CLI runners** (spawn a shell command) and **API runners** (call an LLM directly via the Vercel AI SDK).
+
+Runner configs are **plain objects** — the type is inferred from the shape. No class imports needed for most users. Each runner must have a **unique `name`** — duplicate names throw an error at startup.
 
 You can mix both types in the same config to compare CLI agents against API agents on identical tasks.
 
 ## Runner Types at a Glance
 
-| Type  | How it works                                         | Best for                              |
-| ----- | ---------------------------------------------------- | ------------------------------------- |
-| `cli` | Spawns a shell command with `{{prompt}}` placeholder | IDE agents, CLI tools, custom scripts |
-| `api` | Calls an LLM via Vercel AI SDK `generateObject()`    | Direct model comparison, headless CI  |
+| Type       | How it works                                         | Best for                              |
+| ---------- | ---------------------------------------------------- | ------------------------------------- |
+| CLI runner | Spawns a shell command with `{{prompt}}` placeholder | IDE agents, CLI tools, custom scripts |
+| API runner | Calls an LLM via Vercel AI SDK `generateObject()`    | Direct model comparison, headless CI  |
+
+Both implement the `IRunnerPlugin` interface:
+
+```ts
+interface IRunnerPlugin {
+  readonly name: string;
+  readonly model: string;
+  execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult>;
+}
+```
 
 ---
 
@@ -17,10 +29,12 @@ You can mix both types in the same config to compare CLI agents against API agen
 
 CLI runners execute a shell command. The `{{prompt}}` placeholder is replaced with the test instruction at runtime. The agent is expected to modify files on disk.
 
+A CLI runner config is any object with `name` and `command` properties:
+
 ```ts
+// No imports needed — just a plain object
 {
   name: "my-agent",
-  type: "cli",
   command: 'my-agent-cli "{{prompt}}"',
 }
 ```
@@ -32,7 +46,6 @@ CLI runners execute a shell command. The `{{prompt}}` placeholder is replaced wi
 ```ts
 {
   name: "copilot-cli",
-  type: "cli",
   command: 'gh copilot suggest -t shell "{{prompt}}"',
 }
 ```
@@ -48,7 +61,6 @@ Install the [GitHub CLI](https://cli.github.com/) and authenticate with `gh auth
 ```ts
 {
   name: "aider-sonnet",
-  type: "cli",
   command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
 }
 ```
@@ -64,7 +76,6 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "cursor",
-  type: "cli",
   command: 'cursor --agent "{{prompt}}"',
 }
 ```
@@ -76,7 +87,6 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "cline",
-  type: "cli",
   command: 'cline --task "{{prompt}}"',
 }
 ```
@@ -88,7 +98,6 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "claude-code",
-  type: "cli",
   command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
 }
 ```
@@ -98,7 +107,6 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "codex",
-  type: "cli",
   command: 'codex "{{prompt}}" --approval-mode full-auto',
 }
 ```
@@ -110,7 +118,6 @@ You can wrap any logic in a script and use it as a runner:
 ```ts
 {
   name: "custom-agent",
-  type: "cli",
   command: 'node ./scripts/my-agent.mjs "{{prompt}}"',
 }
 ```
@@ -129,30 +136,27 @@ This is useful when you want to:
 - Run evaluations in CI without installing CLI agents
 - Benchmark different models on the same task
 
+An API runner config is any object with `name` and `model` properties:
+
 ```ts
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+
 {
   name: "claude-api",
-  type: "api",
-  api: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-  },
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
 }
 ```
 
-### Supported API Providers
+### API Runners with Different Providers
 
 #### Anthropic
 
 ```ts
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+
 {
   name: "claude-sonnet",
-  type: "api",
-  api: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-    // apiKey: "sk-ant-...",  // or use ANTHROPIC_API_KEY env var
-  },
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
 }
 ```
 
@@ -165,14 +169,11 @@ This is useful when you want to:
 #### OpenAI
 
 ```ts
+import { OpenAIModel } from "agent-eval/providers/openai";
+
 {
   name: "gpt-4o",
-  type: "api",
-  api: {
-    provider: "openai",
-    model: "gpt-4o",
-    // apiKey: "sk-...",  // or use OPENAI_API_KEY env var
-  },
+  model: new OpenAIModel({ model: "gpt-4o" }),
 }
 ```
 
@@ -187,14 +188,11 @@ This is useful when you want to:
 Run models locally with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
+import { OllamaModel } from "agent-eval/providers/ollama";
+
 {
   name: "llama3-local",
-  type: "api",
-  api: {
-    provider: "ollama",
-    model: "llama3",
-    baseURL: "http://localhost:11434/v1", // default
-  },
+  model: new OllamaModel({ model: "llama3" }),
 }
 ```
 
@@ -209,20 +207,20 @@ Run models locally with [Ollama](https://ollama.ai/). No API key required.
 Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama3`.
 :::
 
-### Custom API Endpoint
+#### Custom Model Provider
 
-Any OpenAI-compatible API can be used via the `openai` provider with a custom `baseURL`:
+Any OpenAI-compatible API can be used via `OpenAIModel` with a custom `baseURL`:
 
 ```ts
+import { OpenAIModel } from "agent-eval/providers/openai";
+
 {
   name: "company-llm",
-  type: "api",
-  api: {
-    provider: "openai",
+  model: new OpenAIModel({
     model: "internal-model-v2",
     baseURL: "https://llm.internal.company.com/v1",
     apiKey: process.env.INTERNAL_LLM_KEY,
-  },
+  }),
 }
 ```
 
@@ -235,10 +233,13 @@ This works with Azure OpenAI, Together AI, Fireworks, Groq, and any provider exp
 ```mermaid
 sequenceDiagram
     participant AE as AgentEval
+    participant MP as IModelPlugin
     participant LLM as LLM API
     participant FS as File System
     participant Git as Git
 
+    AE->>MP: createModel()
+    MP-->>AE: LanguageModel
     AE->>LLM: generateObject(prompt, Zod schema)
     LLM-->>AE: { files: [{ path, content }] }
     loop For each file
@@ -248,10 +249,11 @@ sequenceDiagram
     Git-->>AE: diff captured
 ```
 
-1. AgentEval sends the test prompt to the model via `generateObject()` with a Zod schema
-2. The model returns structured output: `{ files: [{ path, content }] }`
-3. AgentEval writes each file to disk in the project directory
-4. `storeDiff()` is called automatically, followed by any `afterEach` commands
+1. AgentEval calls the model plugin's `createModel()` to get a LanguageModel
+2. Sends the test prompt via `generateObject()` with a Zod schema
+3. The model returns structured output: `{ files: [{ path, content }] }`
+4. AgentEval writes each file to disk in the project directory
+5. `storeDiff()` is called automatically, followed by any `afterEach` commands
 
 ---
 
@@ -265,7 +267,7 @@ flowchart LR
     end
 
     subgraph API["API Runner"]
-        D["generateObject(prompt)"] --> E["Returns files[] JSON"]
+        D["model.createModel()"] --> E["generateObject(prompt)"]
         E --> F["Write files to disk"]
         F --> G["storeDiff()"]
     end
@@ -289,17 +291,35 @@ Both CLI and API runners execute within the configured [environment plugin](/gui
 
 ---
 
+## Creating a Custom Runner Plugin
+
+Implement the `IRunnerPlugin` interface:
+
+```ts
+import type { IRunnerPlugin, RunnerContext, RunnerExecResult } from "agent-eval";
+
+class BrowserAgentRunner implements IRunnerPlugin {
+  readonly name = "browser-agent";
+  readonly model = "playwright-agent";
+
+  async execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult> {
+    // Launch browser, run agent, return result
+    return { stdout: "done", exitCode: 0 };
+  }
+}
+```
+
+---
+
 ## Environment Variables
 
-API runners use environment variables for authentication:
+API runners (via model plugins) use environment variables for authentication:
 
-| Provider    | Variable            | Notes                            |
-| ----------- | ------------------- | -------------------------------- |
-| `anthropic` | `ANTHROPIC_API_KEY` | Or set `apiKey` in runner config |
-| `openai`    | `OPENAI_API_KEY`    | Or set `apiKey` in runner config |
-| `ollama`    | —                   | No key needed (local)            |
-
-You can also use a `.env` file — AgentEval loads it automatically via the config file (since it's a TypeScript file, you can use `dotenv` or `process.env`).
+| Provider  | Variable            | Notes                          |
+| --------- | ------------------- | ------------------------------ |
+| Anthropic | `ANTHROPIC_API_KEY` | Or set `apiKey` in constructor |
+| OpenAI    | `OPENAI_API_KEY`    | Or set `apiKey` in constructor |
+| Ollama    | —                   | No key needed (local)          |
 
 ---
 
@@ -324,20 +344,29 @@ A failing agent execution never crashes the entire run. Each test is wrapped in 
 Use the `matrix` option to select which runners to execute per run:
 
 ```ts
+import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { OpenAIModel } from "agent-eval/providers/openai";
+
 export default defineConfig({
   runners: [
     {
       name: "claude-api",
-      type: "api",
-      api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+      model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
     },
-    { name: "gpt-4o-api", type: "api", api: { provider: "openai", model: "gpt-4o" } },
-    { name: "aider", type: "cli", command: 'aider --message "{{prompt}}" --yes --no-auto-commits' },
+    {
+      name: "gpt-4o",
+      model: new OpenAIModel({ model: "gpt-4o" }),
+    },
+    {
+      name: "aider",
+      command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+    },
   ],
 
   // Run all three on every test
   // Or filter to specific runners:
-  // matrix: { runners: ["claude-api", "gpt-4o-api"] },
+  // matrix: { runners: ["claude-api", "gpt-4o"] },
 });
 ```
 

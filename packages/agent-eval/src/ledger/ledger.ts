@@ -160,24 +160,35 @@ function rowToEntry(row: RunRow): LedgerEntry {
     row.status === "PASS" || row.status === "WARN" || row.status === "FAIL"
       ? (row.status as TestStatus)
       : computeStatus(row.score, thresholds);
+  const commands = row.commands ? (JSON.parse(row.commands) as CommandResult[]) : [];
   const entry: LedgerEntry = {
     id: row.id,
     testId: row.test_id,
     suitePath,
     timestamp: row.timestamp,
+    // Execution data
     agentRunner: row.agent_runner,
+    diff: row.diff,
+    changedFiles: [],
+    commands,
+    taskResults: [],
+    timing: { totalMs: row.duration_ms },
+    logs: "",
+    // Judgment data
     judgeModel: row.judge_model,
     score: row.score,
     pass: row.pass === 1,
     status,
     reason: row.reason,
     improvement: row.improvement ?? "",
+    criteria: "",
+    thresholds,
+    durationMs: row.duration_ms,
+    // Backward compat
     context: {
       diff: row.diff,
-      commands: row.commands ? (JSON.parse(row.commands) as CommandResult[]) : [],
+      commands,
     },
-    durationMs: row.duration_ms,
-    thresholds,
   };
   if (row.override_score != null) {
     const overrideStatus =
@@ -218,8 +229,8 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.status,
       entry.reason,
       entry.improvement,
-      entry.context.diff,
-      JSON.stringify(entry.context.commands),
+      entry.diff,
+      JSON.stringify(entry.commands),
       entry.durationMs,
       entry.thresholds.warn,
       entry.thresholds.fail,

@@ -284,3 +284,96 @@ describe("EvalContext - addTask and exec", () => {
     expect(ctx.commands[0].command).toBe("echo test");
   });
 });
+
+describe("EvalContext - setter methods", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpGitRepo();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("setAgentOutput stores and retrieves output", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(ctx.agentOutput).toBeUndefined();
+    ctx.setAgentOutput("Agent response text");
+    expect(ctx.agentOutput).toBe("Agent response text");
+  });
+
+  it("setAgentTokenUsage stores and retrieves token usage", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(ctx.agentTokenUsage).toBeUndefined();
+    const usage = { inputTokens: 100, outputTokens: 50, totalTokens: 150 };
+    ctx.setAgentTokenUsage(usage);
+    expect(ctx.agentTokenUsage).toEqual(usage);
+  });
+
+  it("setInstruction stores and retrieves instruction", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(ctx.instruction).toBe("");
+    ctx.setInstruction("Add a close button");
+    expect(ctx.instruction).toBe("Add a close button");
+  });
+
+  it("setRunnerInfo stores and retrieves runner info", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(ctx.runnerInfo).toEqual({ name: "unknown", model: "unknown" });
+    ctx.setRunnerInfo({ name: "copilot", model: "gpt-4o" });
+    expect(ctx.runnerInfo).toEqual({ name: "copilot", model: "gpt-4o" });
+  });
+
+  it("storeDiff throws when environment returns a promise", () => {
+    const asyncEnv = {
+      name: "async-env",
+      setup: () => {},
+      execute: () => ({ stdout: "", stderr: "", exitCode: 0 }),
+      getDiff: () => Promise.resolve("diff"),
+    };
+    const ctx = new EvalContext(tmpDir, asyncEnv as never);
+    expect(() => ctx.storeDiff()).toThrow("storeDiff() is synchronous");
+  });
+
+  it("buildExecutionData assembles all context data", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    writeFileSync(join(tmpDir, "file.txt"), "modified");
+    ctx.storeDiff();
+    ctx.setInstruction("Add feature X");
+    ctx.setRunnerInfo({ name: "copilot", model: "gpt-4o" });
+    ctx.setAgentOutput("Done!");
+    ctx.setAgentTokenUsage({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+
+    const timing = { totalMs: 5000, agentMs: 3000 };
+    const taskResults = [
+      {
+        task: {
+          name: "Build",
+          action: async () => ({ stdout: "", exitCode: 0 }),
+          criteria: "build passes",
+        },
+        result: {
+          name: "Build",
+          command: "pnpm build",
+          stdout: "ok",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 100,
+        },
+      },
+    ];
+
+    const data = ctx.buildExecutionData(taskResults, timing);
+
+    expect(data.instruction).toBe("Add feature X");
+    expect(data.runner).toEqual({ name: "copilot", model: "gpt-4o" });
+    expect(data.diff).toBeTruthy();
+    expect(data.changedFiles).toContain("file.txt");
+    expect(data.taskResults).toHaveLength(1);
+    expect(data.tokenUsage).toEqual({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+    expect(data.timing).toEqual(timing);
+    expect(data.agentOutput).toBe("Done!");
+    expect(data.logs).toContain("Git Diff");
+  });
+});

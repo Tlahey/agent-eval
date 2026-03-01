@@ -34,6 +34,8 @@ export default defineConfig({
     "environment/docker": "src/environment/plugins/docker.ts",
     "ledger/sqlite": "src/ledger/plugins/sqlite.ts",
     "ledger/json": "src/ledger/plugins/json.ts",
+    "runner/cli": "src/runner/plugins/cli.ts",
+    "runner/api": "src/runner/plugins/api.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

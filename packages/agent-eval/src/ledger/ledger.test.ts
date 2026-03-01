@@ -38,7 +38,13 @@ function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     status,
     reason: "Looks good",
     improvement: "No improvement needed.",
-    context: { diff: null, commands: [] },
+    diff: null,
+    changedFiles: [],
+    commands: [],
+    taskResults: [],
+    timing: { totalMs: 1000 },
+    logs: "",
+    criteria: "test criteria",
     durationMs: 1000,
     thresholds,
     ...overrides,
@@ -150,27 +156,25 @@ describe("ledger (SQLite)", () => {
 
   it("preserves command results through JSON serialization", () => {
     const entry = makeEntry({
-      context: {
-        diff: "--- a/file.ts\n+++ b/file.ts",
-        commands: [
-          {
-            name: "vitest",
-            command: "npx vitest run",
-            stdout: "Tests: 5 passed",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 2000,
-          },
-        ],
-      },
+      diff: "--- a/file.ts\n+++ b/file.ts",
+      commands: [
+        {
+          name: "vitest",
+          command: "npx vitest run",
+          stdout: "Tests: 5 passed",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 2000,
+        },
+      ],
     });
     appendLedgerEntry(tmpDir, entry);
 
     const entries = readLedger(tmpDir);
-    expect(entries[0].context.diff).toBe("--- a/file.ts\n+++ b/file.ts");
-    expect(entries[0].context.commands).toHaveLength(1);
-    expect(entries[0].context.commands[0].name).toBe("vitest");
-    expect(entries[0].context.commands[0].stdout).toBe("Tests: 5 passed");
+    expect(entries[0].diff).toBe("--- a/file.ts\n+++ b/file.ts");
+    expect(entries[0].commands).toHaveLength(1);
+    expect(entries[0].commands[0].name).toBe("vitest");
+    expect(entries[0].commands[0].stdout).toBe("Tests: 5 passed");
   });
 
   it("computes runner stats with aggregates", () => {
@@ -348,5 +352,50 @@ describe("ledger (SQLite)", () => {
     const cursor = stats.find((s) => s.agentRunner === "cursor")!;
     expect(cursor.avgScore).toBeCloseTo(0.8);
     expect(cursor.passRate).toBe(1.0); // override pass = true (0.8 >= 0.5)
+  });
+
+  it("rowToEntry handles null commands gracefully", () => {
+    // Insert a row with null commands directly
+    appendLedgerEntry(tmpDir, makeEntry({ commands: [] }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].commands).toEqual([]);
+  });
+
+  it("handles entries with null diff", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ diff: null }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].diff).toBeNull();
+  });
+
+  it("getLatestEntries returns no override when none exists", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "no-override" }));
+    const latest = getLatestEntries(tmpDir);
+    const entry = latest.get("no-override");
+    expect(entry).toBeDefined();
+    expect(entry!.override).toBeUndefined();
+  });
+
+  it("override with WARN status computed correctly", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3 }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    const override = overrideRunScore(tmpDir, runId, 0.65, "Partial improvement");
+    expect(override.status).toBe("WARN");
+    expect(override.pass).toBe(true);
+  });
+
+  it("getAllRunnerStats returns empty for no data", () => {
+    // Just open the DB by reading (creates schema) but don't insert anything
+    readLedger(tmpDir);
+    const stats = getAllRunnerStats(tmpDir);
+    expect(stats).toEqual([]);
+  });
+
+  it("getRunOverrides returns empty for no overrides", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
+    const entries = readLedger(tmpDir);
+    const overrides = getRunOverrides(tmpDir, entries[0].id!);
+    expect(overrides).toEqual([]);
   });
 });

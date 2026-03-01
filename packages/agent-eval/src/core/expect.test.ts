@@ -19,6 +19,7 @@ import { DEFAULT_THRESHOLDS } from "./types.js";
 vi.mock("../judge/judge.js", () => ({
   judge: vi.fn(),
   buildJudgePrompt: vi.fn(() => "mock judge prompt"),
+  extractChangedFiles: vi.fn(() => []),
 }));
 
 import { judge as mockJudge } from "../judge/judge.js";
@@ -38,8 +39,11 @@ function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
 }
 
 const judgeConfig: JudgeConfig = {
-  provider: "openai",
-  model: "gpt-4o",
+  llm: {
+    name: "mock",
+    modelId: "gpt-4o",
+    createModel: async () => ({ modelId: "gpt-4o", provider: "mock" }),
+  },
 };
 
 describe("expect", () => {
@@ -63,10 +67,7 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.9,
-      reason: "looks good",
-      improvement: "none",
+      result: { pass: true, score: 0.9, reason: "looks good", improvement: "none" },
     });
 
     const result = await agentExpect(ctx).toPassJudge({
@@ -82,23 +83,14 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.85,
-      reason: "well done",
-      improvement: "none",
+      result: { pass: true, score: 0.85, reason: "well done", improvement: "none" },
     });
 
     await agentExpect(ctx).toPassJudge({
       criteria: "must have close button",
-      model: "gpt-4o-mini",
     });
 
-    vitestExpect(mockJudge).toHaveBeenCalledWith(
-      ctx,
-      "mock judge prompt",
-      judgeConfig,
-      "gpt-4o-mini",
-    );
+    vitestExpect(mockJudge).toHaveBeenCalledWith(ctx, "mock judge prompt", judgeConfig);
   });
 
   it("passes expectedFiles to buildJudgePrompt", async () => {
@@ -107,10 +99,7 @@ describe("expect", () => {
     const { buildJudgePrompt: mockBuildPrompt } = await import("../judge/judge.js");
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.9,
-      reason: "files ok",
-      improvement: "none",
+      result: { pass: true, score: 0.9, reason: "files ok", improvement: "none" },
     });
 
     await agentExpect(ctx).toPassJudge({
@@ -120,7 +109,11 @@ describe("expect", () => {
 
     vitestExpect(mockBuildPrompt).toHaveBeenCalledWith({
       criteria: "test",
-      ctx,
+      execution: vitestExpect.objectContaining({
+        diff: "diff --git a/test.ts",
+        commands: [],
+        logs: "mock logs",
+      }),
       expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
     });
   });
@@ -130,10 +123,7 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.95,
-      reason: "perfect",
-      improvement: "No improvement needed.",
+      result: { pass: true, score: 0.95, reason: "perfect", improvement: "No improvement needed." },
     });
 
     await agentExpect(ctx).toPassJudge({ criteria: "test" });
@@ -170,10 +160,12 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: false,
-      score: 0.3,
-      reason: "missing close button",
-      improvement: "add a close button",
+      result: {
+        pass: false,
+        score: 0.3,
+        reason: "missing close button",
+        improvement: "add a close button",
+      },
     });
 
     await vitestExpect(
@@ -186,10 +178,7 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: false,
-      score: 0.2,
-      reason: "no tests pass",
-      improvement: "fix the tests",
+      result: { pass: false, score: 0.2, reason: "no tests pass", improvement: "fix the tests" },
     });
 
     try {
@@ -210,10 +199,12 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.65,
-      reason: "partially correct",
-      improvement: "needs more work",
+      result: {
+        pass: true,
+        score: 0.65,
+        reason: "partially correct",
+        improvement: "needs more work",
+      },
     });
 
     const result = await agentExpect(ctx).toPassJudge({ criteria: "test" });
@@ -227,10 +218,7 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.75,
-      reason: "ok",
-      improvement: "none",
+      result: { pass: true, score: 0.75, reason: "ok", improvement: "none" },
     });
 
     // With global thresholds (warn=0.9, fail=0.7): 0.75 → WARN
@@ -248,10 +236,7 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      pass: true,
-      score: 0.9,
-      reason: "good",
-      improvement: "none",
+      result: { pass: true, score: 0.9, reason: "good", improvement: "none" },
     });
 
     // score 0.9 with warn=0.95 → WARN

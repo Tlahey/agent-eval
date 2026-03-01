@@ -70,9 +70,10 @@ describe("test registration", () => {
   });
 
   it("initSession sets the judge config", () => {
+    const mockRunner = { name: "test", model: "test-model", execute: async () => ({}) };
     const config: AgentEvalConfig = {
-      runners: [{ name: "test", type: "cli", command: "echo" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [mockRunner],
+      judge: {},
     };
 
     // initSession should not throw
