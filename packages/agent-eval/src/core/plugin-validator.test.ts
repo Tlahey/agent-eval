@@ -244,6 +244,30 @@ describe("validatePlugins - runners and judge.llm", () => {
     expect(errors[0].plugin).toContain("RunnerConfig[1]");
   });
 
+  it("detects null runner in runners array", () => {
+    const errors = validatePlugins({
+      runners: [null as unknown],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].message).toContain("non-null object");
+  });
+
+  it("detects non-object runner in runners array", () => {
+    const errors = validatePlugins({
+      runners: ["not-a-runner" as unknown],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].message).toContain("non-null object");
+  });
+
+  it("detects runner missing name property", () => {
+    const errors = validatePlugins({
+      runners: [{ command: "echo test" }],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].message).toContain("name");
+  });
+
   it("validates judge.llm when present", () => {
     const errors = validatePlugins({
       judge: { llm: { name: "openai" } },

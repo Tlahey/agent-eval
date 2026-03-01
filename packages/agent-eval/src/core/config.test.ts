@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig, defineConfig, resolveRunners } from "../core/config.js";
+import { loadConfig, defineConfig, resolveRunners, assertValidPlugins } from "../core/config.js";
 import type { IModelPlugin, IRunnerPlugin } from "../core/interfaces.js";
+import type { AgentEvalConfig } from "../core/types.js";
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `agenteval-cfg-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -140,6 +141,29 @@ describe("config", () => {
     it("returns empty array for empty configs", async () => {
       const runners = await resolveRunners([]);
       expect(runners).toEqual([]);
+    });
+  });
+
+  describe("assertValidPlugins", () => {
+    it("does not throw for valid config", () => {
+      const config: AgentEvalConfig = {
+        rootDir: tmpDir,
+        outputDir: ".agenteval",
+        runners: [{ name: "test", command: "echo" }],
+        judge: {},
+      };
+      expect(() => assertValidPlugins(config)).not.toThrow();
+    });
+
+    it("throws descriptive error for invalid plugins", () => {
+      const config = {
+        rootDir: tmpDir,
+        outputDir: ".agenteval",
+        runners: [],
+        judge: {},
+        ledger: { name: "broken" },
+      } as unknown as AgentEvalConfig;
+      expect(() => assertValidPlugins(config)).toThrow("Plugin configuration errors");
     });
   });
 });

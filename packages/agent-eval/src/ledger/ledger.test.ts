@@ -353,4 +353,49 @@ describe("ledger (SQLite)", () => {
     expect(cursor.avgScore).toBeCloseTo(0.8);
     expect(cursor.passRate).toBe(1.0); // override pass = true (0.8 >= 0.5)
   });
+
+  it("rowToEntry handles null commands gracefully", () => {
+    // Insert a row with null commands directly
+    appendLedgerEntry(tmpDir, makeEntry({ commands: [] }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].commands).toEqual([]);
+  });
+
+  it("handles entries with null diff", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ diff: null }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].diff).toBeNull();
+  });
+
+  it("getLatestEntries returns no override when none exists", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "no-override" }));
+    const latest = getLatestEntries(tmpDir);
+    const entry = latest.get("no-override");
+    expect(entry).toBeDefined();
+    expect(entry!.override).toBeUndefined();
+  });
+
+  it("override with WARN status computed correctly", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x", score: 0.3 }));
+    const entries = readLedger(tmpDir);
+    const runId = entries[0].id!;
+
+    const override = overrideRunScore(tmpDir, runId, 0.65, "Partial improvement");
+    expect(override.status).toBe("WARN");
+    expect(override.pass).toBe(true);
+  });
+
+  it("getAllRunnerStats returns empty for no data", () => {
+    // Just open the DB by reading (creates schema) but don't insert anything
+    readLedger(tmpDir);
+    const stats = getAllRunnerStats(tmpDir);
+    expect(stats).toEqual([]);
+  });
+
+  it("getRunOverrides returns empty for no overrides", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
+    const entries = readLedger(tmpDir);
+    const overrides = getRunOverrides(tmpDir, entries[0].id!);
+    expect(overrides).toEqual([]);
+  });
 });

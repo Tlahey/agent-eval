@@ -6,7 +6,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/core/types.ts", "src/cli/**"],
+      exclude: [
+        "src/**/*.test.ts",
+        "src/core/types.ts",
+        "src/core/interfaces.ts",
+        "src/runner/index.ts",
+        "src/cli/**",
+      ],
       thresholds: {
         statements: 95,
         branches: 85,

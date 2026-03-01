@@ -291,6 +291,13 @@ describe("VerboseReporter", () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Environment setup"));
   });
 
+  it("prints pipeline step with error status", () => {
+    const reporter = new VerboseReporter();
+    reporter.onPipelineStep(makeTestEvent(), "judge", "error");
+    const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("Judge evaluation");
+  });
+
   it("prints PASS with reason on onTestPass", () => {
     const reporter = new VerboseReporter();
     reporter.onTestPass(makeResultEvent());
@@ -405,6 +412,24 @@ describe("CIReporter", () => {
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("FAIL");
     expect(output).toContain("reason:");
+  });
+
+  it("prints file path on onFileWrite", () => {
+    const reporter = new CIReporter();
+    reporter.onFileWrite(makeTestEvent(), "src/index.ts");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("src/index.ts"));
+  });
+
+  it("prints WARN on onTestWarn", () => {
+    const reporter = new CIReporter();
+    reporter.onTestWarn(makeResultEvent({ entry: makeLedgerEntry({ score: 0.65 }) }));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("WARN"));
+  });
+
+  it("prints ERROR on onTestError", () => {
+    const reporter = new CIReporter();
+    reporter.onTestError(makeTestEvent(), "something broke");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("ERROR"));
   });
 
   it("prints summary on onRunEnd", () => {

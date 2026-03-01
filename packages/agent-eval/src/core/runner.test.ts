@@ -726,6 +726,105 @@ describe("runner - lifecycle hooks", () => {
     // Judge should have been called (declarative pipeline with tasks from config beforeEach)
     expect(runJudge).toHaveBeenCalled();
   });
+
+  it("runs afterEach hooks even when test errors, swallowing hook errors", async () => {
+    const throwingHook = vi.fn().mockRejectedValue(new Error("hook error"));
+    // getMatchingHooks is called twice: once for beforeEach, once for afterEach
+    vi.mocked(getMatchingHooks)
+      .mockReturnValueOnce([]) // beforeEach hooks: none
+      .mockReturnValueOnce([{ fn: throwingHook, suitePath: [] }]); // afterEach hooks: throwing
+
+    const testDef: TestDefinition = {
+      title: "test-error-with-hook",
+      fn: vi.fn().mockRejectedValue(new Error("test error")),
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("test error");
+    // Hook should have been called but its error swallowed
+    expect(throwingHook).toHaveBeenCalled();
+  });
+
+  it("calls env.teardown in finally block", async () => {
+    const teardownFn = vi.fn();
+    const envWithTeardown = {
+      name: "mock-env",
+      setup: vi.fn(),
+      execute: vi.fn(() => ({ stdout: "", stderr: "", exitCode: 0 })),
+      getDiff: vi.fn(() => "diff"),
+      teardown: teardownFn,
+    };
+    mockEnvInstance.setup.mockImplementation(envWithTeardown.setup);
+    mockEnvInstance.execute.mockImplementation(envWithTeardown.execute);
+    mockEnvInstance.getDiff.mockImplementation(envWithTeardown.getDiff);
+    // Add teardown to mockEnvInstance
+    (mockEnvInstance as Record<string, unknown>).teardown = teardownFn;
+
+    const testDef: TestDefinition = {
+      title: "test-teardown",
+      fn: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await runTest(testDef, baseConfig);
+    expect(teardownFn).toHaveBeenCalled();
+
+    // Clean up
+    delete (mockEnvInstance as Record<string, unknown>).teardown;
+  });
+
+  it("reports FAIL via onTestFail when score is below fail threshold", async () => {
+    const testDef: TestDefinition = {
+      title: "test-fail-path",
+      fn: vi.fn().mockImplementation(() => {
+        setLastJudgeResult({
+          pass: false,
+          score: 0.2,
+          reason: "poor",
+          improvement: "fix everything",
+        });
+      }),
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].entries[0].status).toBe("FAIL");
+    expect(results[0].passed).toBe(false);
+  });
+
+  it("reports WARN via onTestWarn when score is between thresholds", async () => {
+    const testDef: TestDefinition = {
+      title: "test-warn-path",
+      fn: vi.fn().mockImplementation(() => {
+        setLastJudgeResult({
+          pass: true,
+          score: 0.65,
+          reason: "partial",
+          improvement: "more work",
+        });
+      }),
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].entries[0].status).toBe("WARN");
+    expect(results[0].passed).toBe(true);
+  });
+
+  it("errors when toPassJudge is called before agent.run in imperative mode", async () => {
+    const testDef: TestDefinition = {
+      title: "test-judge-before-run",
+      fn: vi
+        .fn()
+        .mockImplementation(async ({ agent }: { agent: { run: (p: string) => Promise<void> } }) => {
+          // Set judge options without judge result (simulates toPassJudge before run)
+          setLastJudgeOptions({ criteria: "criteria" });
+          await agent.run("prompt");
+        }),
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("toPassJudge");
+  });
 });
 
 describe("runner - dryRunTest", () => {
