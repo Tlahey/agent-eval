@@ -173,7 +173,7 @@ describe("Plugin Interfaces", () => {
     });
 
     it("returns false for objects without type property", () => {
-      expect(isCliModel({ name: "test" })).toBe(false);
+      expect(isCliModel({ name: "test" } as never)).toBe(false);
     });
   });
 });

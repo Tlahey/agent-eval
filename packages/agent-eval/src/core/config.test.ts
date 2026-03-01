@@ -33,7 +33,10 @@ describe("config", () => {
 
   describe("defineConfig", () => {
     it("returns the config object as-is (identity helper)", () => {
-      const mockRunner = { name: "test", model: "test-model", execute: async () => ({}) };
+      const mockRunner = {
+        name: "test",
+        model: { type: "cli" as const, name: "test", command: "echo test" },
+      };
       const config = defineConfig({
         runners: [mockRunner],
         judge: {},
