@@ -104,17 +104,20 @@ export default defineConfig({
 
 ## Options Reference
 
-| Option       | Type                             | Default                                  | Description                                             |
-| ------------ | -------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
-| `rootDir`    | `string`                         | `process.cwd()`                          | Project root directory                                  |
-| `testFiles`  | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                      |
-| `runners`    | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                               |
-| `judge`      | `JudgeConfig`                    | _required_                               | LLM judge configuration                                 |
-| `afterEach`  | `AfterEachCommand[]`             | —                                        | Commands to run after each agent (auto storeDiff first) |
-| `matrix`     | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                         |
-| `outputDir`  | `string`                         | `.agenteval`                             | Ledger output directory                                 |
-| `timeout`    | `number`                         | `300000`                                 | Agent run timeout (ms)                                  |
-| `thresholds` | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL        |
+| Option        | Type                             | Default                                  | Description                                                                  |
+| ------------- | -------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                                       |
+| `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                                           |
+| `runners`     | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                                                    |
+| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                                                      |
+| `afterEach`   | `AfterEachCommand[]`             | —                                        | Commands to run after each agent (auto storeDiff first)                      |
+| `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                                              |
+| `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                                                      |
+| `timeout`     | `number`                         | `300000`                                 | Agent run timeout (ms)                                                       |
+| `thresholds`  | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL                             |
+| `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin (see [Plugin Architecture](/guide/plugin-architecture)) |
+| `llm`         | `ILLMPlugin`                     | Built-in Vercel AI SDK                   | Custom LLM plugin (see [Plugin Architecture](/guide/plugin-architecture))    |
+| `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment (see [Environments](/guide/environments))              |
 
 ## Environment Variables
 

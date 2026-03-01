@@ -47,7 +47,7 @@ export interface Reporter {
 export class DefaultReporter implements Reporter {
   private spinner: Ora | null = null;
 
-  onRunStart(): void {
+  onRunStart(_totalTests: number, _totalRunners: number): void {
     // Intentionally empty — executeRun prints its own header
   }
 
@@ -62,7 +62,7 @@ export class DefaultReporter implements Reporter {
     }).start();
   }
 
-  onGitReset(): void {
+  onGitReset(_event: TestEvent): void {
     // Spinner is already running — no additional output needed
   }
 
@@ -138,16 +138,16 @@ export class DefaultReporter implements Reporter {
 // ─── Silent Reporter (no output — for CI or programmatic use) ───
 
 export class SilentReporter implements Reporter {
-  onRunStart(): void {}
-  onFileStart(): void {}
-  onTestStart(): void {}
-  onGitReset(): void {}
-  onFileWrite(): void {}
-  onTestPass(): void {}
-  onTestWarn(): void {}
-  onTestFail(): void {}
-  onTestError(): void {}
-  onRunEnd(): void {}
+  onRunStart(_totalTests: number, _totalRunners: number): void {}
+  onFileStart(_filePath: string): void {}
+  onTestStart(_event: TestEvent): void {}
+  onGitReset(_event: TestEvent): void {}
+  onFileWrite(_event: TestEvent, _filePath: string): void {}
+  onTestPass(_event: TestResultEvent): void {}
+  onTestWarn(_event: TestResultEvent): void {}
+  onTestFail(_event: TestResultEvent): void {}
+  onTestError(_event: TestEvent, _error: string): void {}
+  onRunEnd(_results: TestResultEvent[], _durationMs: number): void {}
 }
 
 // ─── Verbose Reporter (detailed output with full reasoning) ───
@@ -165,7 +165,7 @@ export class VerboseReporter implements Reporter {
     console.log(chalk.blue(`\n▶ ${event.testId}`) + chalk.gray(` [${event.runner}]`));
   }
 
-  onGitReset(): void {
+  onGitReset(_event: TestEvent): void {
     console.log(chalk.dim("  ↺ git reset --hard && git clean -fd"));
   }
 

@@ -1,18 +1,19 @@
-import { execSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
 import { getGlobalThresholds } from "./expect.js";
-import { gitResetHard } from "../git/git.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
 import type {
   AgentEvalConfig,
   AgentHandle,
   AgentRunnerConfig,
+  JudgeResult,
   LedgerEntry,
   TestDefinition,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
+import type { ILedgerPlugin, IEnvironmentPlugin } from "./interfaces.js";
+import { LocalEnvironment } from "../environment/local-environment.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 
@@ -63,12 +64,16 @@ async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
 
 /**
  * Create the raw AgentHandle for a given runner config.
+ * Uses config.llm plugin for API runners when available, falls back to built-in resolveRunnerModel.
+ * CLI runners delegate to the environment plugin for command execution.
  */
 function createRawAgent(
   runner: AgentRunnerConfig,
   cwd: string,
   reporter: Reporter,
   testId: string,
+  config: AgentEvalConfig,
+  env: IEnvironmentPlugin,
 ): AgentHandle {
   return {
     name: runner.name,
@@ -80,50 +85,65 @@ function createRawAgent(
           throw new Error(`Runner "${runner.name}" has type "cli" but no command defined`);
         }
         const cmd = runner.command.replace("{{prompt}}", prompt);
-        execSync(cmd, {
-          cwd,
-          stdio: "inherit",
-          timeout: 600_000,
-        });
+        // Use environment plugin for CLI execution
+        const result = await env.execute(cmd, cwd, { timeout: 600_000 });
+        if (result.exitCode !== 0 && result.stderr) {
+          // Log stderr but don't throw — agent may produce partial output
+          reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
+        }
       } else if (runner.type === "api") {
         if (!runner.api) {
           throw new Error(`Runner "${runner.name}" has type "api" but no api config defined`);
         }
 
-        const { generateObject } = await import("ai");
-        const { z } = await import("zod");
+        // Use ILLMPlugin if available, otherwise fall back to built-in
+        if (config.llm?.generate) {
+          const result = await config.llm.generate({
+            prompt,
+            model: runner.api.model,
+          });
+          for (const file of result.files) {
+            const fullPath = resolve(cwd, file.path);
+            mkdirSync(dirname(fullPath), { recursive: true });
+            writeFileSync(fullPath, file.content, "utf-8");
+            reporter.onFileWrite({ testId, runner: runner.name }, file.path);
+          }
+        } else {
+          const { generateObject } = await import("ai");
+          const { z } = await import("zod");
 
-        const model = await resolveRunnerModel(runner.api);
+          const model = await resolveRunnerModel(runner.api);
 
-        const FileOperationSchema = z.object({
-          files: z
-            .array(
-              z.object({
-                path: z.string().describe("Relative file path from project root"),
-                content: z.string().describe("Full file content to write"),
-              }),
-            )
-            .describe("Files to create or modify"),
-        });
+          const FileOperationSchema = z.object({
+            files: z
+              .array(
+                z.object({
+                  path: z.string().describe("Relative file path from project root"),
+                  content: z.string().describe("Full file content to write"),
+                }),
+              )
+              .describe("Files to create or modify"),
+          });
 
-        const { object } = await generateObject({
-          model,
-          schema: FileOperationSchema,
-          prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
+          const { object } = await generateObject({
+            model,
+            schema: FileOperationSchema,
+            prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
 
 Task: ${prompt}
 
 Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
-        });
+          });
 
-        const response = object as ApiAgentResponse;
+          const response = object as ApiAgentResponse;
 
-        // Write files to disk
-        for (const file of response.files) {
-          const fullPath = resolve(cwd, file.path);
-          mkdirSync(dirname(fullPath), { recursive: true });
-          writeFileSync(fullPath, file.content, "utf-8");
-          reporter.onFileWrite({ testId, runner: runner.name }, file.path);
+          // Write files to disk
+          for (const file of response.files) {
+            const fullPath = resolve(cwd, file.path);
+            mkdirSync(dirname(fullPath), { recursive: true });
+            writeFileSync(fullPath, file.content, "utf-8");
+            reporter.onFileWrite({ testId, runner: runner.name }, file.path);
+          }
         }
       } else {
         throw new Error(`Unknown runner type: ${(runner as AgentRunnerConfig).type}`);
@@ -142,8 +162,9 @@ function createAgent(
   config: AgentEvalConfig,
   reporter: Reporter,
   testId: string,
+  env: IEnvironmentPlugin,
 ): AgentHandle {
-  const raw = createRawAgent(runner, cwd, reporter, testId);
+  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
 
   return {
     name: raw.name,
@@ -153,8 +174,8 @@ function createAgent(
       // Execute the agent
       await raw.run(prompt);
 
-      // Auto storeDiff after agent execution
-      ctx.storeDiff();
+      // Auto storeDiff after agent execution (async for env plugins)
+      await ctx.storeDiffAsync();
 
       // Run afterEach commands from config
       if (config.afterEach) {
@@ -175,6 +196,8 @@ export interface RunResult {
 
 /**
  * Run a single test definition against all configured runners, sequentially.
+ * Uses config.ledger (ILedgerPlugin) when provided, otherwise falls back to appendLedgerEntry.
+ * Uses config.environment (IEnvironmentPlugin) when provided, otherwise falls back to LocalEnvironment.
  */
 export async function runTest(
   testDef: TestDefinition,
@@ -184,9 +207,17 @@ export async function runTest(
   const rep = reporter ?? new SilentReporter();
   const cwd = config.rootDir ?? process.cwd();
   const outputDir = config.outputDir ?? ".agenteval";
+  const ledger: ILedgerPlugin | null = config.ledger ?? null;
+  const env: IEnvironmentPlugin = config.environment ?? new LocalEnvironment();
   const runners = config.matrix?.runners
     ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
     : config.runners;
+
+  /** Record entry via plugin or fallback */
+  const record = (entry: LedgerEntry): void | Promise<void> => {
+    if (ledger) return ledger.recordRun(entry);
+    appendLedgerEntry(outputDir, entry);
+  };
 
   const allEvents: TestResultEvent[] = [];
   const results: RunResult[] = [];
@@ -195,12 +226,12 @@ export async function runTest(
     const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
     rep.onTestStart(event);
 
-    // Reset git state before each runner
+    // Setup workspace via environment plugin (git reset, docker create, etc.)
     rep.onGitReset(event);
-    gitResetHard(cwd);
+    await env.setup(cwd);
 
-    const ctx = new EvalContext(cwd);
-    const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title);
+    const ctx = new EvalContext(cwd, env);
+    const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
     const start = Date.now();
     const thresholds = config.thresholds ?? getGlobalThresholds?.() ?? DEFAULT_THRESHOLDS;
 
@@ -233,7 +264,7 @@ export async function runTest(
       if (judgeResult) {
         entry.score = judgeResult.score;
         entry.pass = judgeResult.pass;
-        entry.status = judgeResult.status;
+        entry.status = judgeResult.status ?? computeStatus(judgeResult.score, thresholds);
         entry.reason = judgeResult.reason;
         entry.improvement = judgeResult.improvement;
         clearLastJudgeResult();
@@ -242,7 +273,7 @@ export async function runTest(
         entry.pass = entry.status !== "FAIL";
       }
 
-      appendLedgerEntry(outputDir, entry);
+      await record(entry);
 
       const resultEvent = { ...event, entry, durationMs };
       if (entry.status === "PASS") {
@@ -284,7 +315,7 @@ export async function runTest(
         thresholds,
       };
 
-      appendLedgerEntry(outputDir, entry);
+      await record(entry);
       allEvents.push({ ...event, entry, durationMs });
       results.push({
         testId: testDef.title,
@@ -292,6 +323,11 @@ export async function runTest(
         entries: [entry],
         passed: false,
       });
+    } finally {
+      // Teardown environment (no-op for local, removes container for Docker)
+      if (env.teardown) {
+        await env.teardown(cwd);
+      }
     }
   }
 
@@ -300,26 +336,16 @@ export async function runTest(
 
 // ─── Global judge result store (set by expect().toPassJudge) ───
 
-let _lastJudgeResult: {
-  pass: boolean;
-  score: number;
-  reason: string;
-  improvement: string;
-} | null = null;
+let _lastJudgeResult: JudgeResult | null = null;
 
-export function setLastJudgeResult(result: {
-  pass: boolean;
-  score: number;
-  reason: string;
-  improvement: string;
-}): void {
+export function setLastJudgeResult(result: JudgeResult): void {
   _lastJudgeResult = result;
 }
 
-export function getLastJudgeResult() {
+export function getLastJudgeResult(): JudgeResult | null {
   return _lastJudgeResult;
 }
 
-export function clearLastJudgeResult() {
+export function clearLastJudgeResult(): void {
   _lastJudgeResult = null;
 }

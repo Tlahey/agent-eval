@@ -103,7 +103,7 @@ export function initSession(config: AgentEvalConfig): void {
 // ─── Re-exports ───
 
 export { expect } from "./core/expect.js";
-export { defineConfig } from "./core/config.js";
+export { defineConfig, assertValidPlugins } from "./core/config.js";
 export { DefaultReporter, SilentReporter, VerboseReporter } from "./core/reporter.js";
 export type { Reporter, TestEvent, TestResultEvent } from "./core/reporter.js";
 export type {
@@ -125,3 +125,34 @@ export type {
   Thresholds,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
+
+// ─── Plugin interfaces & implementations ───
+
+export type {
+  ILedgerPlugin,
+  ILLMPlugin,
+  IJudgePlugin,
+  IEnvironmentPlugin,
+  EnvironmentCommandResult,
+  RunnerStats,
+  TestTreeNode,
+} from "./core/interfaces.js";
+
+export { SqliteLedger } from "./ledger/sqlite-plugin.js";
+export { JsonLedger } from "./ledger/json-plugin.js";
+export { BaseLLMPlugin } from "./llm/base-plugin.js";
+export { AnthropicLLM } from "./llm/anthropic-plugin.js";
+export { OpenAILLM } from "./llm/openai-plugin.js";
+export { OllamaLLM } from "./llm/ollama-plugin.js";
+export { LocalEnvironment } from "./environment/local-environment.js";
+export { DockerEnvironment } from "./environment/docker-environment.js";
+export type { DockerEnvironmentOptions } from "./environment/docker-environment.js";
+export {
+  validatePlugins,
+  validateLedgerPlugin,
+  validateLLMPlugin,
+  validateJudgePlugin,
+  validateEnvironmentPlugin,
+  formatPluginErrors,
+} from "./core/plugin-validator.js";
+export type { PluginValidationError } from "./core/plugin-validator.js";

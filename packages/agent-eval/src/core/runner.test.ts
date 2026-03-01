@@ -27,6 +27,17 @@ vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
 }));
 
+// Mock LocalEnvironment so runner uses a mock env instead of real git/execSync
+const mockEnvInstance = {
+  name: "local",
+  setup: vi.fn(),
+  execute: vi.fn(() => ({ stdout: "", stderr: "", exitCode: 0 })),
+  getDiff: vi.fn(() => "mock diff content"),
+};
+vi.mock("../environment/local-environment.js", () => ({
+  LocalEnvironment: vi.fn(() => mockEnvInstance),
+}));
+
 vi.mock("node:fs", () => ({
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
@@ -44,7 +55,6 @@ vi.mock("@ai-sdk/openai", () => ({
   createOpenAI: vi.fn(() => (model: string) => ({ modelId: model, provider: "openai" })),
 }));
 
-import { execSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -83,6 +93,8 @@ describe("runner - runTest", () => {
   beforeEach(() => {
     clearLastJudgeResult();
     vi.clearAllMocks();
+    mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
+    mockEnvInstance.getDiff.mockReturnValue("mock diff content");
   });
 
   it("returns results for each runner", async () => {
@@ -159,9 +171,11 @@ describe("runner - createAgent via runTest", () => {
   beforeEach(() => {
     clearLastJudgeResult();
     vi.clearAllMocks();
+    mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
+    mockEnvInstance.getDiff.mockReturnValue("mock diff content");
   });
 
-  it("CLI runner calls execSync with the command", async () => {
+  it("CLI runner calls env.execute with the command", async () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
@@ -178,12 +192,10 @@ describe("runner - createAgent via runTest", () => {
 
     await runTest(testDef, config);
 
-    expect(execSync).toHaveBeenCalledWith(
+    expect(mockEnvInstance.execute).toHaveBeenCalledWith(
       "echo hello world",
-      expect.objectContaining({
-        cwd: "/tmp/test",
-        stdio: "inherit",
-      }),
+      "/tmp/test",
+      expect.objectContaining({ timeout: 600_000 }),
     );
   });
 
@@ -379,6 +391,8 @@ describe("runner - auto storeDiff and afterEach", () => {
   beforeEach(() => {
     clearLastJudgeResult();
     vi.clearAllMocks();
+    mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
+    mockEnvInstance.getDiff.mockReturnValue("mock diff content");
   });
 
   it("auto-calls storeDiff after agent.run()", async () => {

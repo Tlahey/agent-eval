@@ -15,7 +15,9 @@ flowchart TD
     PKG --> CORE["core/\ntypes, config, runner,\ncontext, expect"]
     PKG --> GIT["git/\nisolation (reset, clean, diff)"]
     PKG --> JUDGE["judge/\nLLM-as-a-Judge"]
-    PKG --> LEDGER["ledger/\nSQLite persistence"]
+    PKG --> LEDGER["ledger/\nSQLite + JSON persistence"]
+    PKG --> LLM["llm/\nLLM provider plugins"]
+    PKG --> ENV["environment/\nexecution environments"]
     PKG --> CLI["cli/\ncommand parsing + API server"]
 
     style ROOT fill:#4f46e5,color:#fff
@@ -36,6 +38,9 @@ packages/agent-eval/src/
 │   └── expect.ts       Fluent assertion API
 ├── git/
 │   └── git.ts          Git isolation (reset, clean, diff)
+├── environment/
+│   ├── local-environment.ts   Default: host + git
+│   └── docker-environment.ts  Sandboxed: Docker container
 ├── judge/
 │   └── judge.ts        LLM-as-a-Judge evaluation
 ├── ledger/
@@ -115,7 +120,7 @@ All tests run **sequentially** (no concurrency). This is intentional — agents 
 
 ## Git Isolation
 
-Before each test iteration: `git reset --hard HEAD && git clean -fd`. This guarantees a pristine working directory. Never skip this step.
+Before each test iteration: `git reset --hard HEAD && git clean -fd`. This guarantees a pristine working directory. This logic is encapsulated in the `IEnvironmentPlugin.setup()` method — `LocalEnvironment` uses Git directly, while `DockerEnvironment` creates a fresh container. See the [Environments guide](/guide/environments).
 
 ## Data Flow
 
@@ -265,12 +270,17 @@ erDiagram
 
 ## Extending the Framework
 
-| What                | Where              | How                                                  |
-| ------------------- | ------------------ | ---------------------------------------------------- |
-| New runner provider | `core/runner.ts`   | Add a `case` in `resolveRunnerModel()`               |
-| New judge provider  | `judge/judge.ts`   | Add a `case` in `resolveModel()`                     |
-| New CLI command     | `cli/cli.ts`       | Add `program.command()`                              |
-| New context method  | `core/context.ts`  | Add to `TestContext` interface + `EvalContext` class |
-| New ledger query    | `ledger/ledger.ts` | Add a new exported function                          |
+With the plugin architecture, extending AgentEval no longer requires modifying core code:
+
+| What                 | How                                                  |
+| -------------------- | ---------------------------------------------------- |
+| New storage backend  | Implement `ILedgerPlugin` interface                  |
+| New LLM provider     | Extend `BaseLLMPlugin` or implement `ILLMPlugin`     |
+| New judge type       | Implement `IJudgePlugin` interface                   |
+| New exec environment | Implement `IEnvironmentPlugin` interface             |
+| New CLI command      | Add `program.command()` in `cli/cli.ts`              |
+| New context method   | Add to `TestContext` interface + `EvalContext` class |
+
+See the [Plugin Architecture](/guide/plugin-architecture) guide for full details.
 
 See ADR-007 (`docs/adrs/007-solid-architecture.md`) for the full decision record.

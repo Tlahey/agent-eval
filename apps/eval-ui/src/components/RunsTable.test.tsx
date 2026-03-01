@@ -90,7 +90,13 @@ describe("RunsTable", () => {
 
   it("shows Adjusted badge for overridden runs", () => {
     const run = createMockRun({
-      override: { score: 0.9, pass: true, reason: "Manual", timestamp: "2025-01-01" },
+      override: {
+        score: 0.9,
+        pass: true,
+        status: "PASS",
+        reason: "Manual",
+        timestamp: "2025-01-01",
+      },
     });
     render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
     expect(screen.getByText("Adjusted")).toBeInTheDocument();
@@ -105,7 +111,7 @@ describe("RunsTable", () => {
   it("uses override score in ScoreRing when present", () => {
     const run = createMockRun({
       score: 0.3,
-      override: { score: 0.95, pass: true, reason: "R", timestamp: "2025-01-01" },
+      override: { score: 0.95, pass: true, status: "PASS", reason: "R", timestamp: "2025-01-01" },
     });
     render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
     expect(screen.getByText("95")).toBeInTheDocument();

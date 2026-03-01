@@ -37,11 +37,13 @@ agent-eval/
 │       ├── src/
 │       │   ├── core/      ← Core modules
 │       │   │   ├── types.ts       ← All TypeScript interfaces
+│       │   │   ├── interfaces.ts  ← Plugin contracts (ILedgerPlugin, ILLMPlugin, IJudgePlugin, IEnvironmentPlugin)
+│       │   │   ├── interfaces.test.ts
 │       │   │   ├── config.ts      ← Config file loader (jiti)
 │       │   │   ├── config.test.ts
 │       │   │   ├── context.ts     ← TestContext (storeDiff, runCommand)
 │       │   │   ├── context.test.ts
-│       │   │   ├── runner.ts      ← Sequential test execution engine
+│       │   │   ├── runner.ts      ← Sequential test execution engine (DI-ready)
 │       │   │   ├── runner.test.ts
 │       │   │   ├── expect.ts      ← Fluent assertion API
 │       │   │   └── index.test.ts  ← test() registration tests
@@ -50,12 +52,28 @@ agent-eval/
 │       │   │   └── git.test.ts
 │       │   ├── judge/     ← LLM-as-a-Judge
 │       │   │   └── judge.ts       ← Vercel AI SDK + Zod structured output
-│       │   ├── ledger/    ← SQLite result storage
-│       │   │   ├── ledger.ts      ← node:sqlite DatabaseSync
-│       │   │   └── ledger.test.ts
+│       │   ├── ledger/    ← Result storage plugins
+│       │   │   ├── ledger.ts        ← Built-in SQLite (node:sqlite DatabaseSync)
+│       │   │   ├── ledger.test.ts
+│       │   │   ├── sqlite-plugin.ts ← SqliteLedger (ILedgerPlugin wrapper)
+│       │   │   ├── json-plugin.ts   ← JsonLedger (JSONL-based, no SQLite)
+│       │   │   └── json-plugin.test.ts
+│       │   ├── llm/       ← LLM provider plugins
+│       │   │   ├── base-plugin.ts     ← BaseLLMPlugin abstract class
+│       │   │   ├── anthropic-plugin.ts ← AnthropicLLM
+│       │   │   ├── openai-plugin.ts    ← OpenAILLM
+│       │   │   ├── ollama-plugin.ts    ← OllamaLLM
+│       │   │   ├── index.ts           ← Barrel exports
+│       │   │   └── llm-plugins.test.ts
+│       │   ├── environment/ ← Execution environment plugins
+│       │   │   ├── local-environment.ts   ← Default: host + git
+│       │   │   ├── local-environment.test.ts
+│       │   │   ├── docker-environment.ts  ← Sandboxed: Docker container
+│       │   │   ├── docker-environment.test.ts
+│       │   │   └── index.ts              ← Barrel exports
 │       │   ├── cli/       ← CLI binary
-│       │   │   └── cli.ts         ← agenteval run|ledger|ui
-│       │   └── index.ts   ← Public API (test, describe, expect, defineConfig)
+│       │   │   └── cli.ts         ← agenteval run|ledger|ui (DI-ready)
+│       │   └── index.ts   ← Public API (test, describe, expect, defineConfig, plugins)
 │       ├── tsup.config.ts ← Build config (ESM + CJS + DTS)
 │       └── tsconfig.json
 └── docs/adrs/             ← Architecture Decision Records
@@ -128,31 +146,53 @@ Build must succeed with zero errors.
 
 ### 4. Commit when green
 
-Once lint + format + tests + build all succeed, **commit immediately**:
+Once lint + format + tests + build all succeed, **commit immediately to your feature branch**:
 
 ```bash
 git add -A
 git commit -m "<type>(<scope>): <description>"
 ```
 
-### 5. Open a Pull Request before merging
+> ⚠️ **You MUST always work on a feature branch, never on `main`.**
+> Before starting any work, create a branch: `git checkout -b <type>/<scope>-<short-description>`
 
-**Every change MUST go through a Pull Request (PR). Never push directly to `main`.**
+### 5. Push and open a Pull Request
 
-Create a feature branch, push your commits, then open a PR on GitHub:
+**Every change MUST go through a Pull Request (PR). The maintainer validates and merges — never merge yourself.**
 
 ```bash
-# Create a feature branch from main
+# 1. Create a feature branch BEFORE starting work
 git checkout -b feat/<scope>-<short-description>
 
-# ... make your changes, commit ...
+# 2. ... make your changes, commit (gates must pass) ...
 
-# Push the branch
+# 3. Push the branch
 git push origin feat/<scope>-<short-description>
 
-# Open a PR via GitHub CLI
-gh pr create --title "<type>(<scope>): <description>" --body-file -
+# 4. Open a PR via GitHub CLI
+gh pr create --title "<type>(<scope>): <description>" --body "$(cat <<'EOF'
+## Summary
+...
+EOF
+)"
 ```
+
+```mermaid
+flowchart LR
+    A["1. Create\nfeature branch"] --> B["2. Code + commit\n(lint+test+build)"]
+    B --> C["3. Push branch"]
+    C --> D["4. Open PR\n(gh pr create)"]
+    D --> E["5. CI runs ✅"]
+    E --> F["6. Maintainer\nreviews & merges"]
+    F --> G["7. Delete branch"]
+
+    style A fill:#6366f1,color:#fff
+    style D fill:#f59e0b,color:#000
+    style E fill:#10b981,color:#fff
+    style F fill:#ef4444,color:#fff
+```
+
+> 🔴 **Step 6 is done by the maintainer, not by you.** Your job ends at step 5 (CI green). Wait for approval.
 
 #### PR Description Template
 
@@ -210,29 +250,15 @@ List any breaking changes, or write "None" if backward compatible.
 
 #### PR Rules
 
+- **ALWAYS work on a feature branch.** Never commit directly to `main`.
 - **One feature per PR.** Don't bundle unrelated changes.
 - **The PR title follows [Conventional Commits](https://www.conventionalcommits.org/)** — same format as commit messages.
 - **The description must be in English**, even if the discussion happens in another language.
-- **All CI checks must pass** before merging (lint, test, build, typecheck).
+- **All CI checks must pass** before the PR can be merged (lint, format, test, build, typecheck).
+- **Only the maintainer merges.** You open the PR and ensure CI is green — the maintainer reviews and approves the merge.
 - **Squash-merge into `main`** to keep a clean linear history.
 - **Delete the feature branch** after merging.
 - **Link related issues** using `Closes #123` or `Fixes #456` in the description when applicable.
-
-```mermaid
-flowchart LR
-    A["Feature branch\nfeat/thresholds"] --> B["Commits\n(lint+test+build)"]
-    B --> C["Push branch"]
-    C --> D["Open PR\n(structured description)"]
-    D --> E["CI passes ✅"]
-    E --> F["Review & Approve"]
-    F --> G["Squash-merge\ninto main"]
-    G --> H["Delete branch"]
-
-    style A fill:#6366f1,color:#fff
-    style D fill:#f59e0b,color:#000
-    style E fill:#10b981,color:#fff
-    style G fill:#4f46e5,color:#fff
-```
 
 ### Commit Convention
 
@@ -260,12 +286,13 @@ git commit -m "docs(readme): add quick start guide"
 
 - **ALL 4 gates must pass before committing:** lint ✅ → format ✅ → test ✅ → build ✅
 - **Husky enforces this automatically.** The pre-commit hook runs `lint-staged` (ESLint + Prettier on staged files), `pnpm test`, and `pnpm build`. A failure at any step blocks the commit.
-- **NEVER push directly to `main`.** Always go through a Pull Request.
+- **NEVER commit or push directly to `main`.** Always work on a feature branch and open a Pull Request.
+- **NEVER merge your own PR.** The maintainer reviews and merges.
 - **NEVER leave working code uncommitted.** If it passes all gates, commit it.
 - **NEVER commit broken code.** Never use `--no-verify` to bypass the hook.
 - **Commit frequently.** Small, focused commits are better than large ones.
 - **Write tests for every new feature or bug fix.**
-- **Open a PR with a structured description** before merging into `main`.
+- **Open a PR with a structured description** and wait for CI + maintainer approval.
 - **If you're unsure whether to commit, commit.** You can always amend or squash later.
 
 ### Testing Guidelines
@@ -360,21 +387,26 @@ flowchart TD
 
 ### Code → Documentation Cross-Reference
 
-| Code file changed  | Documentation files to update                                                    |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `core/types.ts`    | `api/define-config.md`, `api/test.md`, `api/expect.md`, `api/context.md`         |
-| `core/config.ts`   | `guide/configuration.md`, `api/define-config.md`                                 |
-| `core/context.ts`  | `api/context.md`, `guide/writing-tests.md`                                       |
-| `core/runner.ts`   | `guide/runners.md`, `guide/architecture.md`                                      |
-| `core/expect.ts`   | `api/expect.md`, `guide/writing-tests.md`                                        |
-| `git/git.ts`       | `guide/architecture.md`                                                          |
-| `judge/judge.ts`   | `guide/judges.md`, `api/expect.md`                                               |
-| `ledger/ledger.ts` | `api/ledger.md`, `guide/architecture.md`                                         |
-| `cli/cli.ts`       | `guide/cli.md`                                                                   |
-| `apps/eval-ui/**`  | `guide/dashboard.md`                                                             |
-| Any new feature    | `guide/getting-started.md` (if user-facing), `README.md`, `AGENTS.md`            |
-| Any config option  | `guide/configuration.md`, `api/define-config.md`, examples in `guide/runners.md` |
-| Any new provider   | `guide/runners.md` or `guide/judges.md`, `guide/configuration.md`                |
+| Code file changed    | Documentation files to update                                                    |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `core/types.ts`      | `api/define-config.md`, `api/test.md`, `api/expect.md`, `api/context.md`         |
+| `core/interfaces.ts` | `guide/plugin-architecture.md`, `api/define-config.md`                           |
+| `core/config.ts`     | `guide/configuration.md`, `api/define-config.md`                                 |
+| `core/context.ts`    | `api/context.md`, `guide/writing-tests.md`                                       |
+| `core/runner.ts`     | `guide/runners.md`, `guide/architecture.md`                                      |
+| `core/expect.ts`     | `api/expect.md`, `guide/writing-tests.md`                                        |
+| `git/git.ts`         | `guide/architecture.md`                                                          |
+| `judge/judge.ts`     | `guide/judges.md`, `api/expect.md`                                               |
+| `ledger/ledger.ts`   | `api/ledger.md`, `guide/architecture.md`                                         |
+| `ledger/*-plugin.ts` | `guide/plugin-architecture.md`, `guide/configuration.md`                         |
+| `llm/*-plugin.ts`    | `guide/plugin-architecture.md`, `guide/configuration.md`                         |
+| `environment/*.ts`   | `guide/environments.md`, `guide/plugin-architecture.md`, `guide/architecture.md` |
+| `cli/cli.ts`         | `guide/cli.md`                                                                   |
+| `apps/eval-ui/**`    | `guide/dashboard.md`                                                             |
+| Any new feature      | `guide/getting-started.md` (if user-facing), `README.md`, `AGENTS.md`            |
+| Any config option    | `guide/configuration.md`, `api/define-config.md`, examples in `guide/runners.md` |
+| Any new provider     | `guide/runners.md` or `guide/judges.md`, `guide/configuration.md`                |
+| Any new plugin       | `guide/plugin-architecture.md`, `api/define-config.md`                           |
 
 ### Mermaid Diagram Guidelines
 
@@ -426,10 +458,21 @@ All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:
 
 Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM directly). API runners:
 
-- Use Vercel AI SDK `generateObject()` with a Zod schema
+- Use `config.llm.generate()` when an `ILLMPlugin` is configured
+- Fall back to Vercel AI SDK `generateObject()` with built-in `resolveRunnerModel()`
 - Support providers: `anthropic`, `openai`, `ollama`
 - Output structured `files[]` array with `{ path, content }` written to disk
 - Dynamic provider import (unused providers are never bundled)
+
+### Plugin Architecture (SOLID)
+
+The framework uses Dependency Inversion for storage and LLM operations:
+
+- **`ILedgerPlugin`** — Storage backend abstraction. Built-in: `SqliteLedger`, `JsonLedger`
+- **`ILLMPlugin`** — LLM provider abstraction. Built-in: `AnthropicLLM`, `OpenAILLM`, `OllamaLLM`
+- **`IJudgePlugin`** — Judge abstraction for custom evaluation logic
+- Runner and CLI use `config.ledger` / `config.llm` when provided, fallback to built-in implementations
+- All interfaces are in `core/interfaces.ts`, exported from `index.ts`
 
 ---
 
@@ -467,7 +510,31 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 
 > **Remember:** Every code change requires a corresponding documentation update. See [📖 Mandatory Documentation Updates](#📖-mandatory-documentation-updates) above.
 
-### Adding a new Judge provider
+### Adding a new LLM plugin
+
+1. Create `llm/<provider>-plugin.ts` extending `BaseLLMPlugin`
+2. Implement `createModel()` returning the AI SDK model instance
+3. Export from `llm/index.ts` and `index.ts`
+4. Add tests in `llm/llm-plugins.test.ts`
+5. **Update docs:** `guide/plugin-architecture.md` (LLM plugins table), `guide/configuration.md`
+
+### Adding a new Ledger plugin
+
+1. Create `ledger/<name>-plugin.ts` implementing `ILedgerPlugin`
+2. Implement all interface methods
+3. Export from `index.ts`
+4. Add tests in `ledger/<name>-plugin.test.ts`
+5. **Update docs:** `guide/plugin-architecture.md` (ledger plugins table), `guide/configuration.md`
+
+### Adding a new Environment plugin
+
+1. Create `environment/<name>-environment.ts` implementing `IEnvironmentPlugin`
+2. Implement `setup()`, `execute()`, `getDiff()`, and optionally `teardown()`
+3. Export from `environment/index.ts` and `index.ts`
+4. Add tests in `environment/<name>-environment.test.ts`
+5. **Update docs:** `guide/environments.md`, `guide/plugin-architecture.md`, `guide/configuration.md`
+
+### Adding a new Judge provider (legacy)
 
 1. Add the provider type to `JudgeConfig.provider` in `core/types.ts`
 2. Add a new `case` in `resolveModel()` in `judge/judge.ts`
@@ -475,7 +542,7 @@ Runners can be `type: "cli"` (spawn a CLI command) or `type: "api"` (call an LLM
 4. Add tests in `judge/judge.test.ts`
 5. **Update docs:** `guide/judges.md` (provider section + table), `guide/configuration.md` (judge config table)
 
-### Adding a new Agent runner provider
+### Adding a new Agent runner provider (legacy)
 
 1. Add the provider type to `AgentRunnerConfig.api.provider` in `core/types.ts`
 2. Add a new `case` in `resolveRunnerModel()` in `core/runner.ts`

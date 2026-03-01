@@ -8,7 +8,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { glob } from "glob";
 import { createJiti } from "jiti";
-import { loadConfig } from "../core/config.js";
+import { loadConfig, assertValidPlugins } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
 import { runTest } from "../core/runner.js";
 import { DefaultReporter, SilentReporter, VerboseReporter } from "../core/reporter.js";
@@ -23,8 +23,50 @@ import {
   overrideRunScore,
   getRunOverrides,
 } from "../ledger/ledger.js";
+import type { ILedgerPlugin } from "../core/interfaces.js";
 
 program.name("agenteval").description("AI coding agent evaluation framework").version("0.1.0");
+
+// ─── Ledger resolver (plugin or built-in) ───
+
+/**
+ * Build a ledger accessor from config. If config.ledger is set, use the plugin;
+ * otherwise fall back to the built-in SQLite functions.
+ */
+function resolveLedger(
+  outputDir: string,
+  plugin?: ILedgerPlugin,
+): {
+  name: string;
+  getRuns: (testId?: string) => Promise<unknown[]> | unknown[];
+  getTestIds: () => Promise<string[]> | string[];
+  getTestTree: () => Promise<unknown[]> | unknown[];
+  getStats: (testId?: string) => Promise<unknown> | unknown;
+  overrideRunScore: (runId: number, score: number, reason: string) => Promise<unknown> | unknown;
+  getRunOverrides: (runId: number) => Promise<unknown[]> | unknown[];
+} {
+  if (plugin) {
+    return {
+      name: plugin.name,
+      getRuns: (testId) => plugin.getRuns(testId),
+      getTestIds: () => plugin.getTestIds(),
+      getTestTree: () => plugin.getTestTree(),
+      getStats: (testId) => plugin.getStats(testId),
+      overrideRunScore: (runId, score, reason) => plugin.overrideRunScore(runId, score, reason),
+      getRunOverrides: (runId) => plugin.getRunOverrides(runId),
+    };
+  }
+  return {
+    name: "sqlite (built-in)",
+    getRuns: (testId) => (testId ? readLedgerByTestId(outputDir, testId) : readLedger(outputDir)),
+    getTestIds: () => getTestIds(outputDir),
+    getTestTree: () => getTestTree(outputDir),
+    getStats: (testId) =>
+      testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir),
+    overrideRunScore: (runId, score, reason) => overrideRunScore(outputDir, runId, score, reason),
+    getRunOverrides: (runId) => getRunOverrides(outputDir, runId),
+  };
+}
 
 // ─── Shared run logic ───
 
@@ -50,6 +92,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
 
   try {
     const config = await loadConfig(cwd, opts.config);
+    assertValidPlugins(config);
     if (opts.output) {
       config.outputDir = opts.output;
     }
@@ -154,15 +197,25 @@ program
   .action(async (opts) => {
     const cwd = process.cwd();
     let outputDir: string;
+    let ledgerPlugin: ILedgerPlugin | undefined;
 
     if (opts.output) {
       outputDir = resolve(cwd, opts.output);
     } else {
       const config = await loadConfig(cwd);
+      assertValidPlugins(config);
       outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
+      ledgerPlugin = config.ledger;
     }
 
-    const entries = readLedger(outputDir);
+    const ledger = resolveLedger(outputDir, ledgerPlugin);
+    const entries = (await ledger.getRuns()) as {
+      pass: boolean;
+      score: number;
+      testId: string;
+      agentRunner: string;
+      timestamp: string;
+    }[];
 
     if (entries.length === 0) {
       console.log(chalk.yellow("No ledger entries found."));
@@ -174,7 +227,7 @@ program
       return;
     }
 
-    const testIds = getTestIds(outputDir);
+    const testIds = await ledger.getTestIds();
     console.log(chalk.bold(`Ledger: ${entries.length} entries, ${testIds.length} unique tests\n`));
 
     for (const entry of entries.slice(-20)) {
@@ -203,13 +256,18 @@ interface UiOptions {
 async function launchDashboard(opts: UiOptions): Promise<void> {
   const cwd = process.cwd();
   let outputDir: string;
+  let ledgerPlugin: ILedgerPlugin | undefined;
 
   if (opts.output) {
     outputDir = resolve(cwd, opts.output);
   } else {
     const config = await loadConfig(cwd);
+    assertValidPlugins(config);
     outputDir = resolve(cwd, config.outputDir ?? ".agenteval");
+    ledgerPlugin = config.ledger;
   }
+
+  const ledger = resolveLedger(outputDir, ledgerPlugin);
 
   const port = parseInt(opts.port, 10);
 
@@ -266,40 +324,35 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
         req.on("error", reject);
       });
 
-    try {
-      if (url.pathname === "/api/runs") {
+    const handleRequest = async (): Promise<void> => {
+      if (url.pathname === "/api/health") {
+        res.end(JSON.stringify({ status: "ok", ledger: ledger.name }));
+      } else if (url.pathname === "/api/runs") {
         const testId = url.searchParams.get("testId");
-        const entries = testId ? readLedgerByTestId(outputDir, testId) : readLedger(outputDir);
+        const entries = await ledger.getRuns(testId ?? undefined);
         res.end(JSON.stringify(entries));
       } else if (url.pathname === "/api/tests") {
-        res.end(JSON.stringify(getTestIds(outputDir)));
+        res.end(JSON.stringify(await ledger.getTestIds()));
       } else if (url.pathname === "/api/tree") {
-        res.end(JSON.stringify(getTestTree(outputDir)));
+        res.end(JSON.stringify(await ledger.getTestTree()));
       } else if (url.pathname === "/api/stats") {
         const testId = url.searchParams.get("testId");
-        const stats = testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir);
+        const stats = await ledger.getStats(testId ?? undefined);
         res.end(JSON.stringify(stats));
       } else if (req.method === "PATCH" && /^\/api\/runs\/\d+\/override$/.test(url.pathname)) {
         const runId = parseInt(url.pathname.split("/")[3], 10);
-        readBody()
-          .then((raw) => {
-            const body = JSON.parse(raw) as { score?: number; reason?: string };
-            if (typeof body.score !== "number" || typeof body.reason !== "string") {
-              res.statusCode = 400;
-              res.end(JSON.stringify({ error: "score (number) and reason (string) are required" }));
-              return;
-            }
-            const result = overrideRunScore(outputDir, runId, body.score, body.reason);
-            res.end(JSON.stringify(result));
-          })
-          .catch((err: unknown) => {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
-          });
-        return; // Don't end response synchronously
+        const raw = await readBody();
+        const body = JSON.parse(raw) as { score?: number; reason?: string };
+        if (typeof body.score !== "number" || typeof body.reason !== "string") {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "score (number) and reason (string) are required" }));
+          return;
+        }
+        const result = await ledger.overrideRunScore(runId, body.score, body.reason);
+        res.end(JSON.stringify(result));
       } else if (req.method === "GET" && /^\/api\/runs\/\d+\/overrides$/.test(url.pathname)) {
         const runId = parseInt(url.pathname.split("/")[3], 10);
-        res.end(JSON.stringify(getRunOverrides(outputDir, runId)));
+        res.end(JSON.stringify(await ledger.getRunOverrides(runId)));
       } else if (hasUI && !url.pathname.startsWith("/api")) {
         // Serve static UI files (SPA fallback)
         let filePath = join(uiDistDir, url.pathname === "/" ? "index.html" : url.pathname);
@@ -319,10 +372,12 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: "Not found" }));
       }
-    } catch (err: unknown) {
+    };
+
+    handleRequest().catch((err: unknown) => {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
-    }
+    });
   });
 
   server.listen(port, () => {
