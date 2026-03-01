@@ -14,7 +14,7 @@ import {
   getRunOverrides,
   getAllRunnerStats,
 } from "./ledger.js";
-import type { LedgerEntry } from "../core/types.js";
+import type { LedgerEntry, TaskResult } from "../core/types.js";
 import { DEFAULT_THRESHOLDS, computeStatus } from "../core/types.js";
 
 function makeTmpDir(): string {
@@ -439,6 +439,35 @@ describe("ledger (SQLite)", () => {
   it("stores and retrieves task results", () => {
     const taskResults = [
       {
+        task: {
+          name: "unit tests",
+          criteria: "All tests pass",
+          weight: 2,
+          action: () => ({
+            name: "unit tests",
+            command: "pnpm test",
+            stdout: "",
+            stderr: "",
+            exitCode: 0,
+            durationMs: 0,
+          }),
+        },
+        result: {
+          name: "unit tests",
+          command: "pnpm test",
+          stdout: "OK",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 3000,
+        },
+      },
+    ] as TaskResult[];
+    appendLedgerEntry(tmpDir, makeEntry({ taskResults }));
+
+    const entries = readLedger(tmpDir);
+    // action function is not serializable — only data fields survive JSON round-trip
+    expect(entries[0].taskResults).toEqual([
+      {
         task: { name: "unit tests", criteria: "All tests pass", weight: 2 },
         result: {
           name: "unit tests",
@@ -449,11 +478,7 @@ describe("ledger (SQLite)", () => {
           durationMs: 3000,
         },
       },
-    ];
-    appendLedgerEntry(tmpDir, makeEntry({ taskResults }));
-
-    const entries = readLedger(tmpDir);
-    expect(entries[0].taskResults).toEqual(taskResults);
+    ]);
   });
 
   it("stores and retrieves changed files and expected files", () => {

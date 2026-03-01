@@ -114,7 +114,7 @@ pnpm --filter agent-eval typecheck
 
 ---
 
-## ✅ Mandatory Workflow: Lint → Format → Test → Build → Commit
+## ✅ Mandatory Workflow: Lint → Format → Test → Build → Typecheck → Commit
 
 **Every change MUST follow this workflow. No exceptions.**
 
@@ -144,9 +144,18 @@ pnpm build
 
 Build must succeed with zero errors.
 
-### 4. Commit when green
+### 4. Type-check
 
-Once lint + format + tests + build all succeed, **commit immediately to your feature branch**:
+```bash
+pnpm --filter agent-eval typecheck
+pnpm --filter eval-ui exec tsc --noEmit
+```
+
+Both packages must type-check with zero errors. This catches type errors that tests and the bundler may miss (e.g., wrong interface usage, missing properties, unused-but-wrong imports).
+
+### 5. Commit when green
+
+Once lint + format + tests + build + typecheck all succeed, **commit immediately to your feature branch**:
 
 ```bash
 git add -A
@@ -156,7 +165,7 @@ git commit -m "<type>(<scope>): <description>"
 > ⚠️ **You MUST always work on a feature branch, never on `main`.**
 > Before starting any work, create a branch: `git checkout -b <type>/<scope>-<short-description>`
 
-### 5. Push and open a Pull Request
+### 6. Push and open a Pull Request
 
 **Every change MUST go through a Pull Request (PR). The maintainer validates and merges — never merge yourself.**
 
@@ -179,7 +188,7 @@ EOF
 
 ```mermaid
 flowchart LR
-    A["1. Create\nfeature branch"] --> B["2. Code + commit\n(lint+test+build)"]
+    A["1. Create\nfeature branch"] --> B["2. Code + commit\n(lint+test+build+typecheck)"]
     B --> C["3. Push branch"]
     C --> D["4. Open PR\n(gh pr create)"]
     D --> E["5. CI runs ✅"]
@@ -284,8 +293,8 @@ git commit -m "docs(readme): add quick start guide"
 
 ### ⚠️ Rules
 
-- **ALL 4 gates must pass before committing:** lint ✅ → format ✅ → test ✅ → build ✅
-- **Husky enforces this automatically.** The pre-commit hook runs `lint-staged` (ESLint + Prettier on staged files), `pnpm test`, and `pnpm build`. A failure at any step blocks the commit.
+- **ALL 5 gates must pass before committing:** lint ✅ → format ✅ → test ✅ → build ✅ → typecheck ✅
+- **Husky enforces lint, test, and build automatically.** Typecheck (`pnpm --filter agent-eval typecheck && pnpm --filter eval-ui exec tsc --noEmit`) must be run manually before pushing.
 - **NEVER commit or push directly to `main`.** Always work on a feature branch and open a Pull Request.
 - **NEVER merge your own PR.** The maintainer reviews and merges.
 - **NEVER leave working code uncommitted.** If it passes all gates, commit it.

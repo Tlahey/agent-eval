@@ -9,6 +9,7 @@ import {
   dryRunTest,
 } from "./runner.js";
 import type { AgentEvalConfig, TestDefinition, JudgeResult, RunnerConfig } from "./types.js";
+import type { EvalContext } from "./context.js";
 
 // Mock external deps
 vi.mock("../git/git.js", () => ({
@@ -363,11 +364,11 @@ describe("runner - createAgent via runTest", () => {
       judge: {},
     };
 
-    let capturedCtx: import("./types.js").TestContext | null = null;
+    let capturedCtx: EvalContext | null = null;
     const testDef: TestDefinition = {
       title: "test-parseOutput",
       fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
-        capturedCtx = ctx;
+        capturedCtx = ctx as unknown as EvalContext;
         await agent.run("fix the bug");
       }),
     };
@@ -407,11 +408,11 @@ describe("runner - createAgent via runTest", () => {
       judge: {},
     };
 
-    let capturedCtx: import("./types.js").TestContext | null = null;
+    let capturedCtx: EvalContext | null = null;
     const testDef: TestDefinition = {
       title: "test-no-parseOutput",
       fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
-        capturedCtx = ctx;
+        capturedCtx = ctx as unknown as EvalContext;
         await agent.run("do something");
       }),
     };
