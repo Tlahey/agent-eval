@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -6,26 +7,27 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
  *
  * For running a specific implementation, use --config:
  *
- *   # CLI agents
+ *   # API runners (LLM via plugin)
+ *   agenteval run --config evals/anthropic/agenteval.config.ts
+ *   agenteval run --config evals/openai/agenteval.config.ts
+ *   agenteval run --config evals/ollama/agenteval.config.ts
+ *
+ *   # CLI runners (spawn a command)
  *   agenteval run --config evals/cli-mock/agenteval.config.ts
  *   agenteval run --config evals/cli-copilot/agenteval.config.ts
- *   agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts
- *   agenteval run --config evals/cli-claude/agenteval.config.ts
  *   agenteval run --config evals/cli-aider/agenteval.config.ts
  *
- *   # API agents
- *   agenteval run --config evals/api-openai/agenteval.config.ts
- *   agenteval run --config evals/api-anthropic/agenteval.config.ts
- *   agenteval run --config evals/api-ollama/agenteval.config.ts
+ *   # Multi-runner (compare agents side-by-side)
+ *   agenteval run --config evals/multi-runner/agenteval.config.ts
  */
 export default defineConfig({
   rootDir: ".",
 
   runners: [
-    {
+    new CLIRunner({
       name: "mock-agent",
       command: 'node scripts/mock-agent.mjs "{{prompt}}"',
-    },
+    }),
   ],
 
   // ⚠️ The judge must be a strong model capable of understanding code diffs,

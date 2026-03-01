@@ -156,40 +156,37 @@ export function validatePlugins(config: {
     errors.push(...validateEnvironmentPlugin(config.environment));
   }
 
-  // Validate each runner (plain objects or full plugins)
+  // Validate each runner (must be IRunnerPlugin instances)
   if (config.runners) {
     for (let i = 0; i < config.runners.length; i++) {
       const runner = config.runners[i] as Record<string, unknown>;
       if (!runner || typeof runner !== "object") {
         errors.push({
-          plugin: `RunnerConfig[${i}]`,
+          plugin: `Runner[${i}]`,
           member: "(self)",
           expected: "property",
-          message: `RunnerConfig[${i}] must be a non-null object`,
+          message: `Runner[${i}] must be a non-null object (IRunnerPlugin)`,
         });
         continue;
       }
 
-      // All runner configs must have a name
+      // All runners must have a name
       if (!runner.name || typeof runner.name !== "string") {
         errors.push({
-          plugin: `RunnerConfig[${i}]`,
+          plugin: `Runner[${i}]`,
           member: "name",
           expected: "property",
-          message: `RunnerConfig[${i}] is missing required property 'name' (string)`,
+          message: `Runner[${i}] is missing required property 'name' (string)`,
         });
       }
 
-      // Must have at least one of: command (CLI) or execute (custom plugin)
-      const hasCommand = "command" in runner && typeof runner.command === "string";
-      const hasExecute = "execute" in runner && typeof runner.execute === "function";
-
-      if (!hasCommand && !hasExecute) {
+      // All runners must have an execute method
+      if (!("execute" in runner) || typeof runner.execute !== "function") {
         errors.push({
-          plugin: `RunnerConfig[${i}]`,
-          member: "command|execute",
-          expected: "property",
-          message: `RunnerConfig[${i}] must have 'command' (string) or 'execute' (function)`,
+          plugin: `Runner[${i}]`,
+          member: "execute",
+          expected: "method",
+          message: `Runner[${i}] is missing required method 'execute' (function). Use CLIRunner or APIRunner from sub-path imports.`,
         });
       }
     }

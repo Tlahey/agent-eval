@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 import type { ILedgerPlugin, IEnvironmentPlugin, IRunnerPlugin } from "./interfaces.js";
-import { resolveRunners } from "./config.js";
+import { validateRunnerNames } from "./config.js";
 import { LocalEnvironment } from "../environment/plugins/local.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
@@ -200,10 +200,10 @@ export async function dryRunTest(
   testDef: TestDefinition,
   config: AgentEvalConfig,
 ): Promise<DryRunPlan> {
-  const resolvedRunners = await resolveRunners(config.runners);
+  validateRunnerNames(config.runners);
   const runners = config.matrix?.runners
-    ? resolvedRunners.filter((r) => config.matrix!.runners!.includes(r.name))
-    : resolvedRunners;
+    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
+    : config.runners;
 
   // Create a mock context that captures addTask calls but does nothing
   const tasks: Array<{ name: string; criteria: string; weight: number }> = [];
@@ -311,10 +311,10 @@ export async function runTest(
   const outputDir = config.outputDir ?? ".agenteval";
   const ledger: ILedgerPlugin | null = config.ledger ?? null;
   const env: IEnvironmentPlugin = config.environment ?? new LocalEnvironment();
-  const resolvedRunners = await resolveRunners(config.runners);
+  validateRunnerNames(config.runners);
   const runners = config.matrix?.runners
-    ? resolvedRunners.filter((r) => config.matrix!.runners!.includes(r.name))
-    : resolvedRunners;
+    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
+    : config.runners;
 
   /** Record entry via plugin or fallback */
   const record = (entry: LedgerEntry): void | Promise<void> => {

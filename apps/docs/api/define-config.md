@@ -13,22 +13,27 @@ function defineConfig(config: AgentEvalConfig): AgentEvalConfig;
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 export default defineConfig({
   runners: [
-    {
+    new CLIRunner({
       name: "copilot",
       command: 'gh copilot suggest "{{prompt}}"',
-    },
+    }),
   ],
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+  },
 });
 ```
 
@@ -38,7 +43,7 @@ export default defineConfig({
 interface AgentEvalConfig {
   rootDir?: string; // Project root (default: cwd)
   testFiles?: string | string[]; // Glob patterns for test discovery
-  runners: RunnerConfig[]; // Runner configs (plain objects or IRunnerPlugin instances)
+  runners: IRunnerPlugin[]; // Runner plugin instances
   judge: JudgeConfig; // LLM judge configuration
   beforeEach?: HookFn; // Config-level hook before each test
   afterEach?: AfterEachCommand[]; // Auto commands after each agent run
@@ -48,17 +53,6 @@ interface AgentEvalConfig {
   thresholds?: Thresholds; // Scoring thresholds { warn, fail }
   ledger?: ILedgerPlugin; // Custom storage plugin
   environment?: IEnvironmentPlugin; // Execution environment plugin
-}
-
-// Runner config — plain CLI objects or IRunnerPlugin instances
-// { name, command } → CLI runner (auto-resolved)
-// IRunnerPlugin → used as-is (e.g. new APIRunner(...), custom plugins)
-// Each runner must have a unique `name` — duplicates throw at startup
-type RunnerConfig = CLIRunnerConfig | IRunnerPlugin;
-
-interface CLIRunnerConfig {
-  name: string; // Unique runner identifier
-  command: string; // Shell command with {{prompt}} placeholder
 }
 
 interface JudgeConfig {
@@ -87,17 +81,17 @@ interface AfterEachCommand {
 
 ## Config Options
 
-| Option        | Type                     | Default                                  | Description                                                 |
-| ------------- | ------------------------ | ---------------------------------------- | ----------------------------------------------------------- |
-| `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                      |
-| `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
-| `runners`     | `RunnerConfig[]`         | _required_                               | Runner configs (plain objects or `IRunnerPlugin` instances) |
-| `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                     |
-| `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                          |
-| `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)     |
-| `matrix`      | `{ runners?: string[] }` | —                                        | Filter which runners to execute                             |
-| `outputDir`   | `string`                 | `.agenteval`                             | Ledger output directory                                     |
-| `timeout`     | `number`                 | `300000`                                 | Agent run timeout (ms)                                      |
-| `thresholds`  | `Thresholds`             | `{ warn: 0.8, fail: 0.5 }`               | Scoring thresholds                                          |
-| `ledger`      | `ILedgerPlugin`          | Built-in SQLite                          | Custom storage plugin ([docs](/guide/plugins-ledger))       |
-| `environment` | `IEnvironmentPlugin`     | `LocalEnvironment`                       | Execution environment ([docs](/guide/plugins-environments)) |
+| Option        | Type                     | Default                                  | Description                                                   |
+| ------------- | ------------------------ | ---------------------------------------- | ------------------------------------------------------------- |
+| `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                        |
+| `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                            |
+| `runners`     | `IRunnerPlugin[]`        | _required_                               | Runner plugin instances (`CLIRunner`, `APIRunner`, or custom) |
+| `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                       |
+| `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                            |
+| `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)       |
+| `matrix`      | `{ runners?: string[] }` | —                                        | Filter which runners to execute                               |
+| `outputDir`   | `string`                 | `.agenteval`                             | Ledger output directory                                       |
+| `timeout`     | `number`                 | `300000`                                 | Agent run timeout (ms)                                        |
+| `thresholds`  | `Thresholds`             | `{ warn: 0.8, fail: 0.5 }`               | Scoring thresholds                                            |
+| `ledger`      | `ILedgerPlugin`          | Built-in SQLite                          | Custom storage plugin ([docs](/guide/plugins-ledger))         |
+| `environment` | `IEnvironmentPlugin`     | `LocalEnvironment`                       | Execution environment ([docs](/guide/plugins-environments))   |

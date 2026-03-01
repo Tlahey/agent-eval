@@ -221,8 +221,6 @@ export type {
   HookFn,
   HookContext,
   HookDefinition,
-  RunnerConfig,
-  CLIRunnerConfig,
   TokenUsage,
   TaskResult,
   TimingData,
@@ -231,7 +229,7 @@ export type {
   RunReport,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
-export { resolveRunners } from "./core/config.js";
+export { validateRunnerNames } from "./core/config.js";
 
 // ─── Plugin interfaces & implementations ───
 

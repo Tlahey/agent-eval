@@ -1,12 +1,12 @@
 import { defineConfig } from "agent-eval";
+import { APIRunner } from "agent-eval/runner/api";
 import { OllamaModel } from "agent-eval/providers/ollama";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
- * API Runner — Ollama (Local)
+ * Runner — Ollama (Local)
  *
  * Runs a local model via Ollama. Privacy-first: no code leaves your machine.
- *
  * The judge uses Anthropic Claude because local models are generally not
  * capable enough to act as reliable judges for code evaluation.
  *
@@ -16,25 +16,22 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
  *   - ANTHROPIC_API_KEY for the judge
  *
  * Usage:
- *   agenteval run --config evals/api-ollama/agenteval.config.ts
+ *   agenteval run --config evals/ollama/agenteval.config.ts
  */
 export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new APIRunner({
       name: "ollama-llama3",
       model: new OllamaModel({ model: "llama3" }),
-    },
+    }),
   ],
 
-  // ⚠️ Always use a strong cloud model as judge, even with local runners.
-  // Local models lack the reasoning depth to reliably evaluate code quality.
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
-  // Config-level beforeEach: these tasks apply to ALL tests using this config.
   beforeEach: ({ ctx }) => {
     ctx.addTask({
       name: "Tests",
@@ -51,7 +48,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/api-ollama/**/*.eval.ts",
+  testFiles: "evals/ollama/**/*.eval.ts",
   outputDir: ".agenteval",
-  timeout: 300_000, // Local models can be slower
+  timeout: 300_000,
 });

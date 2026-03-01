@@ -241,7 +241,8 @@ describe("validatePlugins - runners and judge.llm", () => {
       runners: [{ name: "ok", model: "test", execute: async () => ({}) }, { name: "bad" }],
     });
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].plugin).toContain("RunnerConfig[1]");
+    expect(errors[0].plugin).toContain("Runner[1]");
+    expect(errors[0].message).toContain("execute");
   });
 
   it("detects null runner in runners array", () => {
@@ -262,10 +263,19 @@ describe("validatePlugins - runners and judge.llm", () => {
 
   it("detects runner missing name property", () => {
     const errors = validatePlugins({
-      runners: [{ command: "echo test" }],
+      runners: [{ execute: async () => ({}) }],
     });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].message).toContain("name");
+  });
+
+  it("detects runner missing execute method", () => {
+    const errors = validatePlugins({
+      runners: [{ name: "test", model: "m" }],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].message).toContain("execute");
+    expect(errors[0].message).toContain("CLIRunner");
   });
 
   it("validates judge.llm when present", () => {

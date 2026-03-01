@@ -464,10 +464,10 @@ All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:
 
 Runners implement **`IRunnerPlugin`** and come in two flavors:
 
-- **CLI runners** — Plain objects with `{ name, command }` that spawn a CLI command (auto-resolved to `CLIRunner`)
+- **CLI runners** — `CLIRunner` instances with `{ name, command }` that spawn a shell command
 - **API runners** — `APIRunner` instances with an `IModelPlugin` that call an LLM, generate structured `files[]` output, and write files to disk
 
-The `runners` array accepts `CLIRunnerConfig` plain objects (auto-resolved) or any `IRunnerPlugin` instance. Each runner must have a **unique `name`** (duplicates throw at startup).
+The `runners` array accepts only `IRunnerPlugin` instances. Each runner must have a **unique `name`** (duplicates throw at startup).
 
 ### Plugin Architecture (SOLID)
 

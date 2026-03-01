@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -24,11 +25,11 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new CLIRunner({
       name: "aider-sonnet",
       command:
         'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
-    },
+    }),
   ],
 
   // ⚠️ The judge must be a capable model. It reads git diffs, test output,

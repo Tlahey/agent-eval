@@ -1,7 +1,7 @@
 import { createJiti } from "jiti";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
-import type { AgentEvalConfig, RunnerConfig } from "./types.js";
+import type { AgentEvalConfig } from "./types.js";
 import type { IRunnerPlugin } from "./interfaces.js";
 import { validatePlugins, formatPluginErrors } from "./plugin-validator.js";
 
@@ -14,55 +14,20 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
 };
 
 /**
- * Check if a runner config is a plain CLI runner object: { name, command }.
- */
-function isCLIRunnerConfig(r: RunnerConfig): r is import("./types.js").CLIRunnerConfig {
-  const obj = r as unknown as Record<string, unknown>;
-  return (
-    typeof r === "object" &&
-    r !== null &&
-    "command" in obj &&
-    typeof obj.command === "string" &&
-    !("execute" in obj)
-  );
-}
-
-/**
- * Resolve runner configs (plain objects) into IRunnerPlugin instances.
- * Also validates that all runner names are unique.
- *
- * - `{ name, command }` → CLIRunner
- * - IRunnerPlugin → used as-is
+ * Validate that all runner names are unique.
  *
  * @throws Error if duplicate runner names are found
  */
-export async function resolveRunners(configs: RunnerConfig[]): Promise<IRunnerPlugin[]> {
-  const resolved: IRunnerPlugin[] = [];
+export function validateRunnerNames(runners: IRunnerPlugin[]): void {
   const names = new Set<string>();
-
-  for (const cfg of configs) {
-    let plugin: IRunnerPlugin;
-
-    if (isCLIRunnerConfig(cfg)) {
-      const { CLIRunner } = (await import("../runner/plugins/cli.js")) as {
-        CLIRunner: new (opts: { name: string; command: string }) => IRunnerPlugin;
-      };
-      plugin = new CLIRunner({ name: cfg.name, command: cfg.command });
-    } else {
-      // Already an IRunnerPlugin instance
-      plugin = cfg as IRunnerPlugin;
-    }
-
-    if (names.has(plugin.name)) {
+  for (const runner of runners) {
+    if (names.has(runner.name)) {
       throw new Error(
-        `Duplicate runner name "${plugin.name}". Each runner must have a unique name.`,
+        `Duplicate runner name "${runner.name}". Each runner must have a unique name.`,
       );
     }
-    names.add(plugin.name);
-    resolved.push(plugin);
+    names.add(runner.name);
   }
-
-  return resolved;
 }
 
 /**

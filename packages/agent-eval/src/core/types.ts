@@ -49,31 +49,8 @@ export function computeStatus(
 
 // ─── Runner Configuration ───
 
-/**
- * CLI runner config — the simplest form: a name + command template.
- * Automatically resolved to a CLIRunner plugin at startup.
- *
- * @example
- * ```ts
- * runners: [
- *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
- * ]
- * ```
- */
-export interface CLIRunnerConfig {
-  /** Unique runner name (used in ledger and logs) */
-  name: string;
-  /** CLI command template. Use {{prompt}} as placeholder for the instruction. */
-  command: string;
-}
-
-/**
- * Runner configuration — plain CLI config objects OR custom IRunnerPlugin instances.
- *
- * - `{ name, command }` → CLI runner (resolved automatically)
- * - IRunnerPlugin → used as-is (e.g. `new APIRunner(...)`, custom plugins)
- */
-export type RunnerConfig = CLIRunnerConfig | import("./interfaces.js").IRunnerPlugin;
+// No more RunnerConfig type alias — runners are IRunnerPlugin instances directly.
+// See CLIRunner (agent-eval/runner/cli) and APIRunner (agent-eval/runner/api).
 
 // ─── Main Configuration ───
 
@@ -84,19 +61,20 @@ export interface AgentEvalConfig {
   testFiles?: string | string[];
   /**
    * Agent runners to test against.
-   * Use plain objects for built-in runners, or IRunnerPlugin instances for custom ones.
-   * Each runner must have a unique `name`.
+   * Each runner must implement IRunnerPlugin and have a unique `name`.
    *
    * @example
    * ```ts
+   * import { CLIRunner } from "agent-eval/runner/cli";
+   * import { APIRunner } from "agent-eval/runner/api";
    * import { AnthropicModel } from "agent-eval/providers/anthropic";
    * runners: [
-   *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
-   *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+   *   new CLIRunner({ name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" }),
+   *   new APIRunner({ name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) }),
    * ]
    * ```
    */
-  runners: RunnerConfig[];
+  runners: import("./interfaces.js").IRunnerPlugin[];
   /** Judge configuration for LLM-as-a-Judge evaluation */
   judge: JudgeConfig;
   /** Model matrix: override which models to test per-run */

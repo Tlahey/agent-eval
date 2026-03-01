@@ -2,8 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig, defineConfig, resolveRunners, assertValidPlugins } from "../core/config.js";
-import type { IModelPlugin, IRunnerPlugin } from "../core/interfaces.js";
+import {
+  loadConfig,
+  defineConfig,
+  validateRunnerNames,
+  assertValidPlugins,
+} from "../core/config.js";
+import type { IRunnerPlugin } from "../core/interfaces.js";
 import type { AgentEvalConfig } from "../core/types.js";
 
 function makeTmpDir(): string {
@@ -74,68 +79,34 @@ describe("config", () => {
     });
   });
 
-  describe("resolveRunners", () => {
-    it("resolves CLI runner config { name, command } into CLIRunner plugin", async () => {
-      const runners = await resolveRunners([
-        { name: "copilot", command: "copilot --prompt={{prompt}}" },
-      ]);
-      expect(runners).toHaveLength(1);
-      expect(runners[0].name).toBe("copilot");
-      expect(runners[0].model).toBe("copilot --prompt={{prompt}}");
-      expect(typeof runners[0].execute).toBe("function");
-    });
-
-    it("passes through APIRunner (IRunnerPlugin) as-is", async () => {
-      const { APIRunner } = await import("../runner/plugins/api.js");
-      const mockModel: IModelPlugin = {
-        name: "mock",
-        modelId: "mock-model-1",
-        createModel: () => ({}),
-      };
-      const apiRunner = new APIRunner({ name: "claude", model: mockModel });
-      const runners = await resolveRunners([apiRunner]);
-      expect(runners).toHaveLength(1);
-      expect(runners[0].name).toBe("claude");
-      expect(runners[0]).toBe(apiRunner);
-    });
-
-    it("passes through custom IRunnerPlugin as-is", async () => {
-      const custom: IRunnerPlugin = {
+  describe("validateRunnerNames", () => {
+    it("accepts runners with unique names", async () => {
+      const { CLIRunner } = await import("../runner/plugins/cli.js");
+      const r1 = new CLIRunner({ name: "copilot", command: "copilot --prompt={{prompt}}" });
+      const r2: IRunnerPlugin = {
         name: "custom",
         model: "custom-model",
         execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
       };
-      const runners = await resolveRunners([custom]);
-      expect(runners).toHaveLength(1);
-      expect(runners[0]).toBe(custom);
+      expect(() => validateRunnerNames([r1, r2])).not.toThrow();
     });
 
-    it("resolves mixed configs (CLI + IRunnerPlugin)", async () => {
-      const custom: IRunnerPlugin = {
-        name: "custom",
-        model: "custom-model",
+    it("throws on duplicate runner names", () => {
+      const r1: IRunnerPlugin = {
+        name: "copilot",
+        model: "m1",
         execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
       };
-      const runners = await resolveRunners([
-        { name: "copilot", command: "copilot --prompt={{prompt}}" },
-        custom,
-      ]);
-      expect(runners).toHaveLength(2);
-      expect(runners.map((r) => r.name)).toEqual(["copilot", "custom"]);
+      const r2: IRunnerPlugin = {
+        name: "copilot",
+        model: "m2",
+        execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
+      };
+      expect(() => validateRunnerNames([r1, r2])).toThrow('Duplicate runner name "copilot"');
     });
 
-    it("throws on duplicate runner names", async () => {
-      await expect(
-        resolveRunners([
-          { name: "copilot", command: "copilot --prompt={{prompt}}" },
-          { name: "copilot", command: "copilot2 --prompt={{prompt}}" },
-        ]),
-      ).rejects.toThrow('Duplicate runner name "copilot"');
-    });
-
-    it("returns empty array for empty configs", async () => {
-      const runners = await resolveRunners([]);
-      expect(runners).toEqual([]);
+    it("accepts empty array", () => {
+      expect(() => validateRunnerNames([])).not.toThrow();
     });
   });
 
@@ -144,7 +115,7 @@ describe("config", () => {
       const config: AgentEvalConfig = {
         rootDir: tmpDir,
         outputDir: ".agenteval",
-        runners: [{ name: "test", command: "echo" }],
+        runners: [{ name: "test", model: "echo", execute: async () => ({}) } as IRunnerPlugin],
         judge: {},
       };
       expect(() => assertValidPlugins(config)).not.toThrow();
