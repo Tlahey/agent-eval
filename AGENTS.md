@@ -37,7 +37,7 @@ agent-eval/
 │       ├── src/
 │       │   ├── core/      ← Core modules
 │       │   │   ├── types.ts       ← All TypeScript interfaces
-│       │   │   ├── interfaces.ts  ← Plugin contracts (ILedgerPlugin, ILLMPlugin, IJudgePlugin)
+│       │   │   ├── interfaces.ts  ← Plugin contracts (ILedgerPlugin, ILLMPlugin, IJudgePlugin, IEnvironmentPlugin)
 │       │   │   ├── interfaces.test.ts
 │       │   │   ├── config.ts      ← Config file loader (jiti)
 │       │   │   ├── config.test.ts
@@ -65,6 +65,12 @@ agent-eval/
 │       │   │   ├── ollama-plugin.ts    ← OllamaLLM
 │       │   │   ├── index.ts           ← Barrel exports
 │       │   │   └── llm-plugins.test.ts
+│       │   ├── environment/ ← Execution environment plugins
+│       │   │   ├── local-environment.ts   ← Default: host + git
+│       │   │   ├── local-environment.test.ts
+│       │   │   ├── docker-environment.ts  ← Sandboxed: Docker container
+│       │   │   ├── docker-environment.test.ts
+│       │   │   └── index.ts              ← Barrel exports
 │       │   ├── cli/       ← CLI binary
 │       │   │   └── cli.ts         ← agenteval run|ledger|ui (DI-ready)
 │       │   └── index.ts   ← Public API (test, describe, expect, defineConfig, plugins)
@@ -394,6 +400,7 @@ flowchart TD
 | `ledger/ledger.ts`   | `api/ledger.md`, `guide/architecture.md`                                         |
 | `ledger/*-plugin.ts` | `guide/plugin-architecture.md`, `guide/configuration.md`                         |
 | `llm/*-plugin.ts`    | `guide/plugin-architecture.md`, `guide/configuration.md`                         |
+| `environment/*.ts`   | `guide/environments.md`, `guide/plugin-architecture.md`, `guide/architecture.md` |
 | `cli/cli.ts`         | `guide/cli.md`                                                                   |
 | `apps/eval-ui/**`    | `guide/dashboard.md`                                                             |
 | Any new feature      | `guide/getting-started.md` (if user-facing), `README.md`, `AGENTS.md`            |
@@ -518,6 +525,14 @@ The framework uses Dependency Inversion for storage and LLM operations:
 3. Export from `index.ts`
 4. Add tests in `ledger/<name>-plugin.test.ts`
 5. **Update docs:** `guide/plugin-architecture.md` (ledger plugins table), `guide/configuration.md`
+
+### Adding a new Environment plugin
+
+1. Create `environment/<name>-environment.ts` implementing `IEnvironmentPlugin`
+2. Implement `setup()`, `execute()`, `getDiff()`, and optionally `teardown()`
+3. Export from `environment/index.ts` and `index.ts`
+4. Add tests in `environment/<name>-environment.test.ts`
+5. **Update docs:** `guide/environments.md`, `guide/plugin-architecture.md`, `guide/configuration.md`
 
 ### Adding a new Judge provider (legacy)
 

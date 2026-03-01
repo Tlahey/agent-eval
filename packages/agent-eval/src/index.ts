@@ -132,6 +132,8 @@ export type {
   ILedgerPlugin,
   ILLMPlugin,
   IJudgePlugin,
+  IEnvironmentPlugin,
+  EnvironmentCommandResult,
   RunnerStats,
   TestTreeNode,
 } from "./core/interfaces.js";
@@ -142,11 +144,15 @@ export { BaseLLMPlugin } from "./llm/base-plugin.js";
 export { AnthropicLLM } from "./llm/anthropic-plugin.js";
 export { OpenAILLM } from "./llm/openai-plugin.js";
 export { OllamaLLM } from "./llm/ollama-plugin.js";
+export { LocalEnvironment } from "./environment/local-environment.js";
+export { DockerEnvironment } from "./environment/docker-environment.js";
+export type { DockerEnvironmentOptions } from "./environment/docker-environment.js";
 export {
   validatePlugins,
   validateLedgerPlugin,
   validateLLMPlugin,
   validateJudgePlugin,
+  validateEnvironmentPlugin,
   formatPluginErrors,
 } from "./core/plugin-validator.js";
 export type { PluginValidationError } from "./core/plugin-validator.js";

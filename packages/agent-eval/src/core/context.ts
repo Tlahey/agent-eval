@@ -1,55 +1,48 @@
-import { execSync } from "node:child_process";
-import { gitDiff } from "../git/git.js";
+import type { IEnvironmentPlugin } from "./interfaces.js";
 import type { CommandResult, TestContext } from "./types.js";
 
 export class EvalContext implements TestContext {
   private _diff: string | null = null;
   private _commands: CommandResult[] = [];
   private _cwd: string;
+  private _env: IEnvironmentPlugin;
 
-  constructor(cwd: string) {
+  constructor(cwd: string, env: IEnvironmentPlugin) {
     this._cwd = cwd;
+    this._env = env;
   }
 
   storeDiff(): void {
-    this._diff = gitDiff(this._cwd);
+    const result = this._env.getDiff(this._cwd);
+    // Handle both sync and async getDiff
+    if (result instanceof Promise) {
+      throw new Error(
+        "storeDiff() is synchronous — use an environment plugin with a sync getDiff()",
+      );
+    }
+    this._diff = result as string;
+  }
+
+  /** Async version of storeDiff for environments returning promises */
+  async storeDiffAsync(): Promise<void> {
+    this._diff = await this._env.getDiff(this._cwd);
   }
 
   async runCommand(name: string, command: string): Promise<CommandResult> {
     const start = Date.now();
-    let stdout: string;
-    let stderr = "";
-    let exitCode = 0;
+    const result = await this._env.execute(command, this._cwd, { timeout: 120_000 });
 
-    try {
-      stdout = execSync(command, {
-        cwd: this._cwd,
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-        timeout: 120_000,
-      });
-    } catch (err: unknown) {
-      const e = err as {
-        stdout?: string;
-        stderr?: string;
-        status?: number;
-      };
-      stdout = e.stdout ?? "";
-      stderr = e.stderr ?? "";
-      exitCode = e.status ?? 1;
-    }
-
-    const result: CommandResult = {
+    const cmd: CommandResult = {
       name,
       command,
-      stdout,
-      stderr,
-      exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
       durationMs: Date.now() - start,
     };
 
-    this._commands.push(result);
-    return result;
+    this._commands.push(cmd);
+    return cmd;
   }
 
   get diff(): string | null {

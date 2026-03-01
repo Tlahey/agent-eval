@@ -35,6 +35,9 @@ const LLM_REQUIRED_METHODS = ["evaluate"] as const;
 const JUDGE_REQUIRED_PROPERTIES = ["name"] as const;
 const JUDGE_REQUIRED_METHODS = ["judge"] as const;
 
+const ENV_REQUIRED_PROPERTIES = ["name"] as const;
+const ENV_REQUIRED_METHODS = ["setup", "execute", "getDiff"] as const;
+
 // ─── Validators ───
 
 function checkMembers(
@@ -97,6 +100,11 @@ export function validateJudgePlugin(plugin: unknown): PluginValidationError[] {
   return checkMembers(plugin, "JudgePlugin", JUDGE_REQUIRED_PROPERTIES, JUDGE_REQUIRED_METHODS);
 }
 
+/** Validate that an object satisfies the IEnvironmentPlugin contract */
+export function validateEnvironmentPlugin(plugin: unknown): PluginValidationError[] {
+  return checkMembers(plugin, "EnvironmentPlugin", ENV_REQUIRED_PROPERTIES, ENV_REQUIRED_METHODS);
+}
+
 /**
  * Validate all plugins in a config object.
  * Returns an array of errors (empty = valid).
@@ -105,6 +113,7 @@ export function validatePlugins(config: {
   ledger?: unknown;
   llm?: unknown;
   judge?: unknown;
+  environment?: unknown;
 }): PluginValidationError[] {
   const errors: PluginValidationError[] = [];
 
@@ -126,6 +135,10 @@ export function validatePlugins(config: {
     typeof (config.judge as Record<string, unknown>).judge === "function"
   ) {
     errors.push(...validateJudgePlugin(config.judge));
+  }
+
+  if (config.environment !== undefined) {
+    errors.push(...validateEnvironmentPlugin(config.environment));
   }
 
   return errors;

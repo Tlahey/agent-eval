@@ -3,6 +3,7 @@ import {
   validateLedgerPlugin,
   validateLLMPlugin,
   validateJudgePlugin,
+  validateEnvironmentPlugin,
   validatePlugins,
   formatPluginErrors,
 } from "./plugin-validator.js";
@@ -138,6 +139,37 @@ describe("validateJudgePlugin", () => {
   });
 });
 
+describe("validateEnvironmentPlugin", () => {
+  it("returns empty array for valid plugin", () => {
+    const env = { name: "test", setup: () => {}, execute: () => ({}), getDiff: () => "" };
+    expect(validateEnvironmentPlugin(env)).toEqual([]);
+  });
+
+  it("detects missing methods", () => {
+    const errors = validateEnvironmentPlugin({ name: "bad-env" });
+    const missing = errors.map((e) => e.member);
+    expect(missing).toContain("setup");
+    expect(missing).toContain("execute");
+    expect(missing).toContain("getDiff");
+    expect(missing).toHaveLength(3);
+  });
+
+  it("detects missing name property", () => {
+    const errors = validateEnvironmentPlugin({
+      setup: () => {},
+      execute: () => {},
+      getDiff: () => "",
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("name");
+  });
+
+  it("does not require optional teardown method", () => {
+    const env = { name: "test", setup: () => {}, execute: () => ({}), getDiff: () => "" };
+    expect(validateEnvironmentPlugin(env)).toEqual([]);
+  });
+});
+
 describe("validatePlugins", () => {
   it("returns empty array when no plugins configured", () => {
     expect(validatePlugins({})).toEqual([]);
@@ -165,6 +197,12 @@ describe("validatePlugins", () => {
     const errors = validatePlugins({ judge: { judge: () => {} } });
     expect(errors).toHaveLength(1);
     expect(errors[0].member).toBe("name");
+  });
+
+  it("validates environment plugin when present", () => {
+    const errors = validatePlugins({ environment: { name: "broken" } });
+    expect(errors.length).toBe(3);
+    expect(errors[0].plugin).toBe("EnvironmentPlugin");
   });
 
   it("accumulates errors from multiple plugins", () => {

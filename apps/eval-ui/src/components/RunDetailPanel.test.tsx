@@ -8,15 +8,13 @@ vi.mock("../lib/api", async () => {
   const actual = await vi.importActual("../lib/api");
   return {
     ...actual,
-    overrideScore: vi
-      .fn()
-      .mockResolvedValue({
-        score: 0.9,
-        pass: true,
-        status: "PASS",
-        reason: "test",
-        timestamp: "2025-01-01",
-      }),
+    overrideScore: vi.fn().mockResolvedValue({
+      score: 0.9,
+      pass: true,
+      status: "PASS",
+      reason: "test",
+      timestamp: "2025-01-01",
+    }),
     fetchOverrides: vi.fn().mockResolvedValue([]),
   };
 });
