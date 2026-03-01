@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -17,7 +18,7 @@ export default defineConfig({
   runners: [
     {
       name: "mock-agent",
-      command: 'node scripts/mock-agent.mjs "{{prompt}}"',
+      model: new CliModel({ command: 'node scripts/mock-agent.mjs "{{prompt}}"' }),
     },
   ],
 

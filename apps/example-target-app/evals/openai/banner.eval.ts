@@ -1,10 +1,5 @@
 import { test, expect } from "agent-eval";
 
-/**
- * This eval file uses config-level beforeEach (see agenteval.config.ts).
- * Common tasks (test, build) are registered automatically by the config.
- * Only test-specific tasks need to be added here.
- */
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   agent.instruct(
     "Add a Close button to the Banner component in src/components/Banner.tsx. " +

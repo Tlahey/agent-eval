@@ -68,12 +68,11 @@ This file tracks the implementation progress of the AgentEval framework. It is u
 - [x] Example eval configs:
   - [x] `cli-mock/` — Mock agent (offline, no API keys)
   - [x] `cli-copilot/` — GitHub Copilot CLI
-  - [x] `cli-claude/` — Claude Code CLI
   - [x] `cli-aider/` — Aider CLI
-  - [x] `cli-judge/` — CLI-based judge
-  - [x] `api-openai/` — OpenAI GPT-4o API runner
-  - [x] `api-anthropic/` — Anthropic Claude API runner
-  - [x] `api-ollama/` — Ollama local model API runner
+  - [x] `anthropic/` — Anthropic Claude API runner
+  - [x] `openai/` — OpenAI GPT-4o API runner
+  - [x] `ollama/` — Ollama local model API runner
+  - [x] `multi-runner/` — Compare multiple agents side-by-side
 - [x] npm scripts per eval config (`pnpm eval:mock`, `pnpm eval:copilot`, etc.)
 
 ## Phase 4 — Visual Dashboard

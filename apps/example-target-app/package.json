@@ -9,12 +9,11 @@
     "eval": "agenteval run",
     "eval:mock": "agenteval run --config evals/cli-mock/agenteval.config.ts",
     "eval:copilot": "agenteval run --config evals/cli-copilot/agenteval.config.ts",
-    "eval:copilot-gpt5": "agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts",
-    "eval:claude": "agenteval run --config evals/cli-claude/agenteval.config.ts",
     "eval:aider": "agenteval run --config evals/cli-aider/agenteval.config.ts",
-    "eval:openai": "agenteval run --config evals/api-openai/agenteval.config.ts",
-    "eval:anthropic": "agenteval run --config evals/api-anthropic/agenteval.config.ts",
-    "eval:ollama": "agenteval run --config evals/api-ollama/agenteval.config.ts",
+    "eval:anthropic": "agenteval run --config evals/anthropic/agenteval.config.ts",
+    "eval:openai": "agenteval run --config evals/openai/agenteval.config.ts",
+    "eval:ollama": "agenteval run --config evals/ollama/agenteval.config.ts",
+    "eval:multi": "agenteval run --config evals/multi-runner/agenteval.config.ts",
     "eval:view": "agenteval view"
   },
   "dependencies": {

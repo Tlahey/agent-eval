@@ -27,13 +27,14 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 export default defineConfig({
   runners: [
     {
       name: "claude-code",
-      command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+      model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
     },
   ],
   judge: {
@@ -46,28 +47,28 @@ export default defineConfig({
 
 ```ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { OpenAIModel } from "agent-eval/providers/openai";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { LocalEnvironment } from "agent-eval/environment/local";
-
-const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
   // ── Plugins ────────────────────────────────────
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
   environment: new LocalEnvironment(),
 
-  // ── Runners (plain objects — type inferred from shape) ──
+  // ── Runners (plain config objects) ─────────────
   runners: [
     {
       name: "claude-code",
-      command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+      model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
     },
-    { name: "gpt-4o", model: gpt4o },
+    { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
   ],
 
   // ── Judge ──────────────────────────────────────
-  judge: { llm: gpt4o },
+  judge: { llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
 
   // ── Lifecycle hooks ────────────────────────────
   beforeEach: ({ ctx }) => {
@@ -97,7 +98,7 @@ export default defineConfig({
 
 | Option        | Type                             | Default                                  | Description                                           |
 | ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
-| `runners`     | `RunnerConfig[]`                 | _required_                               | Runner configs (plain objects or `IRunnerPlugin`)     |
+| `runners`     | `RunnerConfig[]`                 | _required_                               | Runner config objects (`{ name, model }`)             |
 | `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                               |
 | `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                    |
 | `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                |
@@ -112,22 +113,21 @@ export default defineConfig({
 
 ## Plugins
 
-AgentEval is extensible via four plugin axes: **Models** (`IModelPlugin`), **Runners** (`IRunnerPlugin`), **Ledger** (`ILedgerPlugin`), and **Environment** (`IEnvironmentPlugin`). When no plugins are configured for ledger or environment, sensible defaults are used.
+AgentEval is extensible via three plugin axes: **Models** (`IModelPlugin`), **Ledger** (`ILedgerPlugin`), and **Environment** (`IEnvironmentPlugin`). Runners are plain config objects — not plugins. When no plugins are configured for ledger or environment, sensible defaults are used.
 
 ```ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
-import { JsonLedger } from "agent-eval/ledger/json";
 import { LocalEnvironment } from "agent-eval/environment/local";
-import { DockerEnvironment } from "agent-eval/environment/docker";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
-  // Pick runner configs (plain objects — type inferred from shape)
+  // Runners are plain config objects: { name, model }
   runners: [
-    { name: "copilot", command: "gh copilot -p '{{prompt}}'" },
+    { name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) },
     { name: "gpt-4o", model: gpt4o },
   ],
 
@@ -142,12 +142,11 @@ export default defineConfig({
 });
 ```
 
-| Plugin Axis     | Built-in Options                                                        | Default                    |
-| --------------- | ----------------------------------------------------------------------- | -------------------------- |
-| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel`                          | — (required for API judge) |
-| **Runner**      | Plain objects (`CLIRunnerConfig`, `APIRunnerConfig`) or `IRunnerPlugin` | — (required)               |
-| **Ledger**      | `SqliteLedger`, `JsonLedger`                                            | `SqliteLedger`             |
-| **Environment** | `LocalEnvironment`, `DockerEnvironment`                                 | `LocalEnvironment`         |
+| Plugin Axis     | Built-in Options                                           | Default            |
+| --------------- | ---------------------------------------------------------- | ------------------ |
+| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `CliModel` | — (required)       |
+| **Ledger**      | `SqliteLedger`, `JsonLedger`                               | `SqliteLedger`     |
+| **Environment** | `LocalEnvironment`, `DockerEnvironment`                    | `LocalEnvironment` |
 
 ::: tip Learn more
 See the dedicated [Plugins guide](/guide/plugins) for interfaces, custom plugins, and detailed configuration for each.
@@ -233,52 +232,68 @@ Since `agenteval.config.ts` is a TypeScript file, you can use `process.env` dire
 
 ## Runner Configuration
 
-AgentEval supports two built-in runner shapes: **CLI runners** (shell commands) and **API runners** (direct LLM calls). Runner configs are plain objects — the type is inferred from the shape (`{ name, command }` → CLI, `{ name, model }` → API). Each runner must have a **unique `name`** — duplicate names throw an error at startup.
+Runners are **plain config objects** with a `name` and a `model`. The `model` can be an `IModelPlugin` (for API-based execution) or a `CliModel` (for shell commands). Each runner must have a **unique `name`** — duplicate names throw an error at startup.
 
 ### CLI Runners
 
-Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction.
+Use `CliModel` from `agent-eval/providers/cli` to spawn a shell command. The `{{prompt}}` placeholder is replaced with the test instruction at runtime.
 
 ```ts
-// No imports needed — just plain objects
+import { CliModel } from "agent-eval/providers/cli";
+
 runners: [
   {
     name: "claude-code",
-    command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+    model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
   },
   {
     name: "aider",
-    command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+    model: new CliModel({ command: 'aider --message "{{prompt}}" --yes --no-auto-commits' }),
   },
   {
     name: "codex",
-    command: 'codex "{{prompt}}" --approval-mode full-auto',
+    model: new CliModel({ command: 'codex "{{prompt}}" --approval-mode full-auto' }),
   },
 ];
 ```
 
 ### API Runners
 
-Calls an LLM directly via an `IModelPlugin`. The model returns structured file operations that AgentEval writes to disk.
+Pass an `IModelPlugin` directly as the `model` — no wrapper class needed:
 
 ```ts
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 runners: [
+  { name: "claude-api", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+  { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
+];
+```
+
+### Multi-Runner (Compare Agents)
+
+Run **multiple runners** on the same tests to compare them side-by-side:
+
+```ts
+import { CliModel } from "agent-eval/providers/cli";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { OpenAIModel } from "agent-eval/providers/openai";
+
+runners: [
+  { name: "claude-sonnet", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+  { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
   {
-    name: "claude-api",
-    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-  },
-  {
-    name: "gpt-4o",
-    model: new OpenAIModel({ model: "gpt-4o" }),
+    name: "aider",
+    model: new CliModel({ command: 'aider --message "{{prompt}}" --yes --no-auto-commits' }),
   },
 ];
 ```
 
-::: tip Advanced use
-`CLIRunner` and `APIRunner` classes are still available via sub-path imports (`agent-eval/runner/cli`, `agent-eval/runner/api`) for advanced use cases. Custom `IRunnerPlugin` instances (duck-typed by having an `execute()` method) also work in the `runners` array.
+Each runner executes every test sequentially. Results are stored per-runner in the ledger and can be compared in the dashboard (`agenteval ui`).
+
+::: tip Runner config type
+Runners use the `RunnerConfig` type: `{ name: string; model: IModelPlugin | ICliModel }`. The execution logic lives in the core runner — no plugin interface needed.
 :::
 
 See the dedicated [Runners guide](/guide/runners) for all supported agents and detailed examples.

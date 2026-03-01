@@ -70,7 +70,10 @@ describe("test registration", () => {
   });
 
   it("initSession sets the judge config", () => {
-    const mockRunner = { name: "test", model: "test-model", execute: async () => ({}) };
+    const mockRunner = {
+      name: "test",
+      model: { type: "cli" as const, name: "test", command: "echo test" },
+    };
     const config: AgentEvalConfig = {
       runners: [mockRunner],
       judge: {},

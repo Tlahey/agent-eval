@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -26,8 +27,10 @@ export default defineConfig({
   runners: [
     {
       name: "aider-sonnet",
-      command:
-        'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
+      model: new CliModel({
+        command:
+          'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
+      }),
     },
   ],
 

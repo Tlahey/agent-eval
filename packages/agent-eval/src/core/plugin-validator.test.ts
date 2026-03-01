@@ -4,7 +4,6 @@ import {
   validateJudgePlugin,
   validateEnvironmentPlugin,
   validateModelPlugin,
-  validateRunnerPlugin,
   validatePlugins,
   formatPluginErrors,
 } from "./plugin-validator.js";
@@ -203,45 +202,21 @@ describe("validateModelPlugin", () => {
   });
 });
 
-describe("validateRunnerPlugin", () => {
-  it("returns empty array for valid plugin", () => {
-    const runner = { name: "cli", model: "echo", execute: async () => ({}) };
-    expect(validateRunnerPlugin(runner)).toEqual([]);
-  });
-
-  it("detects missing name property", () => {
-    const errors = validateRunnerPlugin({ model: "echo", execute: async () => ({}) });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].member).toBe("name");
-  });
-
-  it("detects missing model property", () => {
-    const errors = validateRunnerPlugin({ name: "cli", execute: async () => ({}) });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].member).toBe("model");
-  });
-
-  it("detects missing execute method", () => {
-    const errors = validateRunnerPlugin({ name: "cli", model: "echo" });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].member).toBe("execute");
-    expect(errors[0].expected).toBe("method");
-  });
-
-  it("detects non-object plugin", () => {
-    const errors = validateRunnerPlugin("string");
-    expect(errors).toHaveLength(1);
-    expect(errors[0].message).toContain("non-null object");
-  });
-});
-
-describe("validatePlugins - runners and judge.llm", () => {
-  it("validates runner plugins in runners array", () => {
+describe("validatePlugins - runners", () => {
+  it("validates runner configs with CLI model", () => {
     const errors = validatePlugins({
-      runners: [{ name: "ok", model: "test", execute: async () => ({}) }, { name: "bad" }],
+      runners: [{ name: "ok", model: { type: "cli", name: "cli", command: "echo {{prompt}}" } }],
     });
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].plugin).toContain("RunnerConfig[1]");
+    expect(errors).toEqual([]);
+  });
+
+  it("validates runner configs with API model", () => {
+    const errors = validatePlugins({
+      runners: [
+        { name: "ok", model: { name: "openai", modelId: "gpt-4o", createModel: () => ({}) } },
+      ],
+    });
+    expect(errors).toEqual([]);
   });
 
   it("detects null runner in runners array", () => {
@@ -262,10 +237,37 @@ describe("validatePlugins - runners and judge.llm", () => {
 
   it("detects runner missing name property", () => {
     const errors = validatePlugins({
-      runners: [{ command: "echo test" }],
+      runners: [{ model: { type: "cli", name: "cli", command: "echo" } }],
     });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].message).toContain("name");
+  });
+
+  it("detects runner missing model property", () => {
+    const errors = validatePlugins({
+      runners: [{ name: "test" }],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].message).toContain("model");
+  });
+
+  it("detects runner with invalid model (neither CLI nor API)", () => {
+    const errors = validatePlugins({
+      runners: [{ name: "test", model: { name: "broken" } }],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].message).toContain("IModelPlugin");
+    expect(errors[0].message).toContain("CliModel");
+  });
+
+  it("validates multiple runners", () => {
+    const errors = validatePlugins({
+      runners: [
+        { name: "a", model: { type: "cli", name: "cli", command: "echo" } },
+        { name: "b", model: { name: "openai", modelId: "gpt-4o", createModel: () => ({}) } },
+      ],
+    });
+    expect(errors).toEqual([]);
   });
 
   it("validates judge.llm when present", () => {
@@ -279,8 +281,8 @@ describe("validatePlugins - runners and judge.llm", () => {
   it("passes for valid runners array", () => {
     const errors = validatePlugins({
       runners: [
-        { name: "a", model: "x", execute: async () => ({}) },
-        { name: "b", model: "y", execute: async () => ({}) },
+        { name: "a", model: { type: "cli", name: "cli", command: "echo" } },
+        { name: "b", model: { type: "cli", name: "cli", command: "run" } },
       ],
     });
     expect(errors).toEqual([]);

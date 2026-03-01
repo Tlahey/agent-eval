@@ -221,24 +221,22 @@ export type {
   HookFn,
   HookContext,
   HookDefinition,
-  RunnerConfig,
-  CLIRunnerConfig,
-  APIRunnerConfig,
   TokenUsage,
   TaskResult,
   TimingData,
   ExecutionData,
   JudgmentData,
   RunReport,
+  RunnerConfig,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
-export { resolveRunners } from "./core/config.js";
+export { validateRunnerNames } from "./core/config.js";
 
 // ─── Plugin interfaces & implementations ───
 
 export type {
   IModelPlugin,
-  IRunnerPlugin,
+  ICliModel,
   RunnerContext,
   RunnerExecResult,
   ILedgerPlugin,
@@ -248,6 +246,7 @@ export type {
   RunnerStats,
   TestTreeNode,
 } from "./core/interfaces.js";
+export { isCliModel } from "./core/interfaces.js";
 
 export {
   validatePlugins,
@@ -255,15 +254,13 @@ export {
   validateJudgePlugin,
   validateEnvironmentPlugin,
   validateModelPlugin,
-  validateRunnerPlugin,
   formatPluginErrors,
 } from "./core/plugin-validator.js";
 export type { PluginValidationError } from "./core/plugin-validator.js";
 
 // ─── Built-in plugins are NOT re-exported from the main entry. ───
 // Import them from their sub-paths:
-//   import { CLIRunner } from "agent-eval/runner/cli";
-//   import { APIRunner } from "agent-eval/runner/api";
+//   import { CliModel } from "agent-eval/providers/cli";
 //   import { OpenAIModel } from "agent-eval/providers/openai";
 //   import { AnthropicModel } from "agent-eval/providers/anthropic";
 //   import { OllamaModel } from "agent-eval/providers/ollama";

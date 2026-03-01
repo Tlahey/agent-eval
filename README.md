@@ -19,6 +19,31 @@
 
 ---
 
+## Dashboard
+
+<p align="center">
+  <img src="assets/screenshots/overview.png" alt="Overview — KPIs, score trends, and runner comparison" width="100%" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/eval-detail.png" alt="Eval Detail — per-test breakdown with charts" width="100%" />
+</p>
+
+<details>
+<summary>More screenshots</summary>
+
+<p align="center">
+  <img src="assets/screenshots/all-runs.png" alt="All Runs — filterable table of every evaluation run" width="100%" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/run-detail.png" alt="Run Detail — diff viewer, commands, tasks, and judge reasoning" width="100%" />
+</p>
+
+</details>
+
+---
+
 ## Features
 
 - **Vitest-like API** — `test()` / `expect()` syntax designed for evaluating AI agents
@@ -65,12 +90,15 @@ agenteval --version
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 
 export default defineConfig({
-  // Agent runners — plain objects, type inferred from shape
-  runners: [{ name: "copilot", command: 'gh copilot suggest "{{prompt}}"' }],
+  // Agent runners — plain { name, model } objects
+  runners: [
+    { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
+  ],
 
   // Judge — LLM model used to score every test
   judge: {
@@ -149,7 +177,7 @@ AgentEval is built around SOLID plugin interfaces. Every major concern is swappa
 | Interface            | Purpose                  | Built-in Implementations                       |
 | -------------------- | ------------------------ | ---------------------------------------------- |
 | `IModelPlugin`       | LLM provider abstraction | `AnthropicModel`, `OpenAIModel`, `OllamaModel` |
-| `IRunnerPlugin`      | Agent execution          | `CLIRunner`, `APIRunner`                       |
+| `ICliModel`          | CLI command execution    | `CliModel`                                     |
 | `ILedgerPlugin`      | Result storage           | `SqliteLedger`, `JsonLedger`                   |
 | `IJudgePlugin`       | Custom evaluation logic  | _(bring your own)_                             |
 | `IEnvironmentPlugin` | Execution sandbox        | `LocalEnvironment`, `DockerEnvironment`        |
@@ -160,8 +188,7 @@ All plugins are imported via **sub-path exports** — unused providers are never
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { OllamaModel } from "agent-eval/providers/ollama";
-import { CLIRunner } from "agent-eval/runner/cli";
-import { APIRunner } from "agent-eval/runner/api";
+import { CliModel } from "agent-eval/providers/cli";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { JsonLedger } from "agent-eval/ledger/json";
 import { LocalEnvironment } from "agent-eval/environment/local";
@@ -189,7 +216,6 @@ agent-eval/
 │           ├── judge/         # LLM-as-a-Judge (Vercel AI SDK + structured output)
 │           ├── ledger/        # Ledger plugins (SQLite, JSON)
 │           ├── llm/           # Model plugins (Anthropic, OpenAI, Ollama)
-│           ├── runner/        # Runner plugins (CLI, API)
 │           ├── environment/   # Environment plugins (Local, Docker)
 │           └── cli/           # CLI binary (Commander.js)
 ├── docs/adrs/                 # Architecture Decision Records

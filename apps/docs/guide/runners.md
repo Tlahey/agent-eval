@@ -1,8 +1,8 @@
 # Runners
 
-Runners define **how** AgentEval triggers an AI coding agent. There are two built-in runner types: **CLI runners** (spawn a shell command) and **API runners** (call an LLM directly via the Vercel AI SDK).
+Runners define **how** AgentEval triggers an AI coding agent. There are two runner types: **CLI runners** (spawn a shell command via `CliModel`) and **API runners** (call an LLM directly via an `IModelPlugin`).
 
-Runner configs are **plain objects** — the type is inferred from the shape. No class imports needed for most users. Each runner must have a **unique `name`** — duplicate names throw an error at startup.
+Runners are **plain config objects** with the `RunnerConfig` type: `{ name: string; model: IModelPlugin | ICliModel }`. No class instantiation needed for API runners — just pass an `IModelPlugin` directly. Each runner must have a **unique `name`** — duplicate names throw an error at startup.
 
 You can mix both types in the same config to compare CLI agents against API agents on identical tasks.
 
@@ -13,13 +13,13 @@ You can mix both types in the same config to compare CLI agents against API agen
 | CLI runner | Spawns a shell command with `{{prompt}}` placeholder | IDE agents, CLI tools, custom scripts |
 | API runner | Calls an LLM via Vercel AI SDK `generateObject()`    | Direct model comparison, headless CI  |
 
-Both implement the `IRunnerPlugin` interface:
-
 ```ts
-interface IRunnerPlugin {
-  readonly name: string;
-  readonly model: string;
-  execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult>;
+import type { RunnerConfig } from "agent-eval";
+
+// RunnerConfig type
+interface RunnerConfig {
+  name: string;
+  model: IModelPlugin | ICliModel;
 }
 ```
 
@@ -27,15 +27,14 @@ interface IRunnerPlugin {
 
 ## CLI Runners
 
-CLI runners execute a shell command. The `{{prompt}}` placeholder is replaced with the test instruction at runtime. The agent is expected to modify files on disk.
-
-A CLI runner config is any object with `name` and `command` properties:
+CLI runners execute a shell command. Use `CliModel` from `agent-eval/providers/cli`. The `{{prompt}}` placeholder is replaced with the test instruction at runtime. The agent is expected to modify files on disk.
 
 ```ts
-// No imports needed — just a plain object
+import { CliModel } from "agent-eval/providers/cli";
+
 {
   name: "my-agent",
-  command: 'my-agent-cli "{{prompt}}"',
+  model: new CliModel({ command: 'my-agent-cli "{{prompt}}"' }),
 }
 ```
 
@@ -46,7 +45,7 @@ A CLI runner config is any object with `name` and `command` properties:
 ```ts
 {
   name: "copilot-cli",
-  command: 'gh copilot suggest -t shell "{{prompt}}"',
+  model: new CliModel({ command: 'gh copilot suggest -t shell "{{prompt}}"' }),
 }
 ```
 
@@ -61,7 +60,7 @@ Install the [GitHub CLI](https://cli.github.com/) and authenticate with `gh auth
 ```ts
 {
   name: "aider-sonnet",
-  command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+  model: new CliModel({ command: 'aider --message "{{prompt}}" --yes --no-auto-commits' }),
 }
 ```
 
@@ -76,7 +75,7 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "cursor",
-  command: 'cursor --agent "{{prompt}}"',
+  model: new CliModel({ command: 'cursor --agent "{{prompt}}"' }),
 }
 ```
 
@@ -87,7 +86,7 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "cline",
-  command: 'cline --task "{{prompt}}"',
+  model: new CliModel({ command: 'cline --task "{{prompt}}"' }),
 }
 ```
 
@@ -98,7 +97,7 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "claude-code",
-  command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+  model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
 }
 ```
 
@@ -107,7 +106,7 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "codex",
-  command: 'codex "{{prompt}}" --approval-mode full-auto',
+  model: new CliModel({ command: 'codex "{{prompt}}" --approval-mode full-auto' }),
 }
 ```
 
@@ -118,7 +117,7 @@ You can wrap any logic in a script and use it as a runner:
 ```ts
 {
   name: "custom-agent",
-  command: 'node ./scripts/my-agent.mjs "{{prompt}}"',
+  model: new CliModel({ command: 'node ./scripts/my-agent.mjs "{{prompt}}"' }),
 }
 ```
 
@@ -136,7 +135,7 @@ This is useful when you want to:
 - Run evaluations in CI without installing CLI agents
 - Benchmark different models on the same task
 
-An API runner config is any object with `name` and `model` properties:
+An API runner is a plain config object with an `IModelPlugin` as its `model`:
 
 ```ts
 import { AnthropicModel } from "agent-eval/providers/anthropic";
@@ -261,12 +260,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph CLI["CLI Runner"]
+    subgraph CLI["CLI Runner (CliModel)"]
         A["env.execute(command)"] --> B["Agent modifies files"]
         B --> C["storeDiff()"]
     end
 
-    subgraph API["API Runner"]
+    subgraph API["API Runner (IModelPlugin)"]
         D["model.createModel()"] --> E["generateObject(prompt)"]
         E --> F["Write files to disk"]
         F --> G["storeDiff()"]
@@ -291,22 +290,25 @@ Both CLI and API runners execute within the configured [environment plugin](/gui
 
 ---
 
-## Creating a Custom Runner Plugin
+## Creating a Custom Model
 
-Implement the `IRunnerPlugin` interface:
+Implement the `IModelPlugin` interface to create a custom model for use in runners:
 
 ```ts
-import type { IRunnerPlugin, RunnerContext, RunnerExecResult } from "agent-eval";
+import type { IModelPlugin } from "agent-eval";
 
-class BrowserAgentRunner implements IRunnerPlugin {
+class BrowserAgentModel implements IModelPlugin {
   readonly name = "browser-agent";
-  readonly model = "playwright-agent";
+  readonly modelId = "playwright-agent";
 
-  async execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult> {
-    // Launch browser, run agent, return result
-    return { stdout: "done", exitCode: 0 };
+  createModel() {
+    // Return a LanguageModel instance or custom model object
+    return myCustomModel;
   }
 }
+
+// Use it in a runner config
+{ name: "browser-agent", model: new BrowserAgentModel() }
 ```
 
 ---
@@ -345,22 +347,17 @@ Use the `matrix` option to select which runners to execute per run:
 
 ```ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
 export default defineConfig({
   runners: [
-    {
-      name: "claude-api",
-      model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-    },
-    {
-      name: "gpt-4o",
-      model: new OpenAIModel({ model: "gpt-4o" }),
-    },
+    { name: "claude-api", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+    { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
     {
       name: "aider",
-      command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+      model: new CliModel({ command: 'aider --message "{{prompt}}" --yes --no-auto-commits' }),
     },
   ],
 

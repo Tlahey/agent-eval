@@ -1,37 +1,34 @@
 import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
 /**
- * CLI Runner — Claude Code (Anthropic)
+ * Runner — Anthropic Claude Sonnet
  *
- * Uses the `claude` CLI to generate code changes in agentic mode.
- * The judge uses OpenAI GPT-4o to avoid self-evaluation bias
- * (different provider for runner vs judge).
+ * Uses the AnthropicModel plugin to call Claude via the Vercel AI SDK.
+ * The judge uses OpenAI GPT-4o to avoid self-evaluation bias.
  *
  * Prerequisites:
- *   - Claude Code CLI: https://docs.anthropic.com/en/docs/claude-code
- *   - Authenticated via `claude auth`
+ *   - ANTHROPIC_API_KEY for the runner
  *   - OPENAI_API_KEY for the judge
  *
  * Usage:
- *   agenteval run --config evals/cli-claude/agenteval.config.ts
+ *   agenteval run --config evals/anthropic/agenteval.config.ts
  */
 export default defineConfig({
   rootDir: "../..",
 
   runners: [
     {
-      name: "claude-code",
-      command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+      name: "claude-sonnet",
+      model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
     },
   ],
 
-  // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
   judge: {
     llm: new OpenAIModel({ model: "gpt-4o" }),
   },
 
-  // Config-level beforeEach: these tasks apply to ALL tests using this config.
   beforeEach: ({ ctx }) => {
     ctx.addTask({
       name: "Tests",
@@ -48,7 +45,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/cli-claude/**/*.eval.ts",
+  testFiles: "evals/anthropic/**/*.eval.ts",
   outputDir: ".agenteval",
   timeout: 180_000,
 });

@@ -37,7 +37,7 @@ agent-eval/
 │       ├── src/
 │       │   ├── core/      ← Core modules
 │       │   │   ├── types.ts       ← All TypeScript interfaces
-│       │   │   ├── interfaces.ts  ← Plugin contracts (IModelPlugin, IRunnerPlugin, ILedgerPlugin, IJudgePlugin, IEnvironmentPlugin)
+│       │   │   ├── interfaces.ts  ← Plugin contracts (IModelPlugin, ICliModel, ILedgerPlugin, IJudgePlugin, IEnvironmentPlugin)
 │       │   │   ├── interfaces.test.ts
 │       │   │   ├── config.ts      ← Config file loader (jiti)
 │       │   │   ├── config.test.ts
@@ -58,19 +58,13 @@ agent-eval/
 │       │   │   ├── sqlite-plugin.ts ← SqliteLedger (ILedgerPlugin wrapper)
 │       │   │   ├── json-plugin.ts   ← JsonLedger (JSONL-based, no SQLite)
 │       │   │   └── json-plugin.test.ts
-│       │   ├── llm/       ← Model plugins (IModelPlugin implementations)
+│       │   ├── llm/       ← Model plugins (IModelPlugin + ICliModel implementations)
 │       │   │   └── plugins/
 │       │   │       ├── anthropic.ts       ← AnthropicModel
 │       │   │       ├── openai.ts          ← OpenAIModel
 │       │   │       ├── ollama.ts          ← OllamaModel
+│       │   │       ├── cli.ts             ← CliModel (CLI command execution)
 │       │   │       └── model-plugins.test.ts
-│       │   ├── runner/    ← Runner plugins (IRunnerPlugin implementations)
-│       │   │   ├── index.ts              ← Barrel exports
-│       │   │   └── plugins/
-│       │   │       ├── cli.ts            ← CLIRunner (advanced use)
-│       │   │       ├── cli.test.ts
-│       │   │       ├── api.ts            ← APIRunner (advanced use)
-│       │   │       └── api.test.ts
 │       │   ├── environment/ ← Execution environment plugins
 │       │   │   ├── local-environment.ts   ← Default: host + git
 │       │   │   ├── local-environment.test.ts
@@ -462,19 +456,19 @@ All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:
 
 ### Runner Plugins
 
-Runners implement **`IRunnerPlugin`** and come in two flavors:
+Runners are plain config objects `{ name, model }` where `model` determines execution:
 
-- **CLI runners** — Plain objects with `{ name, command }` that spawn a CLI command (e.g., `gh copilot suggest "{{prompt}}"`)
-- **API runners** — Plain objects with `{ name, model }` that call an LLM via an `IModelPlugin`, generate structured `files[]` output, and write files to disk
+- **CLI models** — `CliModel` with a `command` template that spawns a shell command (e.g., `aider`, `copilot`)
+- **API models** — `IModelPlugin` instances (e.g., `AnthropicModel`, `OpenAIModel`) that call an LLM, generate structured `files[]` output, and write files to disk
 
-Runner configs are plain objects passed to the `runners` array — the type is inferred from shape. Each runner must have a **unique `name`** (duplicates throw at startup). The `CLIRunner` and `APIRunner` classes are still available via sub-path imports for advanced use. Custom `IRunnerPlugin` instances (duck-typed by having an `execute()` method) also work.
+The `runners` array is typed `RunnerConfig[]`. Each runner must have a **unique `name`** (duplicates throw at startup).
 
 ### Plugin Architecture (SOLID)
 
 The framework uses Dependency Inversion for all extensible operations:
 
 - **`IModelPlugin`** — LLM model abstraction. Built-in: `AnthropicModel`, `OpenAIModel`, `OllamaModel`
-- **`IRunnerPlugin`** — Agent execution abstraction. Built-in: `CLIRunner`, `APIRunner` (most users use plain-object configs instead)
+- **`ICliModel`** — CLI command execution model. Built-in: `CliModel`
 - **`ILedgerPlugin`** — Storage backend abstraction. Built-in: `SqliteLedger`, `JsonLedger`
 - **`IEnvironmentPlugin`** — Execution environment abstraction. Built-in: `LocalEnvironment`, `DockerEnvironment`
 - **`IJudgePlugin`** — Judge abstraction for custom evaluation logic
@@ -548,13 +542,15 @@ The framework uses Dependency Inversion for all extensible operations:
 4. Add tests in `llm/plugins/model-plugins.test.ts`
 5. **Update docs:** `guide/plugins-llm.md`, `guide/configuration.md`
 
-### Adding a new Runner plugin
+### Adding a new model provider
 
-1. Create `runner/plugins/<name>.ts` implementing `IRunnerPlugin`
-2. Implement `name`, `model`, and `execute(prompt, context)` returning `RunnerExecResult`
-3. Export from `runner/index.ts` and `index.ts`
-4. Add tests in `runner/plugins/<name>.test.ts`
-5. **Update docs:** `guide/runners.md`, `guide/configuration.md`
+Runners use `IModelPlugin` or `ICliModel` as their `model`. To add a new API model:
+
+1. Create `llm/plugins/<provider>.ts` implementing `IModelPlugin`
+2. Implement `name`, `modelId`, and `createModel()` returning a Vercel AI SDK model
+3. Add sub-path export in `tsup.config.ts` and `package.json`
+4. Add tests in `llm/plugins/model-plugins.test.ts`
+5. **Update docs:** `guide/plugins.md`, `guide/configuration.md`
 
 ### Adding a new CLI command
 

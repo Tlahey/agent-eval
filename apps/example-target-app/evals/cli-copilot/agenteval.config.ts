@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -22,7 +23,7 @@ export default defineConfig({
   runners: [
     {
       name: "copilot",
-      command: 'gh copilot suggest -t shell "{{prompt}}"',
+      model: new CliModel({ command: 'gh copilot suggest -t shell "{{prompt}}"' }),
     },
   ],
 

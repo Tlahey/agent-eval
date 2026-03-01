@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -6,17 +7,18 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
  *
  * For running a specific implementation, use --config:
  *
- *   # CLI agents
+ *   # API runners (LLM via plugin)
+ *   agenteval run --config evals/anthropic/agenteval.config.ts
+ *   agenteval run --config evals/openai/agenteval.config.ts
+ *   agenteval run --config evals/ollama/agenteval.config.ts
+ *
+ *   # CLI runners (spawn a command)
  *   agenteval run --config evals/cli-mock/agenteval.config.ts
  *   agenteval run --config evals/cli-copilot/agenteval.config.ts
- *   agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts
- *   agenteval run --config evals/cli-claude/agenteval.config.ts
  *   agenteval run --config evals/cli-aider/agenteval.config.ts
  *
- *   # API agents
- *   agenteval run --config evals/api-openai/agenteval.config.ts
- *   agenteval run --config evals/api-anthropic/agenteval.config.ts
- *   agenteval run --config evals/api-ollama/agenteval.config.ts
+ *   # Multi-runner (compare agents side-by-side)
+ *   agenteval run --config evals/multi-runner/agenteval.config.ts
  */
 export default defineConfig({
   rootDir: ".",
@@ -24,7 +26,7 @@ export default defineConfig({
   runners: [
     {
       name: "mock-agent",
-      command: 'node scripts/mock-agent.mjs "{{prompt}}"',
+      model: new CliModel({ command: 'node scripts/mock-agent.mjs "{{prompt}}"' }),
     },
   ],
 

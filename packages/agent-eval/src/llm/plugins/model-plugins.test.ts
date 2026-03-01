@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import { AnthropicModel } from "./anthropic.js";
 import { OpenAIModel } from "./openai.js";
 import { OllamaModel } from "./ollama.js";
@@ -110,5 +110,30 @@ describe("OllamaModel", () => {
         baseURL: "http://remote:11434/v1",
       }),
     );
+  });
+});
+
+describe("CliModel", () => {
+  let CliModel: typeof import("./cli.js").CliModel;
+
+  beforeAll(async () => {
+    ({ CliModel } = await import("./cli.js"));
+  });
+
+  it("has correct type, name, and command", () => {
+    const model = new CliModel({ command: 'aider --message "{{prompt}}" --yes' });
+    expect(model.type).toBe("cli");
+    expect(model.name).toBe("cli");
+    expect(model.command).toBe('aider --message "{{prompt}}" --yes');
+  });
+
+  it("allows custom name", () => {
+    const model = new CliModel({ command: "echo {{prompt}}", name: "echo-runner" });
+    expect(model.name).toBe("echo-runner");
+  });
+
+  it("defaults name to cli", () => {
+    const model = new CliModel({ command: "echo {{prompt}}" });
+    expect(model.name).toBe("cli");
   });
 });

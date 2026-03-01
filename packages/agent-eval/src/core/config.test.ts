@@ -2,14 +2,22 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig, defineConfig, resolveRunners, assertValidPlugins } from "../core/config.js";
-import type { IModelPlugin, IRunnerPlugin } from "../core/interfaces.js";
-import type { AgentEvalConfig } from "../core/types.js";
+import {
+  loadConfig,
+  defineConfig,
+  validateRunnerNames,
+  assertValidPlugins,
+} from "../core/config.js";
+import type { AgentEvalConfig, RunnerConfig } from "../core/types.js";
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `agenteval-cfg-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function makeCliRunner(name: string, command = `echo "{{prompt}}"`): RunnerConfig {
+  return { name, model: { type: "cli" as const, name: "cli", command } };
 }
 
 describe("config", () => {
@@ -25,7 +33,10 @@ describe("config", () => {
 
   describe("defineConfig", () => {
     it("returns the config object as-is (identity helper)", () => {
-      const mockRunner = { name: "test", model: "test-model", execute: async () => ({}) };
+      const mockRunner = {
+        name: "test",
+        model: { type: "cli" as const, name: "test", command: "echo test" },
+      };
       const config = defineConfig({
         runners: [mockRunner],
         judge: {},
@@ -74,73 +85,21 @@ describe("config", () => {
     });
   });
 
-  describe("resolveRunners", () => {
-    it("resolves CLI runner config { name, command } into CLIRunner plugin", async () => {
-      const runners = await resolveRunners([
-        { name: "copilot", command: "copilot --prompt={{prompt}}" },
-      ]);
-      expect(runners).toHaveLength(1);
-      expect(runners[0].name).toBe("copilot");
-      expect(runners[0].model).toBe("copilot --prompt={{prompt}}");
-      expect(typeof runners[0].execute).toBe("function");
+  describe("validateRunnerNames", () => {
+    it("accepts runners with unique names", () => {
+      const r1 = makeCliRunner("copilot", "copilot --prompt={{prompt}}");
+      const r2 = makeCliRunner("custom", "custom-cmd {{prompt}}");
+      expect(() => validateRunnerNames([r1, r2])).not.toThrow();
     });
 
-    it("resolves API runner config { name, model } into APIRunner plugin", async () => {
-      const mockModel: IModelPlugin = {
-        name: "mock",
-        modelId: "mock-model-1",
-        createModel: () => ({}),
-      };
-      const runners = await resolveRunners([{ name: "claude", model: mockModel }]);
-      expect(runners).toHaveLength(1);
-      expect(runners[0].name).toBe("claude");
-      expect(runners[0].model).toBe("mock-model-1");
-      expect(typeof runners[0].execute).toBe("function");
+    it("throws on duplicate runner names", () => {
+      const r1 = makeCliRunner("copilot", "cmd1 {{prompt}}");
+      const r2 = makeCliRunner("copilot", "cmd2 {{prompt}}");
+      expect(() => validateRunnerNames([r1, r2])).toThrow('Duplicate runner name "copilot"');
     });
 
-    it("passes through custom IRunnerPlugin as-is", async () => {
-      const custom: IRunnerPlugin = {
-        name: "custom",
-        model: "custom-model",
-        execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
-      };
-      const runners = await resolveRunners([custom]);
-      expect(runners).toHaveLength(1);
-      expect(runners[0]).toBe(custom);
-    });
-
-    it("resolves mixed configs (CLI + API + custom)", async () => {
-      const mockModel: IModelPlugin = {
-        name: "mock",
-        modelId: "mock-model-1",
-        createModel: () => ({}),
-      };
-      const custom: IRunnerPlugin = {
-        name: "custom",
-        model: "custom-model",
-        execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
-      };
-      const runners = await resolveRunners([
-        { name: "copilot", command: "copilot --prompt={{prompt}}" },
-        { name: "claude", model: mockModel },
-        custom,
-      ]);
-      expect(runners).toHaveLength(3);
-      expect(runners.map((r) => r.name)).toEqual(["copilot", "claude", "custom"]);
-    });
-
-    it("throws on duplicate runner names", async () => {
-      await expect(
-        resolveRunners([
-          { name: "copilot", command: "copilot --prompt={{prompt}}" },
-          { name: "copilot", command: "copilot2 --prompt={{prompt}}" },
-        ]),
-      ).rejects.toThrow('Duplicate runner name "copilot"');
-    });
-
-    it("returns empty array for empty configs", async () => {
-      const runners = await resolveRunners([]);
-      expect(runners).toEqual([]);
+    it("accepts empty array", () => {
+      expect(() => validateRunnerNames([])).not.toThrow();
     });
   });
 
@@ -149,7 +108,7 @@ describe("config", () => {
       const config: AgentEvalConfig = {
         rootDir: tmpDir,
         outputDir: ".agenteval",
-        runners: [{ name: "test", command: "echo" }],
+        runners: [makeCliRunner("test")],
         judge: {},
       };
       expect(() => assertValidPlugins(config)).not.toThrow();

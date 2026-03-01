@@ -3,6 +3,7 @@
  *
  * These interfaces define the contracts for:
  * - IModelPlugin: LLM provider (Anthropic, OpenAI, Ollama, custom)
+ * - ICliModel: CLI execution model (shell commands with {{prompt}})
  * - ILedgerPlugin: Storage backend (SQLite, JSON, custom)
  * - IEnvironmentPlugin: Execution environment (Local, Docker, custom)
  * - IJudgePlugin: Evaluation judge (API, CLI, custom)
@@ -53,76 +54,68 @@ export interface IModelPlugin {
   createModel(): unknown | Promise<unknown>;
 }
 
-// ─── Runner Plugin ───
+// ─── CLI Execution Model ───
 
-/** Context provided to runner plugins during execution */
+/**
+ * Contract for CLI-based execution models.
+ *
+ * A CLI model wraps a shell command template with a `{{prompt}}` placeholder.
+ * The core runner replaces `{{prompt}}` with the test instruction and executes
+ * the command via the environment plugin.
+ *
+ * Built-in: `CliModel` from `agent-eval/providers/cli`.
+ *
+ * @example
+ * ```ts
+ * import { CliModel } from "agent-eval/providers/cli";
+ *
+ * const aider = new CliModel({
+ *   command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+ * });
+ * ```
+ */
+export interface ICliModel {
+  /** Always "cli" — used to discriminate from IModelPlugin */
+  readonly type: "cli";
+  /** Human-readable name (e.g., "aider", "copilot") */
+  readonly name: string;
+  /** Shell command template with {{prompt}} placeholder */
+  readonly command: string;
+}
+
+/**
+ * Type guard: check if a model is a CLI execution model.
+ */
+export function isCliModel(model: IModelPlugin | ICliModel): model is ICliModel {
+  return "type" in model && (model as ICliModel).type === "cli";
+}
+
+// ─── Runner Execution Context ───
+
+/** Context provided to the core runner during execution */
 export interface RunnerContext {
   /** Working directory of the project */
   cwd: string;
-  /** Environment plugin for command execution (used by CLI runners) */
+  /** Environment plugin for command execution */
   env: IEnvironmentPlugin;
   /** Timeout in ms */
   timeout?: number;
 }
 
-/** Result returned by a runner plugin after execution */
+/** Result returned after runner execution */
 export interface RunnerExecResult {
-  /** stdout from execution (CLI runners) */
+  /** stdout from execution (CLI models) */
   stdout?: string;
-  /** stderr from execution (CLI runners) */
+  /** stderr from execution (CLI models) */
   stderr?: string;
-  /** Exit code (CLI runners, 0 = success) */
+  /** Exit code (CLI models, 0 = success) */
   exitCode?: number;
-  /** Files written to disk (API runners) */
+  /** Files written to disk (API models) */
   filesWritten?: string[];
-  /** Token usage from the LLM call (API runners) */
+  /** Token usage from the LLM call (API models) */
   tokenUsage?: import("./types.js").TokenUsage;
-  /** Raw output text (LLM response body for API runners) */
+  /** Raw output text (LLM response body for API models) */
   output?: string;
-}
-
-/**
- * Contract for agent runner plugins.
- *
- * A runner encapsulates the full execution logic for an agent:
- * - CLI runners: build the command, execute via environment plugin
- * - API runners: call LLM API, parse response, write files to disk
- *
- * The core runner orchestrates lifecycle (setup → hooks → execute → diff → judge)
- * and delegates execution to this plugin.
- *
- * Built-in: CLIRunner, APIRunner.
- * Third parties can implement custom runners (e.g., SSH, browser-based agents).
- *
- * @example
- * ```ts
- * import type { IRunnerPlugin, RunnerContext, RunnerExecResult } from "agent-eval";
- *
- * class BrowserAgentRunner implements IRunnerPlugin {
- *   readonly name = "browser-agent";
- *   readonly model = "playwright-agent";
- *   async execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult> {
- *     // Launch browser, run agent, return result
- *     return { stdout: "done", exitCode: 0 };
- *   }
- * }
- * ```
- */
-export interface IRunnerPlugin {
-  /** Human-readable name of the runner (e.g., "copilot", "claude") */
-  readonly name: string;
-  /** Display name of the model or command (for logs and ledger) */
-  readonly model: string;
-
-  /**
-   * Execute the agent with the given prompt.
-   * All execution logic (command building, API calls, file writing) lives here.
-   *
-   * @param prompt - The instruction/prompt for the agent
-   * @param context - Execution context (cwd, environment, timeout)
-   * @returns Execution result with optional stdout/stderr/files
-   */
-  execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult>;
 }
 
 // ─── Ledger Plugin ───

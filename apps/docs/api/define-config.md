@@ -13,22 +13,24 @@ function defineConfig(config: AgentEvalConfig): AgentEvalConfig;
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 export default defineConfig({
   runners: [
-    {
-      name: "copilot",
-      command: 'gh copilot suggest "{{prompt}}"',
-    },
+    { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
   ],
   judge: {
     llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+  },
 });
 ```
 
@@ -38,7 +40,7 @@ export default defineConfig({
 interface AgentEvalConfig {
   rootDir?: string; // Project root (default: cwd)
   testFiles?: string | string[]; // Glob patterns for test discovery
-  runners: RunnerConfig[]; // Runner configs (plain objects or IRunnerPlugin instances)
+  runners: RunnerConfig[]; // Runner config objects
   judge: JudgeConfig; // LLM judge configuration
   beforeEach?: HookFn; // Config-level hook before each test
   afterEach?: AfterEachCommand[]; // Auto commands after each agent run
@@ -50,19 +52,14 @@ interface AgentEvalConfig {
   environment?: IEnvironmentPlugin; // Execution environment plugin
 }
 
-// Runner config — plain objects or IRunnerPlugin instances
-// Type is inferred from shape: { name, command } → CLI, { name, model } → API
-// Each runner must have a unique `name` — duplicates throw at startup
-type RunnerConfig = CLIRunnerConfig | APIRunnerConfig | IRunnerPlugin;
-
-interface CLIRunnerConfig {
+// Runner config — plain object with a name and model
+interface RunnerConfig {
   name: string; // Unique runner identifier
-  command: string; // Shell command with {{prompt}} placeholder
+  model: IModelPlugin | ICliModel; // Model or CLI model
 }
 
-interface APIRunnerConfig {
-  name: string; // Unique runner identifier
-  model: IModelPlugin; // LLM model plugin
+interface ICliModel {
+  readonly command: string; // Shell command with {{prompt}} placeholder
 }
 
 interface JudgeConfig {
@@ -77,12 +74,6 @@ interface IModelPlugin {
   createModel(): unknown | Promise<unknown>;
 }
 
-interface IRunnerPlugin {
-  readonly name: string;
-  readonly model: string;
-  execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult>;
-}
-
 interface AfterEachCommand {
   name: string; // Label for the command
   command: string; // Shell command to execute
@@ -95,7 +86,7 @@ interface AfterEachCommand {
 | ------------- | ------------------------ | ---------------------------------------- | ----------------------------------------------------------- |
 | `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                      |
 | `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
-| `runners`     | `RunnerConfig[]`         | _required_                               | Runner configs (plain objects or `IRunnerPlugin` instances) |
+| `runners`     | `RunnerConfig[]`         | _required_                               | Runner config objects (`{ name, model }`)                   |
 | `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                     |
 | `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                          |
 | `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)     |

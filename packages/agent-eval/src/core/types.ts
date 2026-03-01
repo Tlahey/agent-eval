@@ -50,53 +50,28 @@ export function computeStatus(
 // ─── Runner Configuration ───
 
 /**
- * CLI runner config — the simplest form: a name + command template.
- * Automatically resolved to a CLIRunner plugin at startup.
- *
- * @example
- * ```ts
- * runners: [
- *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
- * ]
- * ```
- */
-export interface CLIRunnerConfig {
-  /** Unique runner name (used in ledger and logs) */
-  name: string;
-  /** CLI command template. Use {{prompt}} as placeholder for the instruction. */
-  command: string;
-}
-
-/**
- * API runner config — a name + model plugin.
- * Automatically resolved to an APIRunner plugin at startup.
+ * A runner is a plain object with a name and a model.
+ * The model determines HOW to execute:
+ *   - IModelPlugin → API call via Vercel AI SDK (generateObject)
+ *   - ICliModel → shell command with {{prompt}} placeholder
  *
  * @example
  * ```ts
  * import { AnthropicModel } from "agent-eval/providers/anthropic";
- * runners: [
- *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
- * ]
+ * import { CliModel } from "agent-eval/providers/cli";
+ *
+ * const runners: RunnerConfig[] = [
+ *   { name: "claude-sonnet", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+ *   { name: "aider", model: new CliModel({ command: 'aider --message "{{prompt}}" --yes' }) },
+ * ];
  * ```
  */
-export interface APIRunnerConfig {
-  /** Unique runner name (used in ledger and logs) */
+export interface RunnerConfig {
+  /** Unique name for the runner (e.g., "claude-sonnet", "gpt-4o", "aider") */
   name: string;
-  /** LLM model plugin for API-based generation */
-  model: import("./interfaces.js").IModelPlugin;
+  /** Model or CLI execution model */
+  model: import("./interfaces.js").IModelPlugin | import("./interfaces.js").ICliModel;
 }
-
-/**
- * Runner configuration — plain objects OR custom IRunnerPlugin instances.
- *
- * - `{ name, command }` → CLI runner (resolved automatically)
- * - `{ name, model }` → API runner (resolved automatically)
- * - Custom IRunnerPlugin → used as-is (must implement `execute()`)
- */
-export type RunnerConfig =
-  | CLIRunnerConfig
-  | APIRunnerConfig
-  | import("./interfaces.js").IRunnerPlugin;
 
 // ─── Main Configuration ───
 
@@ -106,16 +81,19 @@ export interface AgentEvalConfig {
   /** Glob pattern(s) to discover test files */
   testFiles?: string | string[];
   /**
-   * Agent runners to test against.
-   * Use plain objects for built-in runners, or IRunnerPlugin instances for custom ones.
-   * Each runner must have a unique `name`.
+   * Agent runners to test against. Each runner is a plain object `{ name, model }`.
+   * The model determines the execution strategy (API or CLI).
    *
    * @example
    * ```ts
    * import { AnthropicModel } from "agent-eval/providers/anthropic";
+   * import { OpenAIModel } from "agent-eval/providers/openai";
+   * import { CliModel } from "agent-eval/providers/cli";
+   *
    * runners: [
-   *   { name: "copilot", command: "copilot --model=gpt-5 --prompt={{prompt}}" },
    *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+   *   { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
+   *   { name: "aider", model: new CliModel({ command: 'aider --message "{{prompt}}" --yes' }) },
    * ]
    * ```
    */

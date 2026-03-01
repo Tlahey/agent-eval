@@ -6,14 +6,13 @@ A simple React app used as a target for AgentEval evaluations. Each subdirectory
 
 ```
 evals/
+├── anthropic/          ← Claude Sonnet via AnthropicModel
+├── openai/             ← GPT-4o via OpenAIModel
+├── ollama/             ← Llama3 via OllamaModel (local)
+├── cli-copilot/        ← GitHub Copilot CLI via CliModel
+├── cli-aider/          ← Aider via CliModel
 ├── cli-mock/           ← Local mock agent script (no API keys needed)
-├── cli-copilot/        ← GitHub Copilot CLI (`gh copilot suggest`)
-├── cli-copilot-gpt5/   ← Copilot CLI with GPT-5 (`copilot --model=gpt-5`)
-├── cli-claude/         ← Claude Code CLI (`claude -p`)
-├── cli-aider/          ← Aider (`aider --message`)
-├── api-openai/         ← OpenAI GPT-4o via API
-├── api-anthropic/      ← Anthropic Claude via API
-└── api-ollama/         ← Ollama local model via API
+└── multi-runner/       ← Compare multiple agents on the same evals
 ```
 
 ## Usage
@@ -24,16 +23,18 @@ Run a specific example with `--config`:
 # Mock agent (no API keys, great for testing the pipeline)
 pnpm eval:mock
 
-# CLI agents (real coding tools)
-pnpm eval:copilot      # GitHub Copilot
-pnpm eval:copilot-gpt5 # Copilot with GPT-5 (stdout capture)
-pnpm eval:claude        # Claude Code
-pnpm eval:aider         # Aider
+# API runners (direct LLM calls via plugin)
+agenteval run --config evals/anthropic/agenteval.config.ts
+agenteval run --config evals/openai/agenteval.config.ts
+agenteval run --config evals/ollama/agenteval.config.ts
 
-# API agents (direct LLM calls)
-pnpm eval:openai        # OpenAI GPT-4o
-pnpm eval:anthropic     # Anthropic Claude
-pnpm eval:ollama        # Ollama (local)
+# CLI runners (spawn a shell command)
+agenteval run --config evals/cli-copilot/agenteval.config.ts
+agenteval run --config evals/cli-aider/agenteval.config.ts
+agenteval run --config evals/cli-mock/agenteval.config.ts
+
+# Multi-runner — compare Claude, GPT-4o, and Aider side-by-side
+agenteval run --config evals/multi-runner/agenteval.config.ts
 
 # Run all evals with the default config
 pnpm eval
@@ -42,27 +43,42 @@ pnpm eval
 pnpm eval:view
 ```
 
-Or directly with the CLI:
-
-```bash
-agenteval run --config evals/cli-copilot/agenteval.config.ts
-agenteval run --config evals/api-openai/agenteval.config.ts
-```
-
 ## Environment Variables
 
-| Variable            | Required by                               |
-| ------------------- | ----------------------------------------- |
-| `ANTHROPIC_API_KEY` | `cli-aider`, `api-anthropic`, most judges |
-| `OPENAI_API_KEY`    | `api-openai`, some judges                 |
-| _(none)_            | `cli-mock` (offline)                      |
-| _(none)_            | `api-ollama` (local Ollama)               |
+| Variable            | Required by                        |
+| ------------------- | ---------------------------------- |
+| `ANTHROPIC_API_KEY` | `anthropic/`, `cli-aider/`, judges |
+| `OPENAI_API_KEY`    | `openai/`, some judges             |
+| _(none)_            | `cli-mock/` (offline)              |
+| _(none)_            | `ollama/` (local Ollama)           |
+
+## Multi-Runner Example
+
+The `multi-runner/` directory shows how to compare multiple agents:
+
+```ts
+import { CliModel } from "agent-eval/providers/cli";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { OpenAIModel } from "agent-eval/providers/openai";
+
+export default defineConfig({
+  runners: [
+    { name: "claude-sonnet", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+    { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
+    {
+      name: "aider",
+      model: new CliModel({ command: 'aider --message "{{prompt}}" --yes --no-auto-commits' }),
+    },
+  ],
+  // Each runner executes every test → results compared in the dashboard
+});
+```
 
 ## Judge Recommendations
 
 > **⚠️ Always use a capable model as the judge.**
 
-The judge reads git diffs, test output, build logs, and must make nuanced pass/fail decisions. Using a weak model leads to unreliable evaluations.
+The judge reads git diffs, test output, build logs, and must make nuanced pass/fail decisions.
 
 **Recommended judge models:**
 
@@ -72,6 +88,4 @@ The judge reads git diffs, test output, build logs, and must make nuanced pass/f
 | Anthropic | `claude-opus-4-20250514`   | Strongest reasoning       |
 | OpenAI    | `gpt-4o`                   | Strong, fast              |
 
-**Avoid for judging:** `gpt-3.5-turbo`, `claude-haiku`, local models (llama3, mistral) — they lack the reasoning depth for reliable code evaluation.
-
-**Avoid self-evaluation:** When possible, use a different provider for the runner and the judge to prevent self-evaluation bias (e.g., Claude runner → GPT-4o judge).
+**Avoid self-evaluation:** When possible, use a different provider for the runner and the judge (e.g., Claude runner → GPT-4o judge).

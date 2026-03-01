@@ -1,15 +1,10 @@
 import { test, expect } from "agent-eval";
 
 /**
- * Eval: Add a Close button to the Banner component.
+ * Multi-runner eval — the same test runs against every runner in the config.
  *
- * This test uses GitHub Copilot CLI with GPT-5 as the model.
- * The CLI output (stdout) is automatically captured by AgentEval
- * and included in the judge prompt alongside the git diff.
- *
- * The judge evaluates both:
- *   - The stdout output from the CLI (agent reasoning, messages)
- *   - The actual code changes (git diff)
+ * Each runner (claude-sonnet, gpt-4o, aider) receives the same prompt.
+ * The judge scores each independently. Compare results in the dashboard.
  */
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   agent.instruct(
@@ -19,25 +14,12 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
       "Also update the test file src/components/Banner.test.tsx with tests for the close button.",
   );
 
-  // Verify the close button was added to the source file
   ctx.addTask({
     name: "Close button renders",
     action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
     criteria:
       'A close button with aria-label="Close" is rendered when onClose is provided and calls onClose when clicked',
     weight: 2,
-  });
-
-  // Verify the agent stdout contains meaningful output
-  ctx.addTask({
-    name: "Agent stdout captured",
-    action: () => {
-      const commands = ctx.commands;
-      const hasOutput = commands.some((c) => c.stdout && c.stdout.length > 0);
-      return Promise.resolve({ stdout: hasOutput ? "stdout captured" : "no stdout", exitCode: 0 });
-    },
-    criteria: "The CLI agent should produce stdout output that is captured for evaluation",
-    weight: 1,
   });
 
   await expect(ctx).toPassJudge({
@@ -52,12 +34,6 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   });
 });
 
-/**
- * Eval: Create a new utility function.
- *
- * Demonstrates a simpler eval that verifies the agent can create a new file
- * from scratch. The CLI stdout is captured and the judge evaluates the result.
- */
 test("Create a debounce utility", async ({ agent, ctx }) => {
   agent.instruct(
     "Create a debounce utility function in src/utils/debounce.ts. " +

@@ -73,7 +73,7 @@ Each module has **one reason to change**. The runner orchestrates tests but does
 
 ### Open/Closed (OCP)
 
-Adding a new LLM provider means implementing `IModelPlugin` — the runner engine and judge never change. Same for runners (`IRunnerPlugin`), storage (`ILedgerPlugin`), and environments (`IEnvironmentPlugin`).
+Adding a new LLM provider means implementing `IModelPlugin` — the runner engine and judge never change. Same for storage (`ILedgerPlugin`) and environments (`IEnvironmentPlugin`). Runners are plain config objects (`RunnerConfig`) — no interface to implement.
 
 ```typescript
 // To add a new provider, implement the interface — nothing else changes
@@ -108,13 +108,13 @@ Interfaces are small and focused. Test functions receive only what they need:
 | `AgentHandle`        | `run()`, `instruct()`, `name`, `model`               | Test functions      |
 | `TestContext`        | `storeDiff()`, `runCommand()`, `addTask()`, `exec()` | Test functions      |
 | `IModelPlugin`       | `createModel()`, `name`, `modelId`                   | Judge, API runners  |
-| `IRunnerPlugin`      | `execute()`, `name`, `model`                         | Runner engine       |
+| `RunnerConfig`       | `name`, `model`                                      | Runner engine       |
 | `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.       | Ledger persistence  |
 | `IEnvironmentPlugin` | `setup()`, `execute()`, `getDiff()`, `teardown?()`   | Workspace isolation |
 
 ### Dependency Inversion (DIP)
 
-High-level modules (runner, judge) depend on **abstractions** (`IModelPlugin`, `IRunnerPlugin`, `ILedgerPlugin`, `IEnvironmentPlugin`), not concrete SDK implementations. Provider SDKs are **dynamically imported** at runtime inside plugin implementations:
+High-level modules (runner, judge) depend on **abstractions** (`IModelPlugin`, `ILedgerPlugin`, `IEnvironmentPlugin`), not concrete SDK implementations. Runners use plain `RunnerConfig` objects. Provider SDKs are **dynamically imported** at runtime inside plugin implementations:
 
 ```typescript
 // Inside AnthropicModel — no static import at framework level
@@ -316,15 +316,15 @@ erDiagram
 
 With the plugin architecture, extending AgentEval no longer requires modifying core code:
 
-| What                 | How                                                  |
-| -------------------- | ---------------------------------------------------- |
-| New LLM provider     | Implement `IModelPlugin` interface                   |
-| New runner           | Implement `IRunnerPlugin` or use plain object config |
-| New storage backend  | Implement `ILedgerPlugin` interface                  |
-| New exec environment | Implement `IEnvironmentPlugin` interface             |
-| New judge type       | Implement `IJudgePlugin` interface                   |
-| New CLI command      | Add `program.command()` in `cli/cli.ts`              |
-| New context method   | Add to `TestContext` interface + `EvalContext` class |
+| What                 | How                                                           |
+| -------------------- | ------------------------------------------------------------- |
+| New LLM provider     | Implement `IModelPlugin` interface                            |
+| New runner           | Add a `RunnerConfig` object with `IModelPlugin` or `CliModel` |
+| New storage backend  | Implement `ILedgerPlugin` interface                           |
+| New exec environment | Implement `IEnvironmentPlugin` interface                      |
+| New judge type       | Implement `IJudgePlugin` interface                            |
+| New CLI command      | Add `program.command()` in `cli/cli.ts`                       |
+| New context method   | Add to `TestContext` interface + `EvalContext` class          |
 
 See the [Plugins guide](/guide/plugins) for full details.
 
