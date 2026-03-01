@@ -223,7 +223,6 @@ export type {
   HookDefinition,
   RunnerConfig,
   CLIRunnerConfig,
-  APIRunnerConfig,
   TokenUsage,
   TaskResult,
   TimingData,

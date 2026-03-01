@@ -142,12 +142,12 @@ export default defineConfig({
 });
 ```
 
-| Plugin Axis     | Built-in Options                                                        | Default                    |
-| --------------- | ----------------------------------------------------------------------- | -------------------------- |
-| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel`                          | — (required for API judge) |
-| **Runner**      | Plain objects (`CLIRunnerConfig`, `APIRunnerConfig`) or `IRunnerPlugin` | — (required)               |
-| **Ledger**      | `SqliteLedger`, `JsonLedger`                                            | `SqliteLedger`             |
-| **Environment** | `LocalEnvironment`, `DockerEnvironment`                                 | `LocalEnvironment`         |
+| Plugin Axis     | Built-in Options                                               | Default                    |
+| --------------- | -------------------------------------------------------------- | -------------------------- |
+| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel`                 | — (required for API judge) |
+| **Runner**      | `CLIRunnerConfig` (plain objects) or `IRunnerPlugin` instances | — (required)               |
+| **Ledger**      | `SqliteLedger`, `JsonLedger`                                   | `SqliteLedger`             |
+| **Environment** | `LocalEnvironment`, `DockerEnvironment`                        | `LocalEnvironment`         |
 
 ::: tip Learn more
 See the dedicated [Plugins guide](/guide/plugins) for interfaces, custom plugins, and detailed configuration for each.
@@ -259,26 +259,27 @@ runners: [
 
 ### API Runners
 
-Calls an LLM directly via an `IModelPlugin`. The model returns structured file operations that AgentEval writes to disk.
+Calls an LLM directly via an `IModelPlugin`. Use `APIRunner` from `agent-eval/runner/api`:
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 runners: [
-  {
+  new APIRunner({
     name: "claude-api",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-  },
-  {
+  }),
+  new APIRunner({
     name: "gpt-4o",
     model: new OpenAIModel({ model: "gpt-4o" }),
-  },
+  }),
 ];
 ```
 
-::: tip Advanced use
-`CLIRunner` and `APIRunner` classes are still available via sub-path imports (`agent-eval/runner/cli`, `agent-eval/runner/api`) for advanced use cases. Custom `IRunnerPlugin` instances (duck-typed by having an `execute()` method) also work in the `runners` array.
+::: tip Custom runners
+Any object implementing `IRunnerPlugin` (with `name`, `model`, and `execute()`) works in the `runners` array. `CLIRunner` and `APIRunner` are built-in implementations available via sub-path imports.
 :::
 
 See the dedicated [Runners guide](/guide/runners) for all supported agents and detailed examples.

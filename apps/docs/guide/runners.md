@@ -136,15 +136,16 @@ This is useful when you want to:
 - Run evaluations in CI without installing CLI agents
 - Benchmark different models on the same task
 
-An API runner config is any object with `name` and `model` properties:
+An API runner uses `APIRunner` from `agent-eval/runner/api` with an `IModelPlugin`:
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
-{
+new APIRunner({
   name: "claude-api",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-}
+});
 ```
 
 ### API Runners with Different Providers
@@ -152,12 +153,13 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
 #### Anthropic
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
-{
+new APIRunner({
   name: "claude-sonnet",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-}
+});
 ```
 
 | Model                      | Notes                |
@@ -169,12 +171,13 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
 #### OpenAI
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
-{
+new APIRunner({
   name: "gpt-4o",
   model: new OpenAIModel({ model: "gpt-4o" }),
-}
+});
 ```
 
 | Model           | Notes                |
@@ -188,12 +191,13 @@ import { OpenAIModel } from "agent-eval/providers/openai";
 Run models locally with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
 import { OllamaModel } from "agent-eval/providers/ollama";
 
-{
+new APIRunner({
   name: "llama3-local",
   model: new OllamaModel({ model: "llama3" }),
-}
+});
 ```
 
 | Model            | Notes                  |
@@ -212,16 +216,17 @@ Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama
 Any OpenAI-compatible API can be used via `OpenAIModel` with a custom `baseURL`:
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
-{
+new APIRunner({
   name: "company-llm",
   model: new OpenAIModel({
     model: "internal-model-v2",
     baseURL: "https://llm.internal.company.com/v1",
     apiKey: process.env.INTERNAL_LLM_KEY,
   }),
-}
+});
 ```
 
 This works with Azure OpenAI, Together AI, Fireworks, Groq, and any provider exposing an OpenAI-compatible API.
@@ -345,19 +350,20 @@ Use the `matrix` option to select which runners to execute per run:
 
 ```ts
 import { defineConfig } from "agent-eval";
+import { APIRunner } from "agent-eval/runner/api";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
 export default defineConfig({
   runners: [
-    {
+    new APIRunner({
       name: "claude-api",
       model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-    },
-    {
+    }),
+    new APIRunner({
       name: "gpt-4o",
       model: new OpenAIModel({ model: "gpt-4o" }),
-    },
+    }),
     {
       name: "aider",
       command: 'aider --message "{{prompt}}" --yes --no-auto-commits',

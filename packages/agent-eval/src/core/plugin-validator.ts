@@ -180,18 +180,16 @@ export function validatePlugins(config: {
         });
       }
 
-      // Must have at least one of: command (CLI), model (API), or execute (custom plugin)
+      // Must have at least one of: command (CLI) or execute (custom plugin)
       const hasCommand = "command" in runner && typeof runner.command === "string";
-      const hasModel =
-        "model" in runner && typeof runner.model === "object" && runner.model !== null;
       const hasExecute = "execute" in runner && typeof runner.execute === "function";
 
-      if (!hasCommand && !hasModel && !hasExecute) {
+      if (!hasCommand && !hasExecute) {
         errors.push({
           plugin: `RunnerConfig[${i}]`,
-          member: "command|model|execute",
+          member: "command|execute",
           expected: "property",
-          message: `RunnerConfig[${i}] must have 'command' (string), 'model' (IModelPlugin), or 'execute' (function)`,
+          message: `RunnerConfig[${i}] must have 'command' (string) or 'execute' (function)`,
         });
       }
     }

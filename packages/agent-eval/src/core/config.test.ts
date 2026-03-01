@@ -85,17 +85,18 @@ describe("config", () => {
       expect(typeof runners[0].execute).toBe("function");
     });
 
-    it("resolves API runner config { name, model } into APIRunner plugin", async () => {
+    it("passes through APIRunner (IRunnerPlugin) as-is", async () => {
+      const { APIRunner } = await import("../runner/plugins/api.js");
       const mockModel: IModelPlugin = {
         name: "mock",
         modelId: "mock-model-1",
         createModel: () => ({}),
       };
-      const runners = await resolveRunners([{ name: "claude", model: mockModel }]);
+      const apiRunner = new APIRunner({ name: "claude", model: mockModel });
+      const runners = await resolveRunners([apiRunner]);
       expect(runners).toHaveLength(1);
       expect(runners[0].name).toBe("claude");
-      expect(runners[0].model).toBe("mock-model-1");
-      expect(typeof runners[0].execute).toBe("function");
+      expect(runners[0]).toBe(apiRunner);
     });
 
     it("passes through custom IRunnerPlugin as-is", async () => {
@@ -109,12 +110,7 @@ describe("config", () => {
       expect(runners[0]).toBe(custom);
     });
 
-    it("resolves mixed configs (CLI + API + custom)", async () => {
-      const mockModel: IModelPlugin = {
-        name: "mock",
-        modelId: "mock-model-1",
-        createModel: () => ({}),
-      };
+    it("resolves mixed configs (CLI + IRunnerPlugin)", async () => {
       const custom: IRunnerPlugin = {
         name: "custom",
         model: "custom-model",
@@ -122,11 +118,10 @@ describe("config", () => {
       };
       const runners = await resolveRunners([
         { name: "copilot", command: "copilot --prompt={{prompt}}" },
-        { name: "claude", model: mockModel },
         custom,
       ]);
-      expect(runners).toHaveLength(3);
-      expect(runners.map((r) => r.name)).toEqual(["copilot", "claude", "custom"]);
+      expect(runners).toHaveLength(2);
+      expect(runners.map((r) => r.name)).toEqual(["copilot", "custom"]);
     });
 
     it("throws on duplicate runner names", async () => {

@@ -68,35 +68,12 @@ export interface CLIRunnerConfig {
 }
 
 /**
- * API runner config — a name + model plugin.
- * Automatically resolved to an APIRunner plugin at startup.
- *
- * @example
- * ```ts
- * import { AnthropicModel } from "agent-eval/providers/anthropic";
- * runners: [
- *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
- * ]
- * ```
- */
-export interface APIRunnerConfig {
-  /** Unique runner name (used in ledger and logs) */
-  name: string;
-  /** LLM model plugin for API-based generation */
-  model: import("./interfaces.js").IModelPlugin;
-}
-
-/**
- * Runner configuration — plain objects OR custom IRunnerPlugin instances.
+ * Runner configuration — plain CLI config objects OR custom IRunnerPlugin instances.
  *
  * - `{ name, command }` → CLI runner (resolved automatically)
- * - `{ name, model }` → API runner (resolved automatically)
- * - Custom IRunnerPlugin → used as-is (must implement `execute()`)
+ * - IRunnerPlugin → used as-is (e.g. `new APIRunner(...)`, custom plugins)
  */
-export type RunnerConfig =
-  | CLIRunnerConfig
-  | APIRunnerConfig
-  | import("./interfaces.js").IRunnerPlugin;
+export type RunnerConfig = CLIRunnerConfig | import("./interfaces.js").IRunnerPlugin;
 
 // ─── Main Configuration ───
 

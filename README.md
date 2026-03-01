@@ -69,7 +69,7 @@ import { OpenAIModel } from "agent-eval/providers/openai";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 
 export default defineConfig({
-  // Agent runners — plain objects, type inferred from shape
+  // Agent runners — CLI shorthand or IRunnerPlugin instances
   runners: [{ name: "copilot", command: 'gh copilot suggest "{{prompt}}"' }],
 
   // Judge — LLM model used to score every test

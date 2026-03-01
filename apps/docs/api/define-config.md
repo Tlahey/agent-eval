@@ -50,19 +50,15 @@ interface AgentEvalConfig {
   environment?: IEnvironmentPlugin; // Execution environment plugin
 }
 
-// Runner config — plain objects or IRunnerPlugin instances
-// Type is inferred from shape: { name, command } → CLI, { name, model } → API
+// Runner config — plain CLI objects or IRunnerPlugin instances
+// { name, command } → CLI runner (auto-resolved)
+// IRunnerPlugin → used as-is (e.g. new APIRunner(...), custom plugins)
 // Each runner must have a unique `name` — duplicates throw at startup
-type RunnerConfig = CLIRunnerConfig | APIRunnerConfig | IRunnerPlugin;
+type RunnerConfig = CLIRunnerConfig | IRunnerPlugin;
 
 interface CLIRunnerConfig {
   name: string; // Unique runner identifier
   command: string; // Shell command with {{prompt}} placeholder
-}
-
-interface APIRunnerConfig {
-  name: string; // Unique runner identifier
-  model: IModelPlugin; // LLM model plugin
 }
 
 interface JudgeConfig {

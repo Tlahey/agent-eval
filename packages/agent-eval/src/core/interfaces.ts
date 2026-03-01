@@ -91,7 +91,7 @@ export interface RunnerExecResult {
  * The core runner orchestrates lifecycle (setup → hooks → execute → diff → judge)
  * and delegates execution to this plugin.
  *
- * Built-in: CLIRunner, APIRunner.
+ * Built-in: CLIRunner. APIRunner available via `agent-eval/runner/api`.
  * Third parties can implement custom runners (e.g., SSH, browser-based agents).
  *
  * @example

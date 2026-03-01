@@ -57,12 +57,12 @@ flowchart TB
 
 ## Plugin Categories
 
-| Plugin          | Interface            | Purpose                           | Built-in                                                                       |
-| --------------- | -------------------- | --------------------------------- | ------------------------------------------------------------------------------ |
-| **Model**       | `IModelPlugin`       | Wraps LLM providers (judge + API) | `AnthropicModel`, `OpenAIModel`, `OllamaModel`                                 |
-| **Runner**      | `IRunnerPlugin`      | Executes agents (CLI or API)      | Plain objects (`CLIRunnerConfig`, `APIRunnerConfig`) or custom `IRunnerPlugin` |
-| **Ledger**      | `ILedgerPlugin`      | Result storage and querying       | `SqliteLedger`, `JsonLedger`                                                   |
-| **Environment** | `IEnvironmentPlugin` | Workspace setup, exec, diffs      | `LocalEnvironment`, `DockerEnvironment`                                        |
+| Plugin          | Interface            | Purpose                           | Built-in                                                                             |
+| --------------- | -------------------- | --------------------------------- | ------------------------------------------------------------------------------------ |
+| **Model**       | `IModelPlugin`       | Wraps LLM providers (judge + API) | `AnthropicModel`, `OpenAIModel`, `OllamaModel`                                       |
+| **Runner**      | `IRunnerPlugin`      | Executes agents (CLI or API)      | `CLIRunnerConfig` (plain objects) or `IRunnerPlugin` instances (`APIRunner`, custom) |
+| **Ledger**      | `ILedgerPlugin`      | Result storage and querying       | `SqliteLedger`, `JsonLedger`                                                         |
+| **Environment** | `IEnvironmentPlugin` | Workspace setup, exec, diffs      | `LocalEnvironment`, `DockerEnvironment`                                              |
 
 ## Import Map
 
@@ -75,7 +75,7 @@ Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each p
 | `agent-eval/providers/anthropic` | `AnthropicModel`                                                      |
 | `agent-eval/providers/ollama`    | `OllamaModel`                                                         |
 | `agent-eval/runner/cli`          | `CLIRunner` (advanced use — most users use plain objects instead)     |
-| `agent-eval/runner/api`          | `APIRunner` (advanced use — most users use plain objects instead)     |
+| `agent-eval/runner/api`          | `APIRunner` (for API-based LLM runners)                               |
 | `agent-eval/ledger/sqlite`       | `SqliteLedger`                                                        |
 | `agent-eval/ledger/json`         | `JsonLedger`                                                          |
 | `agent-eval/environment/local`   | `LocalEnvironment`                                                    |
@@ -89,6 +89,7 @@ Each provider plugin dynamically imports its AI SDK package (`@ai-sdk/openai`, `
 
 ```ts
 import { defineConfig } from "agent-eval";
+import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { LocalEnvironment } from "agent-eval/environment/local";
@@ -96,10 +97,10 @@ import { LocalEnvironment } from "agent-eval/environment/local";
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
-  // Runner configs are plain objects — type inferred from shape
+  // CLI runners use plain objects — API runners use APIRunner
   runners: [
     { name: "copilot", command: "gh copilot -p '{{prompt}}'" },
-    { name: "gpt-4o", model: gpt4o },
+    new APIRunner({ name: "gpt-4o", model: gpt4o }),
   ],
   judge: { llm: gpt4o },
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),

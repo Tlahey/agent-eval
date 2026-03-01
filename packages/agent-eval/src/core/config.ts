@@ -28,25 +28,10 @@ function isCLIRunnerConfig(r: RunnerConfig): r is import("./types.js").CLIRunner
 }
 
 /**
- * Check if a runner config is a plain API runner object: { name, model }.
- */
-function isAPIRunnerConfig(r: RunnerConfig): r is import("./types.js").APIRunnerConfig {
-  const obj = r as unknown as Record<string, unknown>;
-  return (
-    typeof r === "object" &&
-    r !== null &&
-    "model" in obj &&
-    typeof obj.model === "object" &&
-    !("execute" in obj)
-  );
-}
-
-/**
  * Resolve runner configs (plain objects) into IRunnerPlugin instances.
  * Also validates that all runner names are unique.
  *
  * - `{ name, command }` → CLIRunner
- * - `{ name, model }` → APIRunner
  * - IRunnerPlugin → used as-is
  *
  * @throws Error if duplicate runner names are found
@@ -63,14 +48,6 @@ export async function resolveRunners(configs: RunnerConfig[]): Promise<IRunnerPl
         CLIRunner: new (opts: { name: string; command: string }) => IRunnerPlugin;
       };
       plugin = new CLIRunner({ name: cfg.name, command: cfg.command });
-    } else if (isAPIRunnerConfig(cfg)) {
-      const { APIRunner } = (await import("../runner/plugins/api.js")) as {
-        APIRunner: new (opts: {
-          name: string;
-          model: import("./interfaces.js").IModelPlugin;
-        }) => IRunnerPlugin;
-      };
-      plugin = new APIRunner({ name: cfg.name, model: cfg.model });
     } else {
       // Already an IRunnerPlugin instance
       plugin = cfg as IRunnerPlugin;

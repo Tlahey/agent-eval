@@ -464,17 +464,17 @@ All results are stored in `.agenteval/ledger.db` using Node 22's built-in `node:
 
 Runners implement **`IRunnerPlugin`** and come in two flavors:
 
-- **CLI runners** — Plain objects with `{ name, command }` that spawn a CLI command (e.g., `gh copilot suggest "{{prompt}}"`)
-- **API runners** — Plain objects with `{ name, model }` that call an LLM via an `IModelPlugin`, generate structured `files[]` output, and write files to disk
+- **CLI runners** — Plain objects with `{ name, command }` that spawn a CLI command (auto-resolved to `CLIRunner`)
+- **API runners** — `APIRunner` instances with an `IModelPlugin` that call an LLM, generate structured `files[]` output, and write files to disk
 
-Runner configs are plain objects passed to the `runners` array — the type is inferred from shape. Each runner must have a **unique `name`** (duplicates throw at startup). The `CLIRunner` and `APIRunner` classes are still available via sub-path imports for advanced use. Custom `IRunnerPlugin` instances (duck-typed by having an `execute()` method) also work.
+The `runners` array accepts `CLIRunnerConfig` plain objects (auto-resolved) or any `IRunnerPlugin` instance. Each runner must have a **unique `name`** (duplicates throw at startup).
 
 ### Plugin Architecture (SOLID)
 
 The framework uses Dependency Inversion for all extensible operations:
 
 - **`IModelPlugin`** — LLM model abstraction. Built-in: `AnthropicModel`, `OpenAIModel`, `OllamaModel`
-- **`IRunnerPlugin`** — Agent execution abstraction. Built-in: `CLIRunner`, `APIRunner` (most users use plain-object configs instead)
+- **`IRunnerPlugin`** — Agent execution abstraction. Built-in: `CLIRunner`, `APIRunner`
 - **`ILedgerPlugin`** — Storage backend abstraction. Built-in: `SqliteLedger`, `JsonLedger`
 - **`IEnvironmentPlugin`** — Execution environment abstraction. Built-in: `LocalEnvironment`, `DockerEnvironment`
 - **`IJudgePlugin`** — Judge abstraction for custom evaluation logic
