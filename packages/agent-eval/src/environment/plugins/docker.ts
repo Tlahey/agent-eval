@@ -10,7 +10,7 @@
 
 import { execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import type { IEnvironmentPlugin, EnvironmentCommandResult } from "../core/interfaces.js";
+import type { IEnvironmentPlugin, EnvironmentCommandResult } from "../../core/interfaces.js";
 
 export interface DockerEnvironmentOptions {
   /** Docker image to use (e.g., "node:22", "ubuntu:24.04") */

@@ -29,9 +29,6 @@ const LEDGER_REQUIRED_METHODS = [
   "getRunOverrides",
 ] as const;
 
-const LLM_REQUIRED_PROPERTIES = ["name", "provider", "defaultModel"] as const;
-const LLM_REQUIRED_METHODS = ["evaluate"] as const;
-
 const JUDGE_REQUIRED_PROPERTIES = ["name"] as const;
 const JUDGE_REQUIRED_METHODS = ["judge"] as const;
 
@@ -90,11 +87,6 @@ export function validateLedgerPlugin(plugin: unknown): PluginValidationError[] {
   return checkMembers(plugin, "LedgerPlugin", LEDGER_REQUIRED_PROPERTIES, LEDGER_REQUIRED_METHODS);
 }
 
-/** Validate that an object satisfies the ILLMPlugin contract */
-export function validateLLMPlugin(plugin: unknown): PluginValidationError[] {
-  return checkMembers(plugin, "LLMPlugin", LLM_REQUIRED_PROPERTIES, LLM_REQUIRED_METHODS);
-}
-
 /** Validate that an object satisfies the IJudgePlugin contract */
 export function validateJudgePlugin(plugin: unknown): PluginValidationError[] {
   return checkMembers(plugin, "JudgePlugin", JUDGE_REQUIRED_PROPERTIES, JUDGE_REQUIRED_METHODS);
@@ -111,7 +103,6 @@ export function validateEnvironmentPlugin(plugin: unknown): PluginValidationErro
  */
 export function validatePlugins(config: {
   ledger?: unknown;
-  llm?: unknown;
   judge?: unknown;
   environment?: unknown;
 }): PluginValidationError[] {
@@ -119,10 +110,6 @@ export function validatePlugins(config: {
 
   if (config.ledger !== undefined) {
     errors.push(...validateLedgerPlugin(config.ledger));
-  }
-
-  if (config.llm !== undefined) {
-    errors.push(...validateLLMPlugin(config.llm));
   }
 
   // Only validate judge if it looks like a plugin (has 'judge' method),

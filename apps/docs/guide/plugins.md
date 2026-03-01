@@ -57,12 +57,12 @@ flowchart TB
 ## Quick Configuration
 
 ```ts
-import { defineConfig, OpenAILLM, SqliteLedger, LocalEnvironment } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { LocalEnvironment } from "agent-eval/environment/local";
+import { OpenAILLMProvider } from "agent-eval/providers/openai";
 
 export default defineConfig({
-  // 🤖 LLM plugin — used for judge + API runners
-  llm: new OpenAILLM({ defaultModel: "gpt-4o" }),
-
   // 📦 Ledger plugin — where results are stored
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
 
@@ -72,14 +72,13 @@ export default defineConfig({
   runners: [
     /* ... */
   ],
-  judge: { provider: "openai", model: "gpt-4o" },
+  judge: new OpenAILLMProvider({ model: "gpt-4o" }),
 });
 ```
 
 ::: tip Default behavior
 If you don't configure any plugins, AgentEval uses sensible defaults:
 
-- **LLM**: Built-in Vercel AI SDK (reads `judge.provider` from config)
 - **Ledger**: `SqliteLedger` with `outputDir: ".agenteval"`
 - **Environment**: `LocalEnvironment` (git reset + local exec)
   :::

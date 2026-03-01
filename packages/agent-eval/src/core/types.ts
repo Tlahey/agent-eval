@@ -135,20 +135,6 @@ export interface AgentEvalConfig {
    */
   ledger?: import("./interfaces.js").ILedgerPlugin;
   /**
-   * LLM plugins for judge evaluation and API runners.
-   * When provided, these are used instead of the built-in Vercel AI SDK integrations.
-   *
-   * @example
-   * ```ts
-   * import { AnthropicLLM } from "agent-eval";
-   * export default defineConfig({
-   *   llm: new AnthropicLLM({ model: "claude-sonnet-4-20250514" }),
-   *   // ...
-   * });
-   * ```
-   */
-  llm?: import("./interfaces.js").ILLMPlugin;
-  /**
    * Execution environment plugin (local Git, Docker, SSH, etc.).
    * Controls workspace setup/teardown, command execution, and diff collection.
    * If not provided, defaults to LocalEnvironment (Git isolation + child_process).

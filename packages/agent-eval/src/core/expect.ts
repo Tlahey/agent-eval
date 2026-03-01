@@ -1,4 +1,4 @@
-import { judge as runJudge } from "../judge/judge.js";
+import { judge as runJudge, buildJudgePrompt } from "../judge/judge.js";
 import { setLastJudgeOptions, setLastJudgeResult } from "./runner.js";
 import type {
   ExpectChain,
@@ -66,13 +66,13 @@ export function expect(ctx: TestContext): ExpectChain {
         };
       }
 
-      const result = await runJudge(
+      const prompt = buildJudgePrompt({
+        criteria: options.criteria,
         ctx,
-        options.criteria,
-        _judgeConfig,
-        options.model,
-        options.expectedFiles,
-      );
+        expectedFiles: options.expectedFiles,
+      });
+
+      const result = await runJudge(ctx, prompt, _judgeConfig, options.model);
 
       // Compute status from thresholds (per-test > global > defaults)
       const thresholds = options.thresholds ?? _globalThresholds;

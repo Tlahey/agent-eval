@@ -42,7 +42,7 @@ const mockEnvInstance = {
   execute: vi.fn(() => ({ stdout: "", stderr: "", exitCode: 0 })),
   getDiff: vi.fn(() => "mock diff content"),
 };
-vi.mock("../environment/local-environment.js", () => ({
+vi.mock("../environment/plugins/local.js", () => ({
   LocalEnvironment: vi.fn(() => mockEnvInstance),
 }));
 
@@ -66,7 +66,7 @@ vi.mock("@ai-sdk/openai", () => ({
 // Mock the judge module for declarative pipeline tests
 vi.mock("../judge/judge.js", () => ({
   judge: vi.fn(() => ({ pass: true, score: 0.85, reason: "good", improvement: "none" })),
-  buildDeclarativeJudgePrompt: vi.fn(() => "mock declarative criteria"),
+  buildJudgePrompt: vi.fn(() => "mock judge prompt"),
 }));
 
 // Mock the index module for hook registration

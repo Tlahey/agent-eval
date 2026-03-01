@@ -4,7 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { EvalContext } from "../core/context.js";
-import { LocalEnvironment } from "../environment/local-environment.js";
+import { LocalEnvironment } from "../environment/plugins/local.js";
 
 function makeTmpGitRepo(): string {
   const dir = join(tmpdir(), `agenteval-ctx-${Date.now()}-${Math.random().toString(36).slice(2)}`);

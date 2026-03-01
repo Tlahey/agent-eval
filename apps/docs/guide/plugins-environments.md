@@ -39,7 +39,8 @@ interface EnvironmentCommandResult {
 Runs tests directly on the host machine. Uses Git for workspace isolation and `child_process.execSync` for command execution. This is the zero-dependency default.
 
 ```ts
-import { defineConfig, LocalEnvironment } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { LocalEnvironment } from "agent-eval/environment/local";
 
 export default defineConfig({
   // LocalEnvironment is used automatically when no environment is specified
@@ -68,7 +69,8 @@ Use `LocalEnvironment` when:
 Runs each test iteration inside a **Docker container** with the project directory mounted as a volume. Provides strong isolation — the agent cannot modify the host filesystem directly.
 
 ```ts
-import { defineConfig, DockerEnvironment } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { DockerEnvironment } from "agent-eval/environment/docker";
 
 export default defineConfig({
   environment: new DockerEnvironment({
@@ -106,7 +108,9 @@ new DockerEnvironment({
 #### Full example with Docker
 
 ```ts
-import { defineConfig, DockerEnvironment, AnthropicLLM } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { DockerEnvironment } from "agent-eval/environment/docker";
+import { AnthropicProvider } from "agent-eval/providers/anthropic";
 
 export default defineConfig({
   environment: new DockerEnvironment({
@@ -114,9 +118,8 @@ export default defineConfig({
     dockerArgs: ["--memory=4g"],
   }),
 
-  llm: new AnthropicLLM({ defaultModel: "claude-sonnet-4-20250514" }),
-
   runners: [
+    new AnthropicProvider({ model: "claude-sonnet-4-20250514" }),
     {
       name: "claude-code",
       type: "cli",

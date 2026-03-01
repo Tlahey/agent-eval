@@ -27,6 +27,13 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     cli: "src/cli/cli.ts",
+    "providers/openai": "src/llm/plugins/openai.ts",
+    "providers/anthropic": "src/llm/plugins/anthropic.ts",
+    "providers/ollama": "src/llm/plugins/ollama.ts",
+    "environment/local": "src/environment/plugins/local.ts",
+    "environment/docker": "src/environment/plugins/docker.ts",
+    "ledger/sqlite": "src/ledger/plugins/sqlite.ts",
+    "ledger/json": "src/ledger/plugins/json.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

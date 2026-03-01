@@ -14,6 +14,41 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./providers/openai": {
+      "types": "./dist/providers/openai.d.ts",
+      "import": "./dist/providers/openai.js",
+      "require": "./dist/providers/openai.cjs"
+    },
+    "./providers/anthropic": {
+      "types": "./dist/providers/anthropic.d.ts",
+      "import": "./dist/providers/anthropic.js",
+      "require": "./dist/providers/anthropic.cjs"
+    },
+    "./providers/ollama": {
+      "types": "./dist/providers/ollama.d.ts",
+      "import": "./dist/providers/ollama.js",
+      "require": "./dist/providers/ollama.cjs"
+    },
+    "./environment/local": {
+      "types": "./dist/environment/local.d.ts",
+      "import": "./dist/environment/local.js",
+      "require": "./dist/environment/local.cjs"
+    },
+    "./environment/docker": {
+      "types": "./dist/environment/docker.d.ts",
+      "import": "./dist/environment/docker.js",
+      "require": "./dist/environment/docker.cjs"
+    },
+    "./ledger/sqlite": {
+      "types": "./dist/ledger/sqlite.d.ts",
+      "import": "./dist/ledger/sqlite.js",
+      "require": "./dist/ledger/sqlite.cjs"
+    },
+    "./ledger/json": {
+      "types": "./dist/ledger/json.d.ts",
+      "import": "./dist/ledger/json.js",
+      "require": "./dist/ledger/json.cjs"
     }
   },
   "files": [

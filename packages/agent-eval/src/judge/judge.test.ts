@@ -75,8 +75,9 @@ describe("judge", () => {
 
     const config: JudgeConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
     const ctx = createMockContext();
+    const prompt = buildJudgePrompt({ criteria: "has close button", ctx });
 
-    const result = await judge(ctx, "has close button", config);
+    const result = await judge(ctx, prompt, config);
 
     expect(result).toEqual(mockResult);
     expect(generateObject).toHaveBeenCalledOnce();
@@ -152,8 +153,9 @@ describe("judge", () => {
 
     const ctx = createMockContext({ logs: "", diff: null, commands: [] });
     const config: JudgeConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
 
-    const result = await judge(ctx, "criteria", config);
+    const result = await judge(ctx, prompt, config);
     expect(result.pass).toBe(false);
 
     const callArgs = vi.mocked(generateObject).mock.calls[0][0];
@@ -435,5 +437,139 @@ describe("buildJudgePrompt - expectedFiles", () => {
     expect(prompt).toContain("File Scope Analysis");
     expect(prompt).not.toContain("⚠️ **Missing expected files:**");
     expect(prompt).not.toContain("⚠️ **Unexpected file changes:**");
+  });
+});
+
+describe("buildJudgePrompt - unified adaptive prompt", () => {
+  it("includes instruction section when provided", () => {
+    const ctx = createMockContext();
+    const prompt = buildJudgePrompt({
+      criteria: "test criteria",
+      ctx,
+      instruction: "Add a close button to the Banner component",
+    });
+
+    expect(prompt).toContain("## Agent Instruction");
+    expect(prompt).toContain("Add a close button to the Banner component");
+    expect(prompt).toContain("test criteria");
+  });
+
+  it("excludes instruction section when not provided", () => {
+    const ctx = createMockContext();
+    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+
+    expect(prompt).not.toContain("## Agent Instruction");
+  });
+
+  it("includes task results section with weights when tasks provided", () => {
+    const ctx = createMockContext();
+    const taskAction = async () => ({
+      name: "x",
+      command: "x",
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+      durationMs: 0,
+    });
+    const prompt = buildJudgePrompt({
+      criteria: "criteria",
+      ctx,
+      taskResults: [
+        {
+          task: { name: "Tests", action: taskAction, criteria: "All tests pass", weight: 3 },
+          result: {
+            name: "Tests",
+            command: "pnpm test",
+            stdout: "All tests passed",
+            stderr: "",
+            exitCode: 0,
+            durationMs: 100,
+          },
+        },
+        {
+          task: { name: "Build", action: taskAction, criteria: "Build succeeds", weight: 1 },
+          result: {
+            name: "Build",
+            command: "pnpm build",
+            stdout: "Build succeeded",
+            stderr: "",
+            exitCode: 0,
+            durationMs: 200,
+          },
+        },
+      ],
+    });
+
+    expect(prompt).toContain("## Task Results (2 tasks, total weight: 4)");
+    expect(prompt).toContain("Task 1: Tests (weight: 3)");
+    expect(prompt).toContain("Task 2: Build (weight: 1)");
+    expect(prompt).toContain("All tests passed");
+    expect(prompt).toContain("Weight the scores accordingly");
+  });
+
+  it("excludes task section when no tasks provided", () => {
+    const ctx = createMockContext();
+    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+
+    expect(prompt).not.toContain("## Task Results");
+    expect(prompt).not.toContain("Weight the scores accordingly");
+  });
+
+  it("includes all sections when fully populated", () => {
+    const ctx = createMockContext({
+      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code",
+    });
+    const taskAction = async () => ({
+      name: "x",
+      command: "x",
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+      durationMs: 0,
+    });
+
+    const prompt = buildJudgePrompt({
+      criteria: "component quality",
+      ctx,
+      instruction: "Add close button",
+      taskResults: [
+        {
+          task: { name: "Tests", action: taskAction, criteria: "pass", weight: 2 },
+          result: {
+            name: "Tests",
+            command: "test",
+            stdout: "ok",
+            stderr: "",
+            exitCode: 0,
+            durationMs: 0,
+          },
+        },
+      ],
+      expectedFiles: ["src/Banner.tsx"],
+    });
+
+    expect(prompt).toContain("## Evaluation Criteria");
+    expect(prompt).toContain("## Agent Instruction");
+    expect(prompt).toContain("## Task Results");
+    expect(prompt).toContain("## Code Changes");
+    expect(prompt).toContain("## File Scope Analysis");
+    expect(prompt).toContain("## Scoring Instructions");
+  });
+
+  it("works with the object overload", () => {
+    const ctx = createMockContext();
+    const prompt = buildJudgePrompt({ criteria: "test", ctx });
+
+    expect(prompt).toContain("## Evaluation Criteria");
+    expect(prompt).toContain("test");
+    expect(prompt).toContain("## Scoring Instructions");
+  });
+
+  it("backward-compatible string overload still works", () => {
+    const ctx = createMockContext();
+    const prompt = buildJudgePrompt("legacy criteria", ctx);
+
+    expect(prompt).toContain("legacy criteria");
+    expect(prompt).toContain("## Scoring Instructions");
   });
 });

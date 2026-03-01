@@ -10,7 +10,7 @@ vi.mock("node:crypto", () => ({
   randomBytes: () => ({ toString: () => "deadbeef" }),
 }));
 
-import { DockerEnvironment } from "./docker-environment.js";
+import { DockerEnvironment } from "./docker.js";
 
 describe("DockerEnvironment", () => {
   let env: DockerEnvironment;

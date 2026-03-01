@@ -8,18 +8,24 @@
  */
 
 import { execSync } from "node:child_process";
-import type { IEnvironmentPlugin, EnvironmentCommandResult } from "../core/interfaces.js";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import type { IEnvironmentPlugin, EnvironmentCommandResult } from "../../core/interfaces.js";
 
 export class LocalEnvironment implements IEnvironmentPlugin {
   readonly name = "local";
+  private initialDiff: string | null = null;
 
   /**
-   * Reset git state: `git reset --hard HEAD` + `git clean -fd`.
-   * Guarantees a pristine working directory before each test iteration.
+   * Capture current uncommitted changes to restore them later.
+   * Does NOT clean the base, allowing the agent to see current work.
    */
   setup(cwd: string): void {
-    execSync("git reset --hard HEAD", { cwd, stdio: "pipe" });
-    execSync("git clean -fd", { cwd, stdio: "pipe" });
+    try {
+      this.initialDiff = execSync("git diff HEAD", { cwd, encoding: "utf-8" });
+    } catch {
+      this.initialDiff = null;
+    }
   }
 
   /**
@@ -59,5 +65,31 @@ export class LocalEnvironment implements IEnvironmentPlugin {
       stdio: ["pipe", "pipe", "pipe"],
     });
     return [staged, unstaged].filter(Boolean).join("\n");
+  }
+
+  /**
+   * Rollback agent modifications and restore the original uncommitted changes.
+   */
+  teardown(cwd: string): void {
+    // Clean all agent changes
+    execSync("git reset --hard HEAD", { cwd, stdio: "pipe" });
+    execSync("git clean -fd", { cwd, stdio: "pipe" });
+
+    // Restore user's original uncommitted changes
+    if (this.initialDiff && this.initialDiff.trim()) {
+      const patchPath = join(cwd, ".agenteval_backup.patch");
+      try {
+        writeFileSync(patchPath, this.initialDiff);
+        execSync(`git apply ${patchPath}`, { cwd, stdio: "pipe" });
+      } catch {
+        // Ignore apply errors, best effort restoration
+      } finally {
+        try {
+          unlinkSync(patchPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    }
   }
 }

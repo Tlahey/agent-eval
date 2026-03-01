@@ -253,17 +253,23 @@ The `improvement` field is the judge's **opinion on how the agent could do bette
 
 ## Judge Prompt Anatomy
 
-The system prompt sent to the judge includes:
+The judge uses a **single, unified prompt** that adapts dynamically based on the available context. The prompt always includes the role, criteria, code changes, and scoring instructions. Additional sections are included only when relevant:
 
 ```mermaid
 flowchart TD
-    A["Judge Prompt"] --> B["1. Role<br/>'Expert code reviewer<br/>acting as a judge'"]
+    A["Unified Judge Prompt"] --> B["1. Role<br/>'Expert code reviewer<br/>acting as a judge'"]
     A --> C["2. Evaluation Criteria<br/>Your criteria from toPassJudge()"]
-    A --> D["3. Git Diff<br/>Full diff from storeDiff()"]
-    A --> E["4. Command Outputs<br/>stdout, stderr, exit codes"]
-    A --> F["5. File Scope Analysis<br/>Expected vs. actual files"]
+    A --> D["3. Agent Instruction<br/>(if instruct() was used)"]
+    A --> E["4. Task Results<br/>(if tasks registered via addTask)<br/>with weights and exit codes"]
+    A --> F["5. Code Changes<br/>Git diff + command outputs"]
+    A --> G["6. File Scope Analysis<br/>Expected vs. actual files<br/>(if expectedFiles set)"]
+    A --> H["7. Scoring Instructions<br/>Adapted to task presence"]
 
     style A fill:#6366f1,color:#fff
+    style D fill:#f59e0b,color:#000
+    style E fill:#f59e0b,color:#000
 ```
+
+Sections marked in amber are **conditionally included** — only when the test uses `instruct()` or `addTask()`.
 
 The response is enforced via Zod structured output (`generateObject`) for API judges, guaranteeing `{ pass, score, reason, improvement }` — no prompt injection or malformed JSON. For CLI judges, the JSON is parsed from stdout and validated against the same schema.

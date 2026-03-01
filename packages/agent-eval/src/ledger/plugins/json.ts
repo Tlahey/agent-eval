@@ -7,9 +7,9 @@
 
 import { mkdirSync, readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { LedgerEntry, ScoreOverride, Thresholds } from "../core/types.js";
-import { computeStatus, DEFAULT_THRESHOLDS } from "../core/types.js";
-import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../core/interfaces.js";
+import type { LedgerEntry, ScoreOverride, Thresholds } from "../../core/types.js";
+import { computeStatus, DEFAULT_THRESHOLDS } from "../../core/types.js";
+import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../../core/interfaces.js";
 
 export interface JsonLedgerOptions {
   /** Directory where ledger.jsonl is stored (defaults to ".agenteval") */

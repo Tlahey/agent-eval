@@ -5,8 +5,8 @@
  * This is the default ledger plugin when the user doesn't provide one.
  */
 
-import type { LedgerEntry, ScoreOverride } from "../core/types.js";
-import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../core/interfaces.js";
+import type { LedgerEntry, ScoreOverride } from "../../core/types.js";
+import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../../core/interfaces.js";
 import {
   appendLedgerEntry,
   readLedger,
@@ -18,7 +18,7 @@ import {
   getAllRunnerStats,
   overrideRunScore as _overrideRunScore,
   getRunOverrides as _getRunOverrides,
-} from "./ledger.js";
+} from "../ledger.js";
 
 export interface SqliteLedgerOptions {
   /** Directory where ledger.sqlite is stored (defaults to ".agenteval") */

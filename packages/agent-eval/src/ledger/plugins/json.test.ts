@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { JsonLedger } from "./json-plugin.js";
-import type { LedgerEntry } from "../core/types.js";
+import { JsonLedger } from "./json.js";
+import type { LedgerEntry } from "../../core/types.js";
 
 function makeLedgerEntry(overrides?: Partial<LedgerEntry>): LedgerEntry {
   return {

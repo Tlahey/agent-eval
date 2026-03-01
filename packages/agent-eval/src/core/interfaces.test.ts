@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type {
-  ILedgerPlugin,
-  ILLMPlugin,
-  IJudgePlugin,
-  RunnerStats,
-  TestTreeNode,
-} from "./interfaces.js";
+import type { ILedgerPlugin, IJudgePlugin, RunnerStats, TestTreeNode } from "./interfaces.js";
 
 describe("Plugin Interfaces", () => {
   describe("ILedgerPlugin contract", () => {
@@ -64,43 +58,6 @@ describe("Plugin Interfaces", () => {
         close: () => {},
       };
       expect(typeof withClose.close).toBe("function");
-    });
-  });
-
-  describe("ILLMPlugin contract", () => {
-    it("defines the required shape for an LLM plugin", () => {
-      const mockLLM: ILLMPlugin = {
-        name: "mock-llm",
-        provider: "test",
-        defaultModel: "test-model-v1",
-        evaluate: async () => ({
-          pass: true,
-          score: 0.9,
-          reason: "Good",
-          improvement: "None",
-        }),
-      };
-      expect(mockLLM.name).toBe("mock-llm");
-      expect(mockLLM.provider).toBe("test");
-      expect(mockLLM.defaultModel).toBe("test-model-v1");
-    });
-
-    it("allows optional generate method", () => {
-      const withGenerate: ILLMPlugin = {
-        name: "with-gen",
-        provider: "test",
-        defaultModel: "test-model",
-        evaluate: async () => ({
-          pass: true,
-          score: 1.0,
-          reason: "ok",
-          improvement: "",
-        }),
-        generate: async () => ({
-          files: [{ path: "test.ts", content: "// test" }],
-        }),
-      };
-      expect(typeof withGenerate.generate).toBe("function");
     });
   });
 

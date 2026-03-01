@@ -18,6 +18,7 @@ import { DEFAULT_THRESHOLDS } from "./types.js";
 // Mock the judge module
 vi.mock("../judge/judge.js", () => ({
   judge: vi.fn(),
+  buildJudgePrompt: vi.fn(() => "mock judge prompt"),
 }));
 
 import { judge as mockJudge } from "../judge/judge.js";
@@ -94,16 +95,16 @@ describe("expect", () => {
 
     vitestExpect(mockJudge).toHaveBeenCalledWith(
       ctx,
-      "must have close button",
+      "mock judge prompt",
       judgeConfig,
       "gpt-4o-mini",
-      undefined,
     );
   });
 
-  it("passes expectedFiles to judge", async () => {
+  it("passes expectedFiles to buildJudgePrompt", async () => {
     setJudgeConfig(judgeConfig);
     const ctx = createMockContext();
+    const { buildJudgePrompt: mockBuildPrompt } = await import("../judge/judge.js");
 
     vi.mocked(mockJudge).mockResolvedValue({
       pass: true,
@@ -117,10 +118,11 @@ describe("expect", () => {
       expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
     });
 
-    vitestExpect(mockJudge).toHaveBeenCalledWith(ctx, "test", judgeConfig, undefined, [
-      "src/Banner.tsx",
-      "src/Banner.test.tsx",
-    ]);
+    vitestExpect(mockBuildPrompt).toHaveBeenCalledWith({
+      criteria: "test",
+      ctx,
+      expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
+    });
   });
 
   it("stores the judge result in the global store", async () => {

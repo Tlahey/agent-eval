@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   validateLedgerPlugin,
-  validateLLMPlugin,
   validateJudgePlugin,
   validateEnvironmentPlugin,
   validatePlugins,
@@ -23,16 +22,6 @@ function makeLedgerPlugin(overrides: Record<string, unknown> = {}): Record<strin
     getStats: () => [],
     overrideRunScore: () => ({}),
     getRunOverrides: () => [],
-    ...overrides,
-  };
-}
-
-function makeLLMPlugin(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    name: "test-llm",
-    provider: "test",
-    defaultModel: "test-model",
-    evaluate: async () => ({ pass: true, score: 1, reason: "ok" }),
     ...overrides,
   };
 }
@@ -96,31 +85,6 @@ describe("validateLedgerPlugin", () => {
   });
 });
 
-describe("validateLLMPlugin", () => {
-  it("returns empty array for valid plugin", () => {
-    expect(validateLLMPlugin(makeLLMPlugin())).toEqual([]);
-  });
-
-  it("detects missing properties", () => {
-    const errors = validateLLMPlugin({ evaluate: async () => ({}) });
-    const missingProps = errors.filter((e) => e.expected === "property").map((e) => e.member);
-    expect(missingProps).toContain("name");
-    expect(missingProps).toContain("provider");
-    expect(missingProps).toContain("defaultModel");
-  });
-
-  it("detects missing evaluate method", () => {
-    const errors = validateLLMPlugin({ name: "x", provider: "y", defaultModel: "z" });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].member).toBe("evaluate");
-  });
-
-  it("does not require optional generate method", () => {
-    const errors = validateLLMPlugin(makeLLMPlugin());
-    expect(errors).toEqual([]);
-  });
-});
-
 describe("validateJudgePlugin", () => {
   it("returns empty array for valid plugin", () => {
     expect(validateJudgePlugin(makeJudgePlugin())).toEqual([]);
@@ -181,12 +145,6 @@ describe("validatePlugins", () => {
     expect(errors[0].plugin).toBe("LedgerPlugin");
   });
 
-  it("validates llm plugin when present", () => {
-    const errors = validatePlugins({ llm: {} });
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].plugin).toBe("LLMPlugin");
-  });
-
   it("validates judge plugin only if it has a judge method", () => {
     // Plain JudgeConfig (provider + model) should NOT be validated as a plugin
     const errors = validatePlugins({ judge: { provider: "openai", model: "gpt-4o" } });
@@ -206,7 +164,7 @@ describe("validatePlugins", () => {
   });
 
   it("accumulates errors from multiple plugins", () => {
-    const errors = validatePlugins({ ledger: "bad" as unknown, llm: null as unknown });
+    const errors = validatePlugins({ ledger: "bad" as unknown, environment: null as unknown });
     expect(errors.length).toBe(2);
   });
 });
@@ -228,7 +186,7 @@ describe("formatPluginErrors", () => {
   it("formats multiple errors with numbering", () => {
     const result = formatPluginErrors([
       { plugin: "LedgerPlugin", member: "a", expected: "method", message: "first error" },
-      { plugin: "LLMPlugin", member: "b", expected: "property", message: "second error" },
+      { plugin: "JudgePlugin", member: "b", expected: "property", message: "second error" },
     ]);
     expect(result).toContain("1. first error");
     expect(result).toContain("2. second error");

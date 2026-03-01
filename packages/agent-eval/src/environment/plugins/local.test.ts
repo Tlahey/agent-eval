@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { LocalEnvironment } from "./local-environment.js";
+import { LocalEnvironment } from "./local.js";
 
 function makeTmpGitRepo(): string {
   const dir = join(tmpdir(), `agenteval-env-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -33,21 +33,38 @@ describe("LocalEnvironment", () => {
     expect(env.name).toBe("local");
   });
 
-  describe("setup", () => {
-    it("resets modified files to HEAD", () => {
-      writeFileSync(join(tmpDir, "file.txt"), "modified");
+  describe("setup and teardown", () => {
+    it("preserves uncommitted changes during setup and restores them after teardown", () => {
+      // 1. User makes uncommitted changes
+      writeFileSync(join(tmpDir, "file.txt"), "user change");
+
+      // 2. Setup captures state but leaves working directory dirty
       env.setup(tmpDir);
+      let content = execSync("cat file.txt", { cwd: tmpDir, encoding: "utf-8" });
+      expect(content).toBe("user change");
+
+      // 3. Simulate agent making further changes
+      writeFileSync(join(tmpDir, "file.txt"), "agent change");
+      writeFileSync(join(tmpDir, "agent_new.txt"), "agent file");
+
+      // 4. Teardown rolls back agent changes and restores user's initial dirty state
+      env.teardown(tmpDir);
+      content = execSync("cat file.txt", { cwd: tmpDir, encoding: "utf-8" });
+      expect(content).toBe("user change");
+
+      const ls = execSync("ls", { cwd: tmpDir, encoding: "utf-8" });
+      expect(ls).not.toContain("agent_new.txt");
+    });
+
+    it("works correctly when there are no initial uncommitted changes", () => {
+      env.setup(tmpDir);
+
+      writeFileSync(join(tmpDir, "file.txt"), "agent change");
+
+      env.teardown(tmpDir);
 
       const content = execSync("cat file.txt", { cwd: tmpDir, encoding: "utf-8" });
       expect(content).toBe("initial");
-    });
-
-    it("removes untracked files", () => {
-      writeFileSync(join(tmpDir, "untracked.txt"), "temp");
-      env.setup(tmpDir);
-
-      const result = execSync("ls", { cwd: tmpDir, encoding: "utf-8" });
-      expect(result).not.toContain("untracked.txt");
     });
   });
 

@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
 import { getGlobalThresholds } from "./expect.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
-import { judge as runJudge, buildDeclarativeJudgePrompt } from "../judge/judge.js";
+import { judge as runJudge, buildJudgePrompt } from "../judge/judge.js";
 import {
   getMatchingHooks,
   getRegisteredBeforeEachHooks,
@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 import type { ILedgerPlugin, IEnvironmentPlugin } from "./interfaces.js";
-import { LocalEnvironment } from "../environment/local-environment.js";
+import { LocalEnvironment } from "../environment/plugins/local.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 
@@ -73,7 +73,7 @@ async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
 
 /**
  * Create the raw AgentHandle for a given runner config.
- * Uses config.llm plugin for API runners when available, falls back to built-in resolveRunnerModel.
+ * Uses built-in resolveRunnerModel for API runners.
  * CLI runners delegate to the environment plugin for command execution.
  */
 function createRawAgent(
@@ -105,54 +105,40 @@ function createRawAgent(
           throw new Error(`Runner "${runner.name}" has type "api" but no api config defined`);
         }
 
-        // Use ILLMPlugin if available, otherwise fall back to built-in
-        if (config.llm?.generate) {
-          const result = await config.llm.generate({
-            prompt,
-            model: runner.api.model,
-          });
-          for (const file of result.files) {
-            const fullPath = resolve(cwd, file.path);
-            mkdirSync(dirname(fullPath), { recursive: true });
-            writeFileSync(fullPath, file.content, "utf-8");
-            reporter.onFileWrite({ testId, runner: runner.name }, file.path);
-          }
-        } else {
-          const { generateObject } = await import("ai");
-          const { z } = await import("zod");
+        const { generateObject } = await import("ai");
+        const { z } = await import("zod");
 
-          const model = await resolveRunnerModel(runner.api);
+        const model = await resolveRunnerModel(runner.api);
 
-          const FileOperationSchema = z.object({
-            files: z
-              .array(
-                z.object({
-                  path: z.string().describe("Relative file path from project root"),
-                  content: z.string().describe("Full file content to write"),
-                }),
-              )
-              .describe("Files to create or modify"),
-          });
+        const FileOperationSchema = z.object({
+          files: z
+            .array(
+              z.object({
+                path: z.string().describe("Relative file path from project root"),
+                content: z.string().describe("Full file content to write"),
+              }),
+            )
+            .describe("Files to create or modify"),
+        });
 
-          const { object } = await generateObject({
-            model,
-            schema: FileOperationSchema,
-            prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
+        const { object } = await generateObject({
+          model,
+          schema: FileOperationSchema,
+          prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
 
 Task: ${prompt}
 
 Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
-          });
+        });
 
-          const response = object as ApiAgentResponse;
+        const response = object as ApiAgentResponse;
 
-          // Write files to disk
-          for (const file of response.files) {
-            const fullPath = resolve(cwd, file.path);
-            mkdirSync(dirname(fullPath), { recursive: true });
-            writeFileSync(fullPath, file.content, "utf-8");
-            reporter.onFileWrite({ testId, runner: runner.name }, file.path);
-          }
+        // Write files to disk
+        for (const file of response.files) {
+          const fullPath = resolve(cwd, file.path);
+          mkdirSync(dirname(fullPath), { recursive: true });
+          writeFileSync(fullPath, file.content, "utf-8");
+          reporter.onFileWrite({ testId, runner: runner.name }, file.path);
         }
       } else {
         throw new Error(`Unknown runner type: ${(runner as AgentRunnerConfig).type}`);
@@ -614,20 +600,14 @@ async function executeDeclarativePipeline(
   // 5. Judge evaluation (criteria from expect().toPassJudge + optional task evidence)
   const durationMs = Date.now() - start;
   reporter.onPipelineStep(event, "judge", "running");
-  const prompt = buildDeclarativeJudgePrompt(
-    judgeOptions.criteria,
+  const prompt = buildJudgePrompt({
+    criteria: judgeOptions.criteria,
+    ctx,
     instruction,
     taskResults,
-    ctx,
-    judgeOptions.expectedFiles,
-  );
-  const judgeResult = await runJudge(
-    ctx,
-    prompt,
-    config.judge,
-    judgeOptions.model,
-    judgeOptions.expectedFiles,
-  );
+    expectedFiles: judgeOptions.expectedFiles,
+  });
+  const judgeResult = await runJudge(ctx, prompt, config.judge, judgeOptions.model);
   reporter.onPipelineStep(event, "judge", "done");
 
   const effectiveThresholds = judgeOptions.thresholds ?? thresholds;

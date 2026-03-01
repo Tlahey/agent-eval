@@ -33,7 +33,8 @@ interface ILedgerPlugin {
 Uses Node 22's built-in `node:sqlite` for zero-dependency SQL storage. This is the default when no ledger plugin is configured.
 
 ```ts
-import { defineConfig, SqliteLedger } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
 
 export default defineConfig({
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
@@ -94,7 +95,8 @@ erDiagram
 Stores results as JSONL (one JSON object per line). Works with any Node.js version.
 
 ```ts
-import { defineConfig, JsonLedger } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { JsonLedger } from "agent-eval/ledger/json";
 
 export default defineConfig({
   ledger: new JsonLedger({ outputDir: ".agenteval" }),

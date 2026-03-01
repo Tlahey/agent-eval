@@ -46,11 +46,15 @@ export default defineConfig({
 ## Full Example (with plugins)
 
 ```ts
-import { defineConfig, AnthropicLLM, SqliteLedger, LocalEnvironment } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { AnthropicProvider } from "agent-eval/providers/anthropic";
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { LocalEnvironment } from "agent-eval/environment/local";
+
+const judgeProvider = new AnthropicProvider({ model: "claude-sonnet-4-20250514" });
 
 export default defineConfig({
   // ── Plugins ────────────────────────────────────
-  llm: new AnthropicLLM({ defaultModel: "claude-sonnet-4-20250514" }),
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
   environment: new LocalEnvironment(),
 
@@ -69,10 +73,7 @@ export default defineConfig({
   ],
 
   // ── Judge ──────────────────────────────────────
-  judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-  },
+  judge: judgeProvider,
 
   // ── Lifecycle hooks ────────────────────────────
   beforeEach: ({ ctx }) => {
@@ -121,24 +122,15 @@ export default defineConfig({
 AgentEval is extensible via three plugin axes: **LLM** (models), **Ledger** (storage), and **Environment** (execution). When no plugins are configured, sensible defaults are used.
 
 ```ts
-import {
-  defineConfig,
-  // LLM plugins
-  AnthropicLLM,
-  OpenAILLM,
-  OllamaLLM,
-  // Ledger plugins
-  SqliteLedger,
-  JsonLedger,
-  // Environment plugins
-  LocalEnvironment,
-  DockerEnvironment,
-} from "agent-eval";
+import { defineConfig } from "agent-eval";
+// Ledger plugins
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { JsonLedger } from "agent-eval/ledger/json";
+// Environment plugins
+import { LocalEnvironment } from "agent-eval/environment/local";
+import { DockerEnvironment } from "agent-eval/environment/docker";
 
 export default defineConfig({
-  // Pick one LLM plugin — or omit to use the built-in Vercel AI SDK
-  llm: new AnthropicLLM({ defaultModel: "claude-sonnet-4-20250514" }),
-
   // Pick one ledger plugin — or omit for SqliteLedger
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
 
@@ -149,11 +141,10 @@ export default defineConfig({
 });
 ```
 
-| Plugin Axis     | Built-in Options                         | Default            |
-| --------------- | ---------------------------------------- | ------------------ |
-| **LLM**         | `AnthropicLLM`, `OpenAILLM`, `OllamaLLM` | Vercel AI SDK      |
-| **Ledger**      | `SqliteLedger`, `JsonLedger`             | `SqliteLedger`     |
-| **Environment** | `LocalEnvironment`, `DockerEnvironment`  | `LocalEnvironment` |
+| Plugin Axis     | Built-in Options                        | Default            |
+| --------------- | --------------------------------------- | ------------------ |
+| **Ledger**      | `SqliteLedger`, `JsonLedger`            | `SqliteLedger`     |
+| **Environment** | `LocalEnvironment`, `DockerEnvironment` | `LocalEnvironment` |
 
 ::: tip Learn more
 See the dedicated [Plugins guide](/guide/plugins) for interfaces, custom plugins, and detailed configuration for each.

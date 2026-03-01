@@ -3,7 +3,8 @@
  *
  * These interfaces define the contracts for:
  * - ILedgerPlugin: Storage backend (SQLite, JSON, custom)
- * - ILLMPlugin: LLM provider abstraction (Anthropic, OpenAI, Ollama, custom)
+ * - IEnvironmentPlugin: Execution environment (Local, Docker)
+ * - IJudgePlugin: Evaluation judge (API, CLI)
  *
  * Both follow the Dependency Inversion Principle (DIP):
  * high-level modules (Runner, CLI) depend on abstractions, not concrete implementations.
@@ -91,89 +92,11 @@ export interface ILedgerPlugin {
   close?(): void | Promise<void>;
 }
 
-// ─── LLM Plugin ───
-
-/** Options passed to the LLM for evaluation */
-export interface LLMEvaluationOptions {
-  /** The full prompt to send to the LLM */
-  prompt: string;
-  /** Optional model override (overrides the plugin's default model) */
-  model?: string;
-}
-
-/** Options passed to the LLM for agent execution (API runners) */
-export interface LLMGenerationOptions {
-  /** The prompt for the agent task */
-  prompt: string;
-  /** Optional model override */
-  model?: string;
-}
-
-/** Structured response from an API agent runner */
-export interface AgentFileOutput {
-  files: Array<{
-    path: string;
-    content: string;
-  }>;
-}
-
-/**
- * Contract for all LLM provider plugins.
- *
- * An LLM plugin provides two capabilities:
- * 1. `evaluate()` — Used by the judge to score agent output
- * 2. `generate()` — Used by API runners to execute agent tasks
- *
- * Both are optional: a judge-only plugin need not implement `generate()`,
- * and a runner-only plugin need not implement `evaluate()`.
- *
- * @example
- * ```ts
- * import type { ILLMPlugin } from "agent-eval";
- *
- * class MyLLM implements ILLMPlugin {
- *   readonly name = "my-llm";
- *   readonly provider = "custom";
- *   readonly defaultModel = "my-model-v2";
- *
- *   async evaluate(options) {
- *     // Call your LLM and return { pass, score, reason, improvement }
- *   }
- * }
- * ```
- */
-export interface ILLMPlugin {
-  /** Human-readable name (e.g., "anthropic", "openai", "ollama") */
-  readonly name: string;
-
-  /** Provider identifier */
-  readonly provider: string;
-
-  /** Default model name for this plugin */
-  readonly defaultModel: string;
-
-  /**
-   * Evaluate agent output using LLM-as-a-Judge.
-   * Used by the judge module to score agent performance.
-   *
-   * @returns Structured judge result with score, pass/fail, reasoning
-   */
-  evaluate(options: LLMEvaluationOptions): Promise<JudgeResult>;
-
-  /**
-   * Generate agent output (for API runners).
-   * Used by API-type runners to execute tasks via LLM.
-   *
-   * @returns Structured file operations to apply
-   */
-  generate?(options: LLMGenerationOptions): Promise<AgentFileOutput>;
-}
-
 // ─── Judge Plugin ───
 
 /**
  * Contract for judge implementations.
- * The default implementation delegates to ILLMPlugin.evaluate(),
+ * The default implementation uses the configured judge type (API/CLI),
  * but custom judges (CLI-based, rule-based, etc.) can implement this directly.
  */
 export interface IJudgePlugin {
