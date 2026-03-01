@@ -30,7 +30,10 @@ import {
 } from "../ledger/ledger.js";
 import type { ILedgerPlugin } from "../core/interfaces.js";
 
-program.name("agenteval").description("AI coding agent evaluation framework").version("0.1.0");
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf-8"));
+
+program.name("agenteval").description("AI coding agent evaluation framework").version(pkg.version);
 
 // ─── Ledger resolver (plugin or built-in) ───
 

@@ -17,7 +17,7 @@ Every commit is guarded by **four automated checks** via a Husky pre-commit hook
 flowchart TD
     A["git commit"] --> B["Husky pre-commit hook"]
     B --> C["lint-staged<br/>ESLint + Prettier"]
-    C --> D["pnpm test<br/>351 tests (agent-eval + eval-ui)"]
+    C --> D["pnpm test<br/>399 tests (agent-eval + eval-ui)"]
     D --> E["pnpm build<br/>tsup (ESM + CJS + DTS)"]
     E --> F{"All passed?"}
     F -- Yes --> G["✅ Commit created"]
@@ -43,7 +43,7 @@ pnpm format     # Prettier auto-format
 ### 2. Test
 
 ```bash
-pnpm test       # Runs both agent-eval (223 tests) and eval-ui (128 tests)
+pnpm test       # Runs both agent-eval (271 tests) and eval-ui (128 tests)
 ```
 
 ### 3. Build
@@ -94,7 +94,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - Use `describe` / `it` with clear descriptions
 - Mock external dependencies — no real API calls in unit tests
 - The E2E integration tests in `src/e2e/` validate the full pipeline using temp git repos
-- **223 tests** covering types, config, context, runner, expect, git, ledger, plugins, environment
+- **271 tests** covering types, config, context, runner, expect, git, ledger, plugins, environment
 
 ### Dashboard (`apps/eval-ui`)
 
@@ -136,6 +136,46 @@ pnpm test            # Run component tests
 cd apps/docs
 pnpm dev          # Start VitePress dev server
 ```
+
+## Global Install (for testing locally)
+
+You can install `agenteval` globally on your machine so the CLI is available from any project:
+
+```bash
+# First time: setup pnpm global bin directory
+pnpm setup
+source ~/.zshrc   # or ~/.bashrc
+
+# Link the local package globally
+cd packages/agent-eval
+pnpm link --global
+```
+
+Now you can use `agenteval` from **any directory**:
+
+```bash
+agenteval --version   # 0.0.0-alpha
+agenteval run          # Run evals in the current project
+agenteval ledger       # View results
+agenteval ui           # Launch dashboard
+```
+
+::: tip Live development
+Since `pnpm link --global` creates a symlink, any time you rebuild the core package (`pnpm build`), the global CLI is automatically updated — no need to re-link.
+:::
+
+## Versioning
+
+The version in `package.json` is set to `0.0.0-alpha` during development. **Do not manually bump the version.**
+
+Version bumps are handled exclusively through the **release workflow** using [Changesets](https://github.com/changesets/changesets):
+
+```bash
+pnpm changeset          # Create a changeset describing your change
+pnpm changeset version   # Bump versions (CI does this on release)
+```
+
+The `agenteval --version` command reads the version dynamically from `package.json` at runtime.
 
 ## Architecture
 

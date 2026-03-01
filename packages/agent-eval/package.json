@@ -1,6 +1,6 @@
 {
   "name": "agent-eval",
-  "version": "0.1.0",
+  "version": "0.0.0-alpha",
   "description": "AI coding agent evaluation framework with Vitest-like DX",
   "type": "module",
   "main": "./dist/index.cjs",
