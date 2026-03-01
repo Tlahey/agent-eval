@@ -339,7 +339,12 @@ export async function dryRunTest(
     },
   };
 
-  // Run beforeEach hooks to capture tasks they register
+  // Run config-level beforeEach to capture tasks
+  if (config.beforeEach) {
+    await config.beforeEach({ ctx: mockCtx });
+  }
+
+  // Run DSL-level beforeEach hooks to capture tasks they register
   const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
   for (const hook of beforeEachHooks) {
     await hook.fn({ ctx: mockCtx });
@@ -418,7 +423,12 @@ export async function runTest(
     const thresholds = config.thresholds ?? getGlobalThresholds?.() ?? DEFAULT_THRESHOLDS;
 
     try {
-      // Run beforeEach hooks
+      // Run config-level beforeEach (runs before DSL hooks)
+      if (config.beforeEach) {
+        await config.beforeEach({ ctx });
+      }
+
+      // Run beforeEach hooks (DSL-level)
       for (const hook of beforeEachHooks) {
         await hook.fn({ ctx });
       }

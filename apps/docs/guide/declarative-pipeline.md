@@ -138,13 +138,15 @@ ctx.addTask({ name: "Lint", ..., weight: 1 });    // 1x importance (default)
 ```mermaid
 sequenceDiagram
   participant R as Runner
+  participant C as Config
   participant H as Hooks
   participant A as Agent
   participant E as Environment
   participant T as Tasks
   participant J as Judge
 
-  R->>H: beforeEach hooks
+  R->>C: config.beforeEach (if defined)
+  R->>H: DSL beforeEach hooks
   R->>R: Parse test fn (sync)
   R->>E: env.setup() (git reset)
   R->>A: Execute agent instruction
@@ -208,6 +210,76 @@ Hooks follow Vitest-style scoping rules:
 - **Top-level hooks** match all tests
 - **Hooks inside `describe()`** match only tests in that suite and nested suites
 - `afterEach` hooks run even when tests fail
+
+## Config-Level vs DSL-Level beforeEach
+
+You can register `beforeEach` in two places — the config file or the eval file. Both are supported simultaneously.
+
+```mermaid
+flowchart TD
+    A["Config beforeEach\n(agenteval.config.ts)"] -->|runs first| B["DSL beforeEach\n(.eval.ts files)"]
+    B --> C["Test function"]
+    C --> D["Runner executes pipeline"]
+
+    style A fill:#6366f1,color:#fff
+    style B fill:#f59e0b,color:#000
+    style C fill:#10b981,color:#fff
+    style D fill:#10b981,color:#fff
+```
+
+| Level  | Where                 | Scope                       | Example                                   |
+| ------ | --------------------- | --------------------------- | ----------------------------------------- |
+| Config | `agenteval.config.ts` | All tests using this config | Register common tasks (test, build, lint) |
+| DSL    | `.eval.ts` file       | Tests in that file/describe | Register suite-specific tasks             |
+
+### Config-level `beforeEach`
+
+```ts
+// agenteval.config.ts
+import { defineConfig } from "agent-eval";
+
+export default defineConfig({
+  runners: [{ name: "copilot", type: "cli", command: 'gh copilot "{{prompt}}"' }],
+  judge: { provider: "openai", model: "gpt-4o" },
+
+  // Runs before every test — great for common verification tasks
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "Build succeeds with zero errors",
+      weight: 2,
+    });
+  },
+});
+```
+
+### DSL-level `beforeEach` (eval file)
+
+```ts
+// banner.eval.ts — only adds test-specific tasks
+import { test } from "agent-eval";
+
+test("Add close button to Banner", ({ agent, ctx }) => {
+  agent.instruct("Add a close button to the Banner component");
+  ctx.addTask({
+    name: "Close button",
+    action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
+    criteria: "A close button with aria-label='Close' is rendered",
+    weight: 2,
+  });
+});
+```
+
+::: tip Execution order
+Config `beforeEach` → DSL `beforeEach` → Test function → Runner pipeline. Tasks from all sources are merged.
+:::
 
 ## Dry-Run Mode
 

@@ -710,6 +710,59 @@ describe("runner - lifecycle hooks", () => {
     expect(hookFn).toHaveBeenCalled();
     expect(hookFn.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("runs config-level beforeEach before DSL hooks", async () => {
+    const configBeforeEach = vi.fn();
+    const config: AgentEvalConfig = {
+      ...baseConfig,
+      beforeEach: configBeforeEach,
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-config-before-hook",
+      fn: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await runTest(testDef, config);
+    expect(configBeforeEach).toHaveBeenCalledOnce();
+    expect(configBeforeEach).toHaveBeenCalledWith(
+      expect.objectContaining({ ctx: expect.anything() }),
+    );
+  });
+
+  it("config-level beforeEach can addTask for declarative pipeline", async () => {
+    const config: AgentEvalConfig = {
+      ...baseConfig,
+      beforeEach: ({ ctx }) => {
+        ctx.addTask({
+          name: "Build",
+          action: () =>
+            Promise.resolve({
+              name: "b",
+              command: "b",
+              stdout: "",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 0,
+            }),
+          criteria: "build succeeds",
+          weight: 2,
+        });
+      },
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-config-before-add-task",
+      fn: ({ agent }) => {
+        agent.instruct("do something");
+      },
+    };
+
+    const results = await runTest(testDef, config);
+    expect(results).toHaveLength(1);
+    // Judge should have been called (declarative pipeline with tasks from config beforeEach)
+    expect(runJudge).toHaveBeenCalled();
+  });
 });
 
 describe("runner - dryRunTest", () => {

@@ -41,6 +41,7 @@ interface AgentEvalConfig {
   testFiles?: string | string[]; // Glob patterns for test discovery
   runners: AgentRunnerConfig[]; // Agent runners to evaluate
   judge: JudgeConfig; // LLM judge configuration
+  beforeEach?: HookFn; // Config-level hook before each test
   afterEach?: AfterEachCommand[]; // Auto commands after each agent run
   matrix?: { runners?: string[] }; // Filter which runners to execute
   outputDir?: string; // Ledger output dir (default: .agenteval)

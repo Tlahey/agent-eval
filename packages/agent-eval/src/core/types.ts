@@ -95,6 +95,26 @@ export interface AgentEvalConfig {
    */
   afterEach?: AfterEachCommand[];
   /**
+   * Hook function called before each test iteration.
+   * Use this to register common verification tasks via `ctx.addTask()`.
+   * Config-level beforeEach runs before any DSL-level beforeEach hooks.
+   *
+   * @example
+   * ```ts
+   * export default defineConfig({
+   *   beforeEach: ({ ctx }) => {
+   *     ctx.addTask({
+   *       name: "Tests",
+   *       action: () => ctx.exec("pnpm test"),
+   *       criteria: "All tests must pass",
+   *       weight: 3,
+   *     });
+   *   },
+   * });
+   * ```
+   */
+  beforeEach?: (args: { ctx: TestContext }) => void | Promise<void>;
+  /**
    * Global scoring thresholds for determining test status (PASS / WARN / FAIL).
    * Can be overridden per-test via JudgeOptions.thresholds.
    * Defaults to { warn: 0.8, fail: 0.5 }.
