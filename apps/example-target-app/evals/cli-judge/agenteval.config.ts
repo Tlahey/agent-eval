@@ -38,6 +38,23 @@ export default defineConfig({
       'claude -p "Analyze the following code evaluation and respond ONLY with JSON {pass: boolean, score: number, reason: string}. $(cat {{prompt_file}})" --output-format json',
   },
 
+  // Config-level beforeEach: these tasks apply to ALL tests using this config.
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All existing and new tests must pass",
+      weight: 3,
+    });
+
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "TypeScript compilation must succeed with zero errors",
+      weight: 2,
+    });
+  },
+
   testFiles: "evals/cli-judge/**/*.eval.ts",
   outputDir: ".agenteval",
   timeout: 180_000,

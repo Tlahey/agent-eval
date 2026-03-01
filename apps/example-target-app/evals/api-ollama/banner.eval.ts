@@ -1,21 +1,10 @@
-import { test, beforeEach } from "agent-eval";
+import { test } from "agent-eval";
 
-beforeEach(({ ctx }) => {
-  ctx.addTask({
-    name: "Tests",
-    action: () => ctx.exec("pnpm test"),
-    criteria: "All existing and new tests must pass",
-    weight: 3,
-  });
-
-  ctx.addTask({
-    name: "Build",
-    action: () => ctx.exec("pnpm build"),
-    criteria: "TypeScript compilation must succeed with zero errors",
-    weight: 2,
-  });
-});
-
+/**
+ * This eval file uses config-level beforeEach (see agenteval.config.ts).
+ * Common tasks (test, build) are registered automatically by the config.
+ * Only test-specific tasks need to be added here.
+ */
 test("Add a Close button to the Banner", ({ agent, ctx }) => {
   agent.instruct(
     "Add a Close button to the Banner component in src/components/Banner.tsx. " +

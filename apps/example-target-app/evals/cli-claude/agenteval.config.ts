@@ -27,11 +27,26 @@ export default defineConfig({
   ],
 
   // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
-  // A strong model is essential — the judge must parse diffs, understand test
-  // output, and evaluate code quality with nuance.
   judge: {
     provider: "openai",
     model: "gpt-4o",
+  },
+
+  // Config-level beforeEach: these tasks apply to ALL tests using this config.
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All existing and new tests must pass",
+      weight: 3,
+    });
+
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "TypeScript compilation must succeed with zero errors",
+      weight: 2,
+    });
   },
 
   testFiles: "evals/cli-claude/**/*.eval.ts",

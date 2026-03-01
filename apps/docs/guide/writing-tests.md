@@ -105,6 +105,104 @@ flowchart TD
 
 The dashboard displays these suites as a collapsible tree in the sidebar, with breadcrumb navigation showing the full suite path.
 
+## beforeEach — 3 Levels of Scoping
+
+`beforeEach` can be defined at **three** levels. All applicable hooks run before each test, in order:
+
+```mermaid
+flowchart TD
+    A["1️⃣ Config-level beforeEach\n(agenteval.config.ts)"] --> B["2️⃣ File-level beforeEach\n(.eval.ts top-level)"]
+    B --> C["3️⃣ describe-level beforeEach\n(inside describe block)"]
+    C --> D["Test function"]
+
+    style A fill:#6366f1,color:#fff
+    style B fill:#f59e0b,color:#000
+    style C fill:#10b981,color:#fff
+    style D fill:#10b981,color:#fff
+```
+
+| Level        | Where                 | Scope                                      | Best for                          |
+| ------------ | --------------------- | ------------------------------------------ | --------------------------------- |
+| **Config**   | `agenteval.config.ts` | All tests using this config                | Common tasks (test, build, lint)  |
+| **File**     | `.eval.ts` top-level  | All tests in that file                     | File-specific setup               |
+| **Describe** | Inside `describe()`   | Tests in that describe block + nested ones | Suite-specific verification tasks |
+
+### Level 1 — Config-level (recommended for shared tasks)
+
+```ts
+// agenteval.config.ts
+import { defineConfig } from "agent-eval";
+
+export default defineConfig({
+  runners: [{ name: "copilot", type: "cli", command: 'gh copilot "{{prompt}}"' }],
+  judge: { provider: "openai", model: "gpt-4o" },
+
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "Build succeeds",
+      weight: 2,
+    });
+  },
+});
+```
+
+### Level 2 — File-level (top-level in eval file)
+
+```ts
+// banner.eval.ts
+import { test, beforeEach } from "agent-eval";
+
+beforeEach(({ ctx }) => {
+  ctx.addTask({
+    name: "Lint",
+    action: () => ctx.exec("pnpm lint"),
+    criteria: "No linting errors",
+  });
+});
+
+test("Add close button", ({ agent, ctx }) => {
+  agent.instruct("Add a close button to Banner");
+  ctx.addTask({
+    name: "Button exists",
+    action: () => ctx.exec("grep aria-label Banner.tsx"),
+    criteria: "Button found",
+  });
+});
+```
+
+### Level 3 — Describe-level (scoped to a suite)
+
+```ts
+import { test, describe, beforeEach } from "agent-eval";
+
+describe("Banner", () => {
+  beforeEach(({ ctx }) => {
+    ctx.addTask({
+      name: "Banner test",
+      action: () => ctx.exec("pnpm test -- Banner"),
+      criteria: "Banner tests pass",
+    });
+  });
+
+  test("Add close button", ({ agent, ctx }) => {
+    agent.instruct("Add a close button");
+    // Gets: config beforeEach + describe beforeEach + test-specific tasks
+  });
+});
+```
+
+::: tip Combine all three
+All levels can be used together. Config tasks + file tasks + describe tasks are **merged** and all run before the test function. This keeps eval files lean — put common verification in the config, and only add specific tasks where needed.
+:::
+
 ## The Test Function
 
 The `test()` function receives an object with:
