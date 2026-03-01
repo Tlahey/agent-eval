@@ -195,3 +195,87 @@ export interface IJudgePlugin {
     options?: { model?: string; expectedFiles?: string[] },
   ): Promise<JudgeResult>;
 }
+
+// ─── Environment Plugin ───
+
+/** Result of executing a command in an environment */
+export interface EnvironmentCommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+/**
+ * Contract for execution environment plugins.
+ *
+ * An environment plugin controls where and how agent code runs:
+ * workspace setup/teardown, command execution, and diff collection.
+ *
+ * The default is `LocalEnvironment` (Git isolation + native child_process).
+ * Alternative implementations include Docker containers, remote VMs via SSH,
+ * or temporary directory clones.
+ *
+ * Lifecycle per test iteration:
+ * 1. `setup()` — Prepare workspace (git reset, docker create, etc.)
+ * 2. `execute()` — Run commands in the environment (agent, afterEach)
+ * 3. `getDiff()` — Capture the code changes
+ * 4. `teardown()` — Clean up resources (optional, for containers/VMs)
+ *
+ * @example
+ * ```ts
+ * import type { IEnvironmentPlugin } from "agent-eval";
+ *
+ * class SSHEnvironment implements IEnvironmentPlugin {
+ *   readonly name = "ssh";
+ *   async setup() { // SSH into remote, clone repo }
+ *   async execute(cmd) { // SSH exec command }
+ *   async getDiff() { // SSH exec git diff }
+ *   async teardown() { // clean up remote workspace }
+ * }
+ * ```
+ */
+export interface IEnvironmentPlugin {
+  /** Human-readable name of the environment (e.g., "local", "docker", "ssh") */
+  readonly name: string;
+
+  /**
+   * Prepare the workspace for a test iteration.
+   * For local: git reset --hard + git clean -fd.
+   * For Docker: create/start container, mount/copy repo.
+   *
+   * @param cwd - The project root directory
+   */
+  setup(cwd: string): void | Promise<void>;
+
+  /**
+   * Execute a shell command in the environment.
+   *
+   * @param command - The shell command to run
+   * @param cwd - The working directory
+   * @param options - Optional execution settings
+   * @returns Command output (stdout, stderr, exitCode)
+   */
+  execute(
+    command: string,
+    cwd: string,
+    options?: { timeout?: number },
+  ): EnvironmentCommandResult | Promise<EnvironmentCommandResult>;
+
+  /**
+   * Capture the current code diff (staged + unstaged).
+   *
+   * @param cwd - The project root directory
+   * @returns The combined diff string
+   */
+  getDiff(cwd: string): string | Promise<string>;
+
+  /**
+   * Clean up resources after a test iteration.
+   * For local: no-op (git reset handles it).
+   * For Docker: stop + remove container.
+   * Optional — environments that don't need cleanup can omit this.
+   *
+   * @param cwd - The project root directory
+   */
+  teardown?(cwd: string): void | Promise<void>;
+}

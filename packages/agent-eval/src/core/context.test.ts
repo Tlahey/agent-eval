@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { EvalContext } from "../core/context.js";
+import { LocalEnvironment } from "../environment/local-environment.js";
 
 function makeTmpGitRepo(): string {
   const dir = join(tmpdir(), `agenteval-ctx-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -28,7 +29,7 @@ describe("EvalContext", () => {
   });
 
   it("starts with no diff and no commands", () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     expect(ctx.diff).toBeNull();
     expect(ctx.commands).toEqual([]);
     expect(ctx.logs).toBe("");
@@ -36,7 +37,7 @@ describe("EvalContext", () => {
 
   it("storeDiff captures git changes", () => {
     writeFileSync(join(tmpDir, "file.txt"), "modified");
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     ctx.storeDiff();
 
     expect(ctx.diff).toBeTruthy();
@@ -44,13 +45,13 @@ describe("EvalContext", () => {
   });
 
   it("storeDiff returns empty string when no changes", () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     ctx.storeDiff();
     expect(ctx.diff).toBe("");
   });
 
   it("runCommand captures stdout for successful commands", async () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     const result = await ctx.runCommand("echo", "echo hello world");
 
     expect(result.name).toBe("echo");
@@ -61,7 +62,7 @@ describe("EvalContext", () => {
   });
 
   it("runCommand captures stderr and exit code for failing commands", async () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     const result = await ctx.runCommand(
       "fail",
       "node -e \"process.stderr.write('oops'); process.exit(2)\"",
@@ -72,7 +73,7 @@ describe("EvalContext", () => {
   });
 
   it("stores multiple commands", async () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     await ctx.runCommand("one", "echo first");
     await ctx.runCommand("two", "echo second");
 
@@ -82,7 +83,7 @@ describe("EvalContext", () => {
   });
 
   it("commands returns a copy (immutable)", async () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     await ctx.runCommand("test", "echo ok");
 
     const cmds = ctx.commands;
@@ -95,7 +96,7 @@ describe("EvalContext", () => {
 
   it("logs formats diff and command output", async () => {
     writeFileSync(join(tmpDir, "file.txt"), "changed");
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     ctx.storeDiff();
     await ctx.runCommand("check", "echo all good");
 
@@ -107,7 +108,7 @@ describe("EvalContext", () => {
   });
 
   it("logs includes STDERR section when stderr is present", async () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     await ctx.runCommand("warn", "node -e \"process.stderr.write('warning'); process.exit(1)\"");
 
     const logs = ctx.logs;
@@ -116,7 +117,7 @@ describe("EvalContext", () => {
   });
 
   it("logs omits STDERR section when stderr is empty", async () => {
-    const ctx = new EvalContext(tmpDir);
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     await ctx.runCommand("clean", "echo clean");
 
     const logs = ctx.logs;

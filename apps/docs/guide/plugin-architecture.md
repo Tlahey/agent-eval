@@ -15,6 +15,7 @@ flowchart LR
         LP["ILedgerPlugin"]
         LMP["ILLMPlugin"]
         JP["IJudgePlugin"]
+        EP["IEnvironmentPlugin"]
     end
 
     subgraph Ledger["Ledger Plugins"]
@@ -30,8 +31,15 @@ flowchart LR
         CL["Your Custom LLM"]
     end
 
+    subgraph EnvImpls["Environment Plugins"]
+        LE["LocalEnvironment"]
+        DE["DockerEnvironment"]
+        CE["Your Custom Env"]
+    end
+
     R --> LP
     R --> LMP
+    R --> EP
     E --> JP
 
     LP --> SQ
@@ -43,10 +51,15 @@ flowchart LR
     LMP --> OL
     LMP --> CL
 
+    EP --> LE
+    EP --> DE
+    EP --> CE
+
     style Core fill:#6366f1,color:#fff
     style Plugins fill:#f59e0b,color:#000
     style Ledger fill:#10b981,color:#fff
     style LLM fill:#10b981,color:#fff
+    style EnvImpls fill:#10b981,color:#fff
 ```
 
 ## Plugin Interfaces
@@ -107,6 +120,26 @@ interface IJudgePlugin {
   ): Promise<JudgeResult>;
 }
 ```
+
+### IEnvironmentPlugin
+
+The environment plugin abstracts where and how commands execute — locally, in Docker, via SSH, etc.
+
+```ts
+interface IEnvironmentPlugin {
+  readonly name: string;
+  setup(cwd: string): void | Promise<void>;
+  execute(
+    command: string,
+    cwd: string,
+    options?: { timeout?: number },
+  ): EnvironmentCommandResult | Promise<EnvironmentCommandResult>;
+  getDiff(cwd: string): string | Promise<string>;
+  teardown?(cwd: string): void | Promise<void>;
+}
+```
+
+See [Execution Environments](/guide/environments) for detailed usage and examples.
 
 ## Built-in Plugins
 

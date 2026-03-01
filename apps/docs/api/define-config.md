@@ -47,6 +47,7 @@ interface AgentEvalConfig {
   timeout?: number; // Agent run timeout ms (default: 300000)
   ledger?: ILedgerPlugin; // Custom storage plugin
   llm?: ILLMPlugin; // Custom LLM plugin
+  environment?: IEnvironmentPlugin; // Execution environment plugin
 }
 
 interface AgentRunnerConfig {
@@ -84,15 +85,16 @@ interface AfterEachCommand {
 
 ## Config Options
 
-| Option      | Type                     | Default                                  | Description                                                |
-| ----------- | ------------------------ | ---------------------------------------- | ---------------------------------------------------------- |
-| `rootDir`   | `string`                 | `process.cwd()`                          | Project root directory                                     |
-| `testFiles` | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                         |
-| `runners`   | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate                                  |
-| `judge`     | `JudgeConfig`            | _required_                               | LLM judge configuration                                    |
-| `afterEach` | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)    |
-| `matrix`    | `{ runners?: string[] }` | —                                        | Filter which runners to execute                            |
-| `outputDir` | `string`                 | `.agenteval`                             | Ledger output directory                                    |
-| `timeout`   | `number`                 | `300000`                                 | Agent run timeout (ms)                                     |
-| `ledger`    | `ILedgerPlugin`          | Built-in SQLite                          | Custom storage plugin ([docs](/guide/plugin-architecture)) |
-| `llm`       | `ILLMPlugin`             | Built-in Vercel AI SDK                   | Custom LLM plugin ([docs](/guide/plugin-architecture))     |
+| Option        | Type                     | Default                                  | Description                                                |
+| ------------- | ------------------------ | ---------------------------------------- | ---------------------------------------------------------- |
+| `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                     |
+| `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                         |
+| `runners`     | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate                                  |
+| `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                    |
+| `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)    |
+| `matrix`      | `{ runners?: string[] }` | —                                        | Filter which runners to execute                            |
+| `outputDir`   | `string`                 | `.agenteval`                             | Ledger output directory                                    |
+| `timeout`     | `number`                 | `300000`                                 | Agent run timeout (ms)                                     |
+| `ledger`      | `ILedgerPlugin`          | Built-in SQLite                          | Custom storage plugin ([docs](/guide/plugin-architecture)) |
+| `llm`         | `ILLMPlugin`             | Built-in Vercel AI SDK                   | Custom LLM plugin ([docs](/guide/plugin-architecture))     |
+| `environment` | `IEnvironmentPlugin`     | `LocalEnvironment`                       | Execution environment ([docs](/guide/environments))        |

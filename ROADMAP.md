@@ -485,6 +485,54 @@ This file tracks the implementation progress of the AgentEval framework. It is u
   - [x] `guide/architecture.md` — Updated extending table and structure
   - [x] `AGENTS.md` — Updated structure, doc map, feature guide, architecture section
 
+## Phase 20 — SOLID Environment Plugins (Execution Context & Docker)
+
+- [x] **Core Interfaces & Contracts (`core/interfaces.ts`)**
+  - [x] Define `IEnvironmentPlugin` interface with lifecycle hooks: `setup()`, `execute()`, `getDiff()`, `teardown?()`
+  - [x] Define `EnvironmentCommandResult` type: `{ stdout, stderr, exitCode }`
+  - [x] Add `environment?: IEnvironmentPlugin` to `AgentEvalConfig` in `types.ts`
+  - [x] Add `validateEnvironmentPlugin()` to `plugin-validator.ts`
+  - [x] Refactor `EvalContext` to delegate operations to injected `IEnvironmentPlugin` instance
+  - [x] Add `storeDiffAsync()` method for async environment plugins
+
+- [x] **Local Git Environment Plugin (Default Fallback)**
+  - [x] Create `environment/local-environment.ts` as default execution environment
+  - [x] `setup()` — `git reset --hard HEAD` + `git clean -fd`
+  - [x] `execute()` — native `child_process.execSync` with captured output
+  - [x] `getDiff()` — staged + unstaged git diff
+  - [x] Full test suite: `local-environment.test.ts`
+
+- [x] **Docker Environment Plugin (Sandboxed)**
+  - [x] Create `environment/docker-environment.ts` for isolated container execution
+  - [x] `setup()` — `docker create` with volume mount + `docker start`
+  - [x] `execute()` — `docker exec` inside running container
+  - [x] `getDiff()` — `docker exec git diff` inside container
+  - [x] `teardown()` — `docker rm -f` to remove container
+  - [x] Support `Dockerfile` builds and custom `dockerArgs`
+  - [x] Full test suite (mocked): `docker-environment.test.ts`
+
+- [x] **Runner Refactor (`core/runner.ts`)**
+  - [x] Replace `gitResetHard()` with `env.setup(cwd)`
+  - [x] Replace CLI `execSync` with `env.execute()`
+  - [x] Add `env.teardown()` in `finally` block
+  - [x] Use `storeDiffAsync()` for async environment support
+  - [x] Fallback to `LocalEnvironment` when no env configured
+  - [x] Updated all runner tests with mock environment
+
+- [x] **Configuration & Documentation**
+  - [x] Create `guide/environments.md` with Mermaid diagrams, SSH + temp-clone examples
+  - [x] Add `Environments` to VitePress sidebar
+  - [x] Update `guide/plugin-architecture.md` — add IEnvironmentPlugin section and diagram
+  - [x] Update `guide/configuration.md` — add `environment` to options table
+  - [x] Update `api/define-config.md` — add `environment` field
+  - [x] Update `guide/architecture.md` — add environment module, update extending table
+  - [x] Update `AGENTS.md` — add environment plugin recipe, structure, cross-reference
+  - [x] Update `ROADMAP.md`
+
+- [ ] **Parallel Execution Readiness (Future)**
+  - [ ] Add `maxWorkers` experimental config for parallel test execution
+  - [ ] Pool-based runner with multiple environment instances
+
 ---
 
 ## Future — Planned

@@ -128,6 +128,21 @@ export interface AgentEvalConfig {
    * ```
    */
   llm?: import("./interfaces.js").ILLMPlugin;
+  /**
+   * Execution environment plugin (local Git, Docker, SSH, etc.).
+   * Controls workspace setup/teardown, command execution, and diff collection.
+   * If not provided, defaults to LocalEnvironment (Git isolation + child_process).
+   *
+   * @example
+   * ```ts
+   * import { DockerEnvironment } from "agent-eval";
+   * export default defineConfig({
+   *   environment: new DockerEnvironment({ image: "node:22" }),
+   *   // ...
+   * });
+   * ```
+   */
+  environment?: import("./interfaces.js").IEnvironmentPlugin;
 }
 
 export interface AfterEachCommand {

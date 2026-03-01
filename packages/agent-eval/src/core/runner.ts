@@ -1,9 +1,7 @@
-import { execSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
 import { getGlobalThresholds } from "./expect.js";
-import { gitResetHard } from "../git/git.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
 import type {
   AgentEvalConfig,
@@ -14,7 +12,8 @@ import type {
   TestDefinition,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
-import type { ILedgerPlugin } from "./interfaces.js";
+import type { ILedgerPlugin, IEnvironmentPlugin } from "./interfaces.js";
+import { LocalEnvironment } from "../environment/local-environment.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 
@@ -66,6 +65,7 @@ async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
 /**
  * Create the raw AgentHandle for a given runner config.
  * Uses config.llm plugin for API runners when available, falls back to built-in resolveRunnerModel.
+ * CLI runners delegate to the environment plugin for command execution.
  */
 function createRawAgent(
   runner: AgentRunnerConfig,
@@ -73,6 +73,7 @@ function createRawAgent(
   reporter: Reporter,
   testId: string,
   config: AgentEvalConfig,
+  env: IEnvironmentPlugin,
 ): AgentHandle {
   return {
     name: runner.name,
@@ -84,11 +85,12 @@ function createRawAgent(
           throw new Error(`Runner "${runner.name}" has type "cli" but no command defined`);
         }
         const cmd = runner.command.replace("{{prompt}}", prompt);
-        execSync(cmd, {
-          cwd,
-          stdio: "inherit",
-          timeout: 600_000,
-        });
+        // Use environment plugin for CLI execution
+        const result = await env.execute(cmd, cwd, { timeout: 600_000 });
+        if (result.exitCode !== 0 && result.stderr) {
+          // Log stderr but don't throw — agent may produce partial output
+          reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
+        }
       } else if (runner.type === "api") {
         if (!runner.api) {
           throw new Error(`Runner "${runner.name}" has type "api" but no api config defined`);
@@ -160,8 +162,9 @@ function createAgent(
   config: AgentEvalConfig,
   reporter: Reporter,
   testId: string,
+  env: IEnvironmentPlugin,
 ): AgentHandle {
-  const raw = createRawAgent(runner, cwd, reporter, testId, config);
+  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
 
   return {
     name: raw.name,
@@ -171,8 +174,8 @@ function createAgent(
       // Execute the agent
       await raw.run(prompt);
 
-      // Auto storeDiff after agent execution
-      ctx.storeDiff();
+      // Auto storeDiff after agent execution (async for env plugins)
+      await ctx.storeDiffAsync();
 
       // Run afterEach commands from config
       if (config.afterEach) {
@@ -194,6 +197,7 @@ export interface RunResult {
 /**
  * Run a single test definition against all configured runners, sequentially.
  * Uses config.ledger (ILedgerPlugin) when provided, otherwise falls back to appendLedgerEntry.
+ * Uses config.environment (IEnvironmentPlugin) when provided, otherwise falls back to LocalEnvironment.
  */
 export async function runTest(
   testDef: TestDefinition,
@@ -204,6 +208,7 @@ export async function runTest(
   const cwd = config.rootDir ?? process.cwd();
   const outputDir = config.outputDir ?? ".agenteval";
   const ledger: ILedgerPlugin | null = config.ledger ?? null;
+  const env: IEnvironmentPlugin = config.environment ?? new LocalEnvironment();
   const runners = config.matrix?.runners
     ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
     : config.runners;
@@ -221,12 +226,12 @@ export async function runTest(
     const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
     rep.onTestStart(event);
 
-    // Reset git state before each runner
+    // Setup workspace via environment plugin (git reset, docker create, etc.)
     rep.onGitReset(event);
-    gitResetHard(cwd);
+    await env.setup(cwd);
 
-    const ctx = new EvalContext(cwd);
-    const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title);
+    const ctx = new EvalContext(cwd, env);
+    const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
     const start = Date.now();
     const thresholds = config.thresholds ?? getGlobalThresholds?.() ?? DEFAULT_THRESHOLDS;
 
@@ -318,6 +323,11 @@ export async function runTest(
         entries: [entry],
         passed: false,
       });
+    } finally {
+      // Teardown environment (no-op for local, removes container for Docker)
+      if (env.teardown) {
+        await env.teardown(cwd);
+      }
     }
   }
 

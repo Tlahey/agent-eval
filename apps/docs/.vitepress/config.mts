@@ -24,6 +24,7 @@ export default withMermaid(
             { text: "CLI", link: "/guide/cli" },
             { text: "Architecture", link: "/guide/architecture" },
             { text: "Plugin Architecture", link: "/guide/plugin-architecture" },
+            { text: "Environments", link: "/guide/environments" },
             { text: "Contributing", link: "/guide/contributing" },
           ],
         },

@@ -19,7 +19,7 @@ function makeLedgerEntry(overrides?: Partial<LedgerEntry>): LedgerEntry {
     improvement: "",
     context: { diff: "diff content", commands: [] },
     durationMs: 1234,
-    thresholds: { pass: 0.7, warn: 0.5 },
+    thresholds: { warn: 0.7, fail: 0.5 },
     ...overrides,
   };
 }
