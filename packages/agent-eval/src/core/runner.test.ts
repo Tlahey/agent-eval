@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { setLastJudgeResult, getLastJudgeResult, clearLastJudgeResult, runTest } from "./runner.js";
+import {
+  setLastJudgeResult,
+  getLastJudgeResult,
+  clearLastJudgeResult,
+  runTest,
+  dryRunTest,
+} from "./runner.js";
 import type { AgentEvalConfig, TestDefinition, JudgeResult } from "./types.js";
 
 // Mock external deps
@@ -55,9 +61,28 @@ vi.mock("@ai-sdk/openai", () => ({
   createOpenAI: vi.fn(() => (model: string) => ({ modelId: model, provider: "openai" })),
 }));
 
+// Mock the judge module for declarative pipeline tests
+vi.mock("../judge/judge.js", () => ({
+  judge: vi.fn(() => ({ pass: true, score: 0.85, reason: "good", improvement: "none" })),
+  buildDeclarativeJudgePrompt: vi.fn(() => "mock declarative criteria"),
+}));
+
+// Mock the index module for hook registration
+vi.mock("../index.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../index.js")>();
+  return {
+    ...original,
+    getRegisteredBeforeEachHooks: vi.fn(() => []),
+    getRegisteredAfterEachHooks: vi.fn(() => []),
+    getMatchingHooks: vi.fn(() => []),
+  };
+});
+
 import { writeFileSync, mkdirSync } from "node:fs";
 import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { judge as runJudge } from "../judge/judge.js";
+import { getMatchingHooks } from "../index.js";
 
 describe("runner - judge result store", () => {
   beforeEach(() => {
@@ -486,5 +511,336 @@ describe("runner - auto storeDiff and afterEach", () => {
     };
 
     await runTest(testDef, config);
+  });
+});
+
+describe("runner - declarative pipeline (agent.instruct)", () => {
+  const baseConfig: AgentEvalConfig = {
+    rootDir: "/tmp/test",
+    outputDir: "/tmp/test/.agenteval",
+    runners: [{ name: "mock-cli", type: "cli", command: "echo {{prompt}}" }],
+    judge: { provider: "openai", model: "gpt-4o" },
+  };
+
+  beforeEach(() => {
+    clearLastJudgeResult();
+    vi.clearAllMocks();
+    mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
+    mockEnvInstance.getDiff.mockReturnValue("mock diff content");
+  });
+
+  it("executes declarative pipeline when agent.instruct() is used", async () => {
+    const testDef: TestDefinition = {
+      title: "test-declarative",
+      fn: ({ agent, ctx }) => {
+        agent.instruct("Add a close button to the Banner");
+        ctx.addTask({
+          name: "Build",
+          action: () =>
+            Promise.resolve({
+              name: "Build",
+              command: "pnpm build",
+              stdout: "ok",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 100,
+            }),
+          criteria: "build must succeed",
+          weight: 2,
+        });
+      },
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results).toHaveLength(1);
+    // Agent should have been executed via the raw agent
+    expect(mockEnvInstance.execute).toHaveBeenCalled();
+    // Judge should have been called for declarative pipeline
+    expect(runJudge).toHaveBeenCalled();
+  });
+
+  it("enforces single-instruct policy", async () => {
+    const testDef: TestDefinition = {
+      title: "test-single-instruct",
+      fn: ({ agent }) => {
+        agent.instruct("First instruction");
+        agent.instruct("Second instruction"); // should throw
+      },
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("Single-Instruct Policy");
+  });
+
+  it("prevents mixing instruct() and run()", async () => {
+    const testDef: TestDefinition = {
+      title: "test-mixed-instruct-run",
+      fn: async ({ agent }) => {
+        agent.instruct("instruction");
+        await agent.run("prompt"); // should throw
+      },
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("Cannot use run() after instruct()");
+  });
+
+  it("prevents mixing run() and instruct()", async () => {
+    const testDef: TestDefinition = {
+      title: "test-mixed-run-instruct",
+      fn: async ({ agent }) => {
+        await agent.run("prompt");
+        agent.instruct("instruction"); // should throw
+      },
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("Cannot use instruct() after run()");
+  });
+
+  it("declarative with no tasks records as incomplete", async () => {
+    const testDef: TestDefinition = {
+      title: "test-no-tasks",
+      fn: ({ agent }) => {
+        agent.instruct("do something");
+      },
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("without tasks or judge evaluation");
+  });
+
+  it("declarative test function is sync (no async needed)", async () => {
+    const syncFn = ({
+      agent,
+      ctx,
+    }: {
+      agent: { instruct: (p: string) => void };
+      ctx: { addTask: (t: unknown) => void };
+    }) => {
+      agent.instruct("sync instruction");
+      ctx.addTask({
+        name: "test",
+        action: () =>
+          Promise.resolve({
+            name: "t",
+            command: "t",
+            stdout: "",
+            stderr: "",
+            exitCode: 0,
+            durationMs: 0,
+          }),
+        criteria: "pass",
+      });
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-sync",
+      fn: syncFn as TestDefinition["fn"],
+    };
+
+    const results = await runTest(testDef, baseConfig);
+    expect(results).toHaveLength(1);
+    expect(runJudge).toHaveBeenCalled();
+  });
+
+  it("runs config afterEach commands in declarative mode", async () => {
+    const config: AgentEvalConfig = {
+      ...baseConfig,
+      afterEach: [{ name: "lint", command: "pnpm lint" }],
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-declarative-after-each",
+      fn: ({ agent, ctx }) => {
+        agent.instruct("task");
+        ctx.addTask({
+          name: "build",
+          action: () =>
+            Promise.resolve({
+              name: "b",
+              command: "b",
+              stdout: "",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 0,
+            }),
+          criteria: "pass",
+        });
+      },
+    };
+
+    await runTest(testDef, config);
+    // env.execute should have been called for: agent instruction + afterEach lint command
+    const executeCalls = mockEnvInstance.execute.mock.calls;
+    expect(executeCalls.length).toBeGreaterThanOrEqual(2); // agent + lint
+  });
+});
+
+describe("runner - lifecycle hooks", () => {
+  const baseConfig: AgentEvalConfig = {
+    rootDir: "/tmp/test",
+    outputDir: "/tmp/test/.agenteval",
+    runners: [{ name: "mock-cli", type: "cli", command: "echo {{prompt}}" }],
+    judge: { provider: "openai", model: "gpt-4o" },
+  };
+
+  beforeEach(() => {
+    clearLastJudgeResult();
+    vi.clearAllMocks();
+    mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
+    mockEnvInstance.getDiff.mockReturnValue("mock diff content");
+  });
+
+  it("runs beforeEach hooks before test execution", async () => {
+    const hookFn = vi.fn();
+    vi.mocked(getMatchingHooks).mockReturnValue([{ fn: hookFn, suitePath: [] }]);
+
+    const testDef: TestDefinition = {
+      title: "test-before-hook",
+      fn: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await runTest(testDef, baseConfig);
+    // Hook may be called for both beforeEach and afterEach matching
+    expect(hookFn).toHaveBeenCalled();
+    expect(hookFn.mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("runs config-level beforeEach before DSL hooks", async () => {
+    const configBeforeEach = vi.fn();
+    const config: AgentEvalConfig = {
+      ...baseConfig,
+      beforeEach: configBeforeEach,
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-config-before-hook",
+      fn: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await runTest(testDef, config);
+    expect(configBeforeEach).toHaveBeenCalledOnce();
+    expect(configBeforeEach).toHaveBeenCalledWith(
+      expect.objectContaining({ ctx: expect.anything() }),
+    );
+  });
+
+  it("config-level beforeEach can addTask for declarative pipeline", async () => {
+    const config: AgentEvalConfig = {
+      ...baseConfig,
+      beforeEach: ({ ctx }) => {
+        ctx.addTask({
+          name: "Build",
+          action: () =>
+            Promise.resolve({
+              name: "b",
+              command: "b",
+              stdout: "",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 0,
+            }),
+          criteria: "build succeeds",
+          weight: 2,
+        });
+      },
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-config-before-add-task",
+      fn: ({ agent }) => {
+        agent.instruct("do something");
+      },
+    };
+
+    const results = await runTest(testDef, config);
+    expect(results).toHaveLength(1);
+    // Judge should have been called (declarative pipeline with tasks from config beforeEach)
+    expect(runJudge).toHaveBeenCalled();
+  });
+});
+
+describe("runner - dryRunTest", () => {
+  const baseConfig: AgentEvalConfig = {
+    rootDir: "/tmp/test",
+    runners: [
+      { name: "copilot", type: "cli", command: "echo {{prompt}}" },
+      {
+        name: "claude",
+        type: "api",
+        api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+      },
+    ],
+    judge: { provider: "openai", model: "gpt-4o" },
+    afterEach: [{ name: "test", command: "pnpm test" }],
+  };
+
+  it("returns plan for declarative test", async () => {
+    const testDef: TestDefinition = {
+      title: "test-dry-run-declarative",
+      fn: ({ agent, ctx }) => {
+        agent.instruct("Add a close button");
+        ctx.addTask({
+          name: "Build",
+          action: () =>
+            Promise.resolve({
+              name: "b",
+              command: "b",
+              stdout: "",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 0,
+            }),
+          criteria: "build succeeds",
+          weight: 2,
+        });
+      },
+    };
+
+    const plan = await dryRunTest(testDef, baseConfig);
+    expect(plan.testId).toBe("test-dry-run-declarative");
+    expect(plan.mode).toBe("declarative");
+    expect(plan.instruction).toBe("Add a close button");
+    expect(plan.tasks).toHaveLength(1);
+    expect(plan.tasks[0].name).toBe("Build");
+    expect(plan.tasks[0].weight).toBe(2);
+    expect(plan.runners).toHaveLength(2);
+    expect(plan.afterEachCommands).toEqual(["pnpm test"]);
+  });
+
+  it("returns plan for imperative test", async () => {
+    const testDef: TestDefinition = {
+      title: "test-dry-run-imperative",
+      fn: async ({ agent }) => {
+        await agent.run("prompt");
+      },
+    };
+
+    const plan = await dryRunTest(testDef, baseConfig);
+    expect(plan.mode).toBe("imperative");
+    expect(plan.instruction).toBeUndefined();
+  });
+
+  it("respects matrix runner filter", async () => {
+    const config: AgentEvalConfig = {
+      ...baseConfig,
+      matrix: { runners: ["copilot"] },
+    };
+
+    const testDef: TestDefinition = {
+      title: "test-dry-run-matrix",
+      fn: ({ agent }) => {
+        agent.instruct("task");
+      },
+    };
+
+    const plan = await dryRunTest(testDef, config);
+    expect(plan.runners).toHaveLength(1);
+    expect(plan.runners[0].name).toBe("copilot");
   });
 });

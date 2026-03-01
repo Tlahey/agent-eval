@@ -36,6 +36,7 @@ agenteval run [options]
 | `-f, --filter <pattern>` | Filter tests by title (substring match)           |
 | `-t, --tag <tag>`        | Filter tests by tag                               |
 | `-o, --output <dir>`     | Override output directory for the ledger database |
+| `--dry-run`              | Preview execution plan without running agents     |
 | `-s, --silent`           | Suppress all output except errors (for CI)        |
 | `-v, --verbose`          | Show detailed output including judge reasoning    |
 
@@ -68,6 +69,9 @@ agenteval run --silent
 
 # Verbose mode (includes judge reasoning and improvement suggestions)
 agenteval run --verbose
+
+# Dry-run mode (preview execution plan without running agents)
+agenteval run --dry-run
 
 # Combine: verbose output filtered to a specific tag
 agenteval run -v -t ui

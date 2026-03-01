@@ -10,7 +10,7 @@ import { glob } from "glob";
 import { createJiti } from "jiti";
 import { loadConfig, assertValidPlugins } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
-import { runTest } from "../core/runner.js";
+import { runTest, dryRunTest } from "../core/runner.js";
 import { DefaultReporter, SilentReporter, VerboseReporter } from "../core/reporter.js";
 import type { Reporter, TestResultEvent } from "../core/reporter.js";
 import {
@@ -77,6 +77,7 @@ interface RunOptions {
   output?: string;
   silent?: boolean;
   verbose?: boolean;
+  dryRun?: boolean;
 }
 
 function createReporter(opts: RunOptions): Reporter {
@@ -142,6 +143,45 @@ async function executeRun(opts: RunOptions): Promise<void> {
       if (tests.length === 0) continue;
 
       const relPath = file.replace(cwd + "/", "");
+
+      // ─── Dry-run mode: output execution plan without running ───
+      if (opts.dryRun) {
+        console.log(chalk.bold(`\n📄 ${relPath}`));
+        for (const testDef of tests) {
+          const plan = await dryRunTest(testDef, config);
+          const modeIcon =
+            plan.mode === "declarative" ? "🔹" : plan.mode === "imperative" ? "🔸" : "❓";
+          console.log(`\n  ${modeIcon} ${chalk.bold(plan.testId)} ${chalk.dim(`(${plan.mode})`)}`);
+          if (plan.suitePath && plan.suitePath.length > 0) {
+            console.log(`    Suite: ${chalk.dim(plan.suitePath.join(" > "))}`);
+          }
+          if (plan.instruction) {
+            console.log(`    Instruction: ${chalk.green(`"${plan.instruction}"`)}`);
+          }
+          if (plan.tasks.length > 0) {
+            console.log(`    Tasks:`);
+            for (const task of plan.tasks) {
+              console.log(
+                `      - ${task.name} ${chalk.dim(`(weight: ${task.weight})`)} — ${task.criteria}`,
+              );
+            }
+          }
+          console.log(
+            `    Runners: ${plan.runners.map((r) => `${r.name} (${r.type})`).join(", ")}`,
+          );
+          if (plan.beforeEachHooks > 0) {
+            console.log(`    beforeEach hooks: ${plan.beforeEachHooks}`);
+          }
+          if (plan.afterEachCommands.length > 0) {
+            console.log(`    afterEach commands: ${plan.afterEachCommands.join(", ")}`);
+          }
+          if (plan.afterEachHooks > 0) {
+            console.log(`    afterEach hooks: ${plan.afterEachHooks}`);
+          }
+        }
+        continue;
+      }
+
       reporter.onFileStart(relPath);
 
       // Count total tests × runners for onRunStart
@@ -160,6 +200,11 @@ async function executeRun(opts: RunOptions): Promise<void> {
           });
         }
       }
+    }
+
+    if (opts.dryRun) {
+      console.log(chalk.dim("\n✅ Dry run complete. No agents were executed.\n"));
+      process.exit(0);
     }
 
     // Final summary via reporter
@@ -185,6 +230,7 @@ program
   .option("-o, --output <dir>", "Override output directory for the ledger database")
   .option("-s, --silent", "Suppress all output except errors")
   .option("-v, --verbose", "Show detailed output including judge reasoning")
+  .option("--dry-run", "Output the execution plan without running agents or judges")
   .action(executeRun);
 
 // ─── Ledger command ───

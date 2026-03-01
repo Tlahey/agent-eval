@@ -535,6 +535,40 @@ This file tracks the implementation progress of the AgentEval framework. It is u
 
 ---
 
+## Phase 21 — Declarative Pipeline & Single-Instruct Policy ✅
+
+- [x] **Types**
+  - [x] `TaskDefinition` interface (name, action, criteria, weight)
+  - [x] `agent.instruct(prompt)` on `AgentHandle`
+  - [x] `ctx.addTask()`, `ctx.exec()`, `ctx.tasks` on `TestContext`
+  - [x] `HookFn`, `HookContext`, `HookDefinition` types
+  - [x] `TestFn` supports sync (declarative) and async (imperative)
+
+- [x] **Declarative Pipeline**
+  - [x] `agent.instruct()` + `ctx.addTask()` registers declarative plan
+  - [x] Runner auto-executes: agent → storeDiff → afterEach → tasks → auto-judge
+  - [x] Weighted task scoring via `buildDeclarativeJudgePrompt()`
+  - [x] Single-Instruct Policy: one `instruct()` per test, no mixing with `run()`
+
+- [x] **Lifecycle Hooks**
+  - [x] `beforeEach()` / `afterEach()` DSL with describe-scope matching
+  - [x] `getMatchingHooks()` prefix-based hook filtering
+  - [x] afterEach hooks run even on test failure
+
+- [x] **Dry-Run Mode**
+  - [x] `--dry-run` CLI flag
+  - [x] `dryRunTest()` returns execution plan without side effects
+  - [x] Formatted CLI output: mode, instruction, tasks, runners, hooks
+
+- [x] **Tests & Documentation**
+  - [x] Context tests: addTask, exec, validation, immutability
+  - [x] Runner tests: declarative pipeline, single-instruct, dry-run, hooks
+  - [x] Index tests: beforeEach/afterEach registration, scoping, matching
+  - [x] Declarative Pipeline guide page
+  - [x] Updated writing-tests, context API, test API, CLI docs
+
+---
+
 ## Future — Planned
 
 - [ ] Benchmark suites — Curated evaluation sets for common tasks (React components, API endpoints, refactoring)

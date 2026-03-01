@@ -95,6 +95,26 @@ export interface AgentEvalConfig {
    */
   afterEach?: AfterEachCommand[];
   /**
+   * Hook function called before each test iteration.
+   * Use this to register common verification tasks via `ctx.addTask()`.
+   * Config-level beforeEach runs before any DSL-level beforeEach hooks.
+   *
+   * @example
+   * ```ts
+   * export default defineConfig({
+   *   beforeEach: ({ ctx }) => {
+   *     ctx.addTask({
+   *       name: "Tests",
+   *       action: () => ctx.exec("pnpm test"),
+   *       criteria: "All tests must pass",
+   *       weight: 3,
+   *     });
+   *   },
+   * });
+   * ```
+   */
+  beforeEach?: (args: { ctx: TestContext }) => void | Promise<void>;
+  /**
    * Global scoring thresholds for determining test status (PASS / WARN / FAIL).
    * Can be overridden per-test via JudgeOptions.thresholds.
    * Defaults to { warn: 0.8, fail: 0.5 }.
@@ -163,15 +183,52 @@ export interface CommandResult {
   durationMs: number;
 }
 
+/**
+ * A task registered via `ctx.addTask()` in declarative pipeline mode.
+ * Tasks execute after the agent instruction and are evaluated by the judge.
+ */
+export interface TaskDefinition {
+  /** Human-readable name for the task (used in logs and judge prompt) */
+  name: string;
+  /** Action to execute after the agent runs. Returns a CommandResult for the judge. */
+  action: () => CommandResult | Promise<CommandResult>;
+  /** Evaluation criteria for the judge to assess this task's outcome */
+  criteria: string;
+  /** Weight for scoring (default: 1). Higher weight = more impact on final score. */
+  weight?: number;
+}
+
 export interface TestContext {
   /** Store the current git diff into context */
   storeDiff(): void;
   /** Run a shell command and store its output in context */
   runCommand(name: string, command: string): Promise<CommandResult>;
+  /**
+   * Register a task for post-agent execution (declarative pipeline).
+   * Tasks are executed by the runner after the agent instruction completes.
+   * Each task's criteria and result are sent to the judge for evaluation.
+   */
+  addTask(task: TaskDefinition): void;
+  /**
+   * Execute a shell command and return the result.
+   * Convenience wrapper for use inside task actions.
+   *
+   * @example
+   * ```ts
+   * ctx.addTask({
+   *   name: "Build",
+   *   action: () => ctx.exec("pnpm run build"),
+   *   criteria: "the build must succeed",
+   * });
+   * ```
+   */
+  exec(command: string): Promise<CommandResult>;
   /** Get the stored git diff */
   readonly diff: string | null;
   /** Get all stored command results */
   readonly commands: CommandResult[];
+  /** Get all registered tasks (declarative pipeline) */
+  readonly tasks: ReadonlyArray<TaskDefinition>;
   /** Get all logs as a formatted string */
   readonly logs: string;
 }
@@ -264,8 +321,14 @@ export interface ScoreOverride {
 // ─── Test Definition ───
 
 export interface AgentHandle {
-  /** Execute the agent with a prompt instruction */
+  /** Execute the agent with a prompt instruction (imperative mode — legacy) */
   run(prompt: string): Promise<void>;
+  /**
+   * Register a prompt for declarative execution (Single-Instruct Policy).
+   * The runner will execute this instruction after the test function returns.
+   * Only ONE instruct() call is allowed per test — calling it twice throws an error.
+   */
+  instruct(prompt: string): void;
   /** The name of the current runner */
   readonly name: string;
   /** The model being used */
@@ -278,7 +341,7 @@ export interface TestFnArgs {
   judge: JudgeConfig;
 }
 
-export type TestFn = (args: TestFnArgs) => Promise<void>;
+export type TestFn = (args: TestFnArgs) => void | Promise<void>;
 
 export interface TestDefinition {
   title: string;
@@ -293,4 +356,20 @@ export interface TestDefinition {
 
 export interface ExpectChain {
   toPassJudge(options: JudgeOptions): Promise<JudgeResult>;
+}
+
+// ─── Hooks ───
+
+/** Context passed to beforeEach/afterEach hook functions */
+export interface HookContext {
+  ctx: TestContext;
+}
+
+/** A lifecycle hook function (beforeEach / afterEach) */
+export type HookFn = (args: HookContext) => void | Promise<void>;
+
+/** Internal hook definition with suite scope */
+export interface HookDefinition {
+  fn: HookFn;
+  suitePath: string[];
 }

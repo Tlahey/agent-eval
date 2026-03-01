@@ -25,6 +25,7 @@ export default withMermaid(
             { text: "Architecture", link: "/guide/architecture" },
             { text: "Plugin Architecture", link: "/guide/plugin-architecture" },
             { text: "Environments", link: "/guide/environments" },
+            { text: "Declarative Pipeline", link: "/guide/declarative-pipeline" },
             { text: "Contributing", link: "/guide/contributing" },
           ],
         },

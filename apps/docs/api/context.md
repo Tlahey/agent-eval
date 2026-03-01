@@ -27,8 +27,11 @@ interface TestContext {
   storeDiff(): void;
   storeDiffAsync(): Promise<void>;
   runCommand(name: string, command: string): Promise<CommandResult>;
+  addTask(task: TaskDefinition): void;
+  exec(command: string): Promise<CommandResult>;
   readonly diff: string | null;
   readonly commands: CommandResult[];
+  readonly tasks: readonly TaskDefinition[];
   readonly logs: string;
 }
 ```
@@ -62,12 +65,51 @@ interface CommandResult {
 For commands that should run after every agent execution, use the `afterEach` config option instead of calling `runCommand()` in every test file.
 :::
 
+### `addTask(task)`
+
+Registers a verification task for the [declarative pipeline](/guide/declarative-pipeline). Only used with `agent.instruct()`.
+
+```ts
+interface TaskDefinition {
+  name: string; // Task identifier
+  action: () => Promise<CommandResult>; // Task execution function
+  criteria: string; // Judge evaluation criteria
+  weight?: number; // Scoring weight (default: 1)
+}
+```
+
+**Validation rules:**
+
+- `name` must be a non-empty string
+- `action` must be a function
+- `criteria` must be a non-empty string
+- `weight` (if provided) must be a non-negative number
+
+```ts
+ctx.addTask({
+  name: "Build",
+  action: () => ctx.exec("pnpm build"),
+  criteria: "Build succeeds with zero errors",
+  weight: 2,
+});
+```
+
+### `exec(command)`
+
+Convenience method that executes a shell command and returns a `CommandResult`. Shorthand for `runCommand()` that auto-generates the task name from the command.
+
+```ts
+const result = await ctx.exec("pnpm build");
+// result: { name: "pnpm build", command: "pnpm build", stdout, stderr, exitCode, durationMs }
+```
+
 ## Properties
 
-| Property   | Type              | Description                                |
-| ---------- | ----------------- | ------------------------------------------ |
-| `diff`     | `string \| null`  | Captured git diff (auto-populated)         |
-| `commands` | `CommandResult[]` | All command results (manual + afterEach)   |
-| `logs`     | `string`          | Formatted log string (diff + all commands) |
+| Property   | Type                        | Description                                |
+| ---------- | --------------------------- | ------------------------------------------ |
+| `diff`     | `string \| null`            | Captured git diff (auto-populated)         |
+| `commands` | `CommandResult[]`           | All command results (manual + afterEach)   |
+| `tasks`    | `readonly TaskDefinition[]` | Registered tasks (declarative mode)        |
+| `logs`     | `string`                    | Formatted log string (diff + all commands) |
 
 The `logs` property combines the diff and all command outputs into a single formatted string, which is used internally by the judge prompt builder.

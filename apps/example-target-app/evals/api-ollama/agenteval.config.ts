@@ -38,12 +38,22 @@ export default defineConfig({
     model: "claude-sonnet-4-20250514",
   },
 
-  // Commands run automatically after each agent.run() call.
-  // storeDiff() is always called first (built-in).
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
+  // Config-level beforeEach: these tasks apply to ALL tests using this config.
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All existing and new tests must pass",
+      weight: 3,
+    });
+
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "TypeScript compilation must succeed with zero errors",
+      weight: 2,
+    });
+  },
 
   testFiles: "evals/api-ollama/**/*.eval.ts",
   outputDir: ".agenteval",

@@ -82,6 +82,17 @@ export default defineConfig({
     { name: "typecheck", command: "pnpm build" },
   ],
 
+  // Config-level beforeEach hook — runs before EVERY test in this config.
+  // Great for registering common verification tasks.
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All existing and new tests must pass",
+      weight: 3,
+    });
+  },
+
   // Model matrix (optional): only run specific runners
   matrix: {
     runners: ["copilot", "claude-code"],
@@ -110,6 +121,7 @@ export default defineConfig({
 | `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                                           |
 | `runners`     | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                                                    |
 | `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                                                      |
+| `beforeEach`  | `HookFn`                         | —                                        | Config-level hook called before each test (can add tasks)                    |
 | `afterEach`   | `AfterEachCommand[]`             | —                                        | Commands to run after each agent (auto storeDiff first)                      |
 | `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                                              |
 | `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                                                      |

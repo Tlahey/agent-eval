@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   test as evalTest,
   describe as evalDescribe,
+  beforeEach as evalBeforeEach,
+  afterEach as evalAfterEach,
   getRegisteredTests,
+  getRegisteredBeforeEachHooks,
+  getRegisteredAfterEachHooks,
+  getMatchingHooks,
   clearRegisteredTests,
   initSession,
 } from "../index.js";
@@ -186,5 +191,95 @@ describe("describe() suite scoping", () => {
     evalTest("fresh", async () => {});
     const tests = getRegisteredTests();
     expect(tests[0].suitePath).toBeUndefined();
+  });
+});
+
+describe("beforeEach / afterEach hooks", () => {
+  beforeEach(() => {
+    clearRegisteredTests();
+  });
+
+  it("registers a top-level beforeEach hook", () => {
+    const hookFn = async () => {};
+    evalBeforeEach(hookFn);
+
+    const hooks = getRegisteredBeforeEachHooks();
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0].fn).toBe(hookFn);
+    expect(hooks[0].suitePath).toEqual([]);
+  });
+
+  it("registers a top-level afterEach hook", () => {
+    const hookFn = async () => {};
+    evalAfterEach(hookFn);
+
+    const hooks = getRegisteredAfterEachHooks();
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0].fn).toBe(hookFn);
+    expect(hooks[0].suitePath).toEqual([]);
+  });
+
+  it("scopes hooks inside describe blocks", () => {
+    evalDescribe("MySuite", () => {
+      evalBeforeEach(async () => {});
+      evalAfterEach(async () => {});
+    });
+
+    const beforeHooks = getRegisteredBeforeEachHooks();
+    const afterHooks = getRegisteredAfterEachHooks();
+    expect(beforeHooks[0].suitePath).toEqual(["MySuite"]);
+    expect(afterHooks[0].suitePath).toEqual(["MySuite"]);
+  });
+
+  it("nested describe scopes hooks correctly", () => {
+    evalDescribe("Outer", () => {
+      evalBeforeEach(async () => {});
+      evalDescribe("Inner", () => {
+        evalBeforeEach(async () => {});
+      });
+    });
+
+    const hooks = getRegisteredBeforeEachHooks();
+    expect(hooks).toHaveLength(2);
+    expect(hooks[0].suitePath).toEqual(["Outer"]);
+    expect(hooks[1].suitePath).toEqual(["Outer", "Inner"]);
+  });
+
+  it("clearRegisteredTests also clears hooks", () => {
+    evalBeforeEach(async () => {});
+    evalAfterEach(async () => {});
+    clearRegisteredTests();
+
+    expect(getRegisteredBeforeEachHooks()).toHaveLength(0);
+    expect(getRegisteredAfterEachHooks()).toHaveLength(0);
+  });
+
+  it("getMatchingHooks returns hooks matching suite prefix", () => {
+    const hookOuter = { fn: async () => {}, suitePath: ["Outer"] };
+    const hookInner = { fn: async () => {}, suitePath: ["Outer", "Inner"] };
+    const hookOther = { fn: async () => {}, suitePath: ["Other"] };
+    const hookRoot = { fn: async () => {}, suitePath: [] as string[] };
+
+    const allHooks = [hookOuter, hookInner, hookOther, hookRoot];
+
+    // Test matching ["Outer", "Inner"] - should match hookOuter, hookInner, hookRoot
+    const matched = getMatchingHooks(allHooks, ["Outer", "Inner"]);
+    expect(matched).toContain(hookOuter);
+    expect(matched).toContain(hookInner);
+    expect(matched).toContain(hookRoot);
+    expect(matched).not.toContain(hookOther);
+  });
+
+  it("getMatchingHooks returns all root hooks", () => {
+    const rootHook = { fn: async () => {}, suitePath: [] as string[] };
+    const matched = getMatchingHooks([rootHook], ["AnySuite"]);
+    expect(matched).toHaveLength(1);
+  });
+
+  it("getMatchingHooks handles undefined testSuitePath", () => {
+    const hook = { fn: async () => {}, suitePath: [] as string[] };
+    const matched = getMatchingHooks([hook], undefined);
+    // Root hooks match everything
+    expect(matched).toHaveLength(1);
   });
 });

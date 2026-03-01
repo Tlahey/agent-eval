@@ -21,8 +21,11 @@ function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
   return {
     storeDiff: vi.fn(),
     runCommand: vi.fn(),
+    addTask: vi.fn(),
+    exec: vi.fn(),
     diff: "diff --git a/test.ts",
     commands: [],
+    tasks: [],
     logs: "mock logs",
     ...overrides,
   };

@@ -3,12 +3,20 @@ import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
 import { getGlobalThresholds } from "./expect.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
+import { judge as runJudge, buildDeclarativeJudgePrompt } from "../judge/judge.js";
+import {
+  getMatchingHooks,
+  getRegisteredBeforeEachHooks,
+  getRegisteredAfterEachHooks,
+} from "../index.js";
 import type {
   AgentEvalConfig,
   AgentHandle,
   AgentRunnerConfig,
+  CommandResult,
   JudgeResult,
   LedgerEntry,
+  TaskDefinition,
   TestDefinition,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
@@ -74,7 +82,7 @@ function createRawAgent(
   testId: string,
   config: AgentEvalConfig,
   env: IEnvironmentPlugin,
-): AgentHandle {
+): Omit<AgentHandle, "instruct"> {
   return {
     name: runner.name,
     model: runner.api?.model ?? runner.command ?? "unknown",
@@ -153,7 +161,18 @@ Respond with the list of files to create or modify. Each file must include the f
 }
 
 /**
- * Wrap an AgentHandle to auto-run storeDiff + afterEach commands after agent.run().
+ * Internal state tracked by the declarative agent handle.
+ * Used by the runner to determine which pipeline to execute.
+ */
+interface AgentState {
+  instruction: string | null;
+  isDeclarative: boolean;
+  isImperative: boolean;
+}
+
+/**
+ * Create an AgentHandle that supports both imperative (run) and declarative (instruct) modes.
+ * Enforces the Single-Instruct Policy and mutual exclusivity of the two modes.
  */
 function createAgent(
   runner: AgentRunnerConfig,
@@ -163,14 +182,37 @@ function createAgent(
   reporter: Reporter,
   testId: string,
   env: IEnvironmentPlugin,
-): AgentHandle {
+): { agent: AgentHandle; state: AgentState } {
   const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
+  const state: AgentState = {
+    instruction: null,
+    isDeclarative: false,
+    isImperative: false,
+  };
 
-  return {
+  const agent: AgentHandle = {
     name: raw.name,
     model: raw.model,
 
+    instruct(prompt: string): void {
+      if (state.isImperative) {
+        throw new Error("Cannot use instruct() after run(). Choose one API style per test.");
+      }
+      if (state.instruction !== null) {
+        throw new Error(
+          "Single-Instruct Policy: A test can only have one instruction. Use separate test() blocks for different prompts.",
+        );
+      }
+      state.instruction = prompt;
+      state.isDeclarative = true;
+    },
+
     async run(prompt: string) {
+      if (state.isDeclarative) {
+        throw new Error("Cannot use run() after instruct(). Choose one API style per test.");
+      }
+      state.isImperative = true;
+
       // Execute the agent
       await raw.run(prompt);
 
@@ -185,6 +227,25 @@ function createAgent(
       }
     },
   };
+
+  return { agent, state };
+}
+
+/**
+ * Execute the raw agent instruction (without storeDiff/afterEach wrapping).
+ * Used by the declarative pipeline where the runner controls the full lifecycle.
+ */
+async function executeRawAgent(
+  runner: AgentRunnerConfig,
+  cwd: string,
+  prompt: string,
+  reporter: Reporter,
+  testId: string,
+  config: AgentEvalConfig,
+  env: IEnvironmentPlugin,
+): Promise<void> {
+  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
+  await raw.run(prompt);
 }
 
 export interface RunResult {
@@ -195,7 +256,129 @@ export interface RunResult {
 }
 
 /**
+ * Information about a test execution plan (for dry-run mode).
+ */
+export interface DryRunPlan {
+  testId: string;
+  suitePath?: string[];
+  runners: Array<{
+    name: string;
+    type: string;
+    model: string;
+  }>;
+  mode: "declarative" | "imperative" | "unknown";
+  instruction?: string;
+  tasks: Array<{ name: string; criteria: string; weight: number }>;
+  beforeEachHooks: number;
+  afterEachHooks: number;
+  afterEachCommands: string[];
+}
+
+/**
+ * Run a test in dry-run mode: parse and return the execution plan without side effects.
+ */
+export async function dryRunTest(
+  testDef: TestDefinition,
+  config: AgentEvalConfig,
+): Promise<DryRunPlan> {
+  const runners = config.matrix?.runners
+    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
+    : config.runners;
+
+  // Create a mock context that captures addTask calls but does nothing
+  const tasks: Array<{ name: string; criteria: string; weight: number }> = [];
+  let instruction: string | undefined;
+  let mode: "declarative" | "imperative" | "unknown" = "unknown";
+
+  // Create a mock agent to detect which mode the test uses
+  const mockAgent: AgentHandle = {
+    name: "dry-run",
+    model: "dry-run",
+    instruct(prompt: string) {
+      instruction = prompt;
+      mode = "declarative";
+    },
+    async run(_prompt: string) {
+      mode = "imperative";
+    },
+  };
+
+  // Create a mock context to capture tasks
+  const mockCtx = {
+    storeDiff: () => {},
+    runCommand: async () => ({
+      name: "",
+      command: "",
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+      durationMs: 0,
+    }),
+    addTask: (task: TaskDefinition) => {
+      tasks.push({ name: task.name, criteria: task.criteria, weight: task.weight ?? 1 });
+    },
+    exec: async () => ({
+      name: "",
+      command: "",
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+      durationMs: 0,
+    }),
+    get diff() {
+      return null;
+    },
+    get commands() {
+      return [];
+    },
+    get tasks() {
+      return tasks as unknown as ReadonlyArray<TaskDefinition>;
+    },
+    get logs() {
+      return "";
+    },
+  };
+
+  // Run config-level beforeEach to capture tasks
+  if (config.beforeEach) {
+    await config.beforeEach({ ctx: mockCtx });
+  }
+
+  // Run DSL-level beforeEach hooks to capture tasks they register
+  const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
+  for (const hook of beforeEachHooks) {
+    await hook.fn({ ctx: mockCtx });
+  }
+
+  // Execute the test function with mock agent/context
+  try {
+    await testDef.fn({ agent: mockAgent, ctx: mockCtx, judge: config.judge });
+  } catch {
+    // Ignore errors in dry-run mode
+  }
+
+  const afterEachHooks = getMatchingHooks(getRegisteredAfterEachHooks(), testDef.suitePath);
+
+  return {
+    testId: testDef.title,
+    suitePath: testDef.suitePath,
+    runners: runners.map((r) => ({
+      name: r.name,
+      type: r.type,
+      model: r.api?.model ?? r.command ?? "unknown",
+    })),
+    mode,
+    instruction,
+    tasks,
+    beforeEachHooks: beforeEachHooks.length,
+    afterEachHooks: afterEachHooks.length,
+    afterEachCommands: (config.afterEach ?? []).map((c) => c.command),
+  };
+}
+
+/**
  * Run a single test definition against all configured runners, sequentially.
+ * Supports both imperative (agent.run) and declarative (agent.instruct) pipelines.
  * Uses config.ledger (ILedgerPlugin) when provided, otherwise falls back to appendLedgerEntry.
  * Uses config.environment (IEnvironmentPlugin) when provided, otherwise falls back to LocalEnvironment.
  */
@@ -219,6 +402,10 @@ export async function runTest(
     appendLedgerEntry(outputDir, entry);
   };
 
+  // Get matching lifecycle hooks
+  const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
+  const afterEachHooks = getMatchingHooks(getRegisteredAfterEachHooks(), testDef.suitePath);
+
   const allEvents: TestResultEvent[] = [];
   const results: RunResult[] = [];
 
@@ -231,51 +418,48 @@ export async function runTest(
     await env.setup(cwd);
 
     const ctx = new EvalContext(cwd, env);
-    const agent = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
+    const { agent, state } = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
     const start = Date.now();
     const thresholds = config.thresholds ?? getGlobalThresholds?.() ?? DEFAULT_THRESHOLDS;
 
     try {
+      // Run config-level beforeEach (runs before DSL hooks)
+      if (config.beforeEach) {
+        await config.beforeEach({ ctx });
+      }
+
+      // Run beforeEach hooks (DSL-level)
+      for (const hook of beforeEachHooks) {
+        await hook.fn({ ctx });
+      }
+
+      // Execute the test function (registers instruction/tasks or calls run)
       await testDef.fn({ agent, ctx, judge: config.judge });
 
-      const durationMs = Date.now() - start;
-      const entry: LedgerEntry = {
-        testId: testDef.title,
-        suitePath: testDef.suitePath ?? [],
-        timestamp: new Date().toISOString(),
-        agentRunner: runner.name,
-        judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
-        score: 0,
-        pass: false,
-        status: "FAIL",
-        reason: "Test completed without judge evaluation",
-        improvement: "",
-        context: {
-          diff: ctx.diff,
-          commands: ctx.commands,
-        },
-        durationMs,
-        thresholds,
-      };
+      let entry: LedgerEntry;
 
-      // If the test fn stored judge results via expect(), they'll be in the
-      // global store. Otherwise, we record a basic entry.
-      const judgeResult = getLastJudgeResult();
-      if (judgeResult) {
-        entry.score = judgeResult.score;
-        entry.pass = judgeResult.pass;
-        entry.status = judgeResult.status ?? computeStatus(judgeResult.score, thresholds);
-        entry.reason = judgeResult.reason;
-        entry.improvement = judgeResult.improvement;
-        clearLastJudgeResult();
+      if (state.isDeclarative) {
+        // ─── DECLARATIVE PIPELINE ───
+        entry = await executeDeclarativePipeline(
+          state.instruction!,
+          runner,
+          cwd,
+          ctx,
+          config,
+          rep,
+          testDef,
+          env,
+          start,
+          thresholds,
+        );
       } else {
-        entry.status = computeStatus(entry.score, thresholds);
-        entry.pass = entry.status !== "FAIL";
+        // ─── IMPERATIVE PIPELINE (legacy: agent.run() was called) ───
+        entry = buildImperativeEntry(testDef, runner, ctx, config, start, thresholds);
       }
 
       await record(entry);
 
-      const resultEvent = { ...event, entry, durationMs };
+      const resultEvent = { ...event, entry, durationMs: entry.durationMs };
       if (entry.status === "PASS") {
         rep.onTestPass(resultEvent);
       } else if (entry.status === "WARN") {
@@ -291,6 +475,11 @@ export async function runTest(
         entries: [entry],
         passed: entry.pass,
       });
+
+      // Run afterEach hooks
+      for (const hook of afterEachHooks) {
+        await hook.fn({ ctx });
+      }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       rep.onTestError(event, errorMsg);
@@ -316,6 +505,16 @@ export async function runTest(
       };
 
       await record(entry);
+
+      // Run afterEach hooks even on error
+      for (const hook of afterEachHooks) {
+        try {
+          await hook.fn({ ctx });
+        } catch {
+          // Swallow hook errors during error handling
+        }
+      }
+
       allEvents.push({ ...event, entry, durationMs });
       results.push({
         testId: testDef.title,
@@ -332,6 +531,168 @@ export async function runTest(
   }
 
   return results;
+}
+
+/**
+ * Execute the declarative pipeline:
+ * 1. Run the agent instruction
+ * 2. Auto storeDiff
+ * 3. Run config afterEach commands
+ * 4. Execute registered tasks
+ * 5. Auto judge evaluation from task criteria
+ */
+async function executeDeclarativePipeline(
+  instruction: string,
+  runner: AgentRunnerConfig,
+  cwd: string,
+  ctx: EvalContext,
+  config: AgentEvalConfig,
+  reporter: Reporter,
+  testDef: TestDefinition,
+  env: IEnvironmentPlugin,
+  start: number,
+  thresholds: import("./types.js").Thresholds,
+): Promise<LedgerEntry> {
+  // 1. Execute the agent instruction
+  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, config, env);
+
+  // 2. Auto storeDiff
+  await ctx.storeDiffAsync();
+
+  // 3. Run config afterEach commands
+  if (config.afterEach) {
+    for (const cmd of config.afterEach) {
+      await ctx.runCommand(cmd.name, cmd.command);
+    }
+  }
+
+  // 4. Execute registered tasks and collect results
+  const taskResults: Array<{ task: TaskDefinition; result: CommandResult }> = [];
+  for (const task of ctx.tasks) {
+    const result = await task.action();
+    taskResults.push({ task, result });
+  }
+
+  // 5. Auto judge evaluation
+  const durationMs = Date.now() - start;
+
+  if (taskResults.length > 0) {
+    // Build a weighted judge prompt from task criteria
+    const prompt = buildDeclarativeJudgePrompt(instruction, taskResults, ctx);
+    const judgeResult = await runJudge(ctx, prompt, config.judge);
+
+    const status = computeStatus(judgeResult.score, thresholds);
+    return {
+      testId: testDef.title,
+      suitePath: testDef.suitePath ?? [],
+      timestamp: new Date().toISOString(),
+      agentRunner: runner.name,
+      judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+      score: judgeResult.score,
+      pass: status !== "FAIL",
+      status,
+      reason: judgeResult.reason,
+      improvement: judgeResult.improvement,
+      context: {
+        diff: ctx.diff,
+        commands: ctx.commands,
+      },
+      durationMs,
+      thresholds,
+    };
+  }
+
+  // No tasks registered — check if expect().toPassJudge() was used
+  const judgeResult = getLastJudgeResult();
+  if (judgeResult) {
+    const status = judgeResult.status ?? computeStatus(judgeResult.score, thresholds);
+    clearLastJudgeResult();
+    return {
+      testId: testDef.title,
+      suitePath: testDef.suitePath ?? [],
+      timestamp: new Date().toISOString(),
+      agentRunner: runner.name,
+      judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+      score: judgeResult.score,
+      pass: judgeResult.pass,
+      status,
+      reason: judgeResult.reason,
+      improvement: judgeResult.improvement,
+      context: {
+        diff: ctx.diff,
+        commands: ctx.commands,
+      },
+      durationMs,
+      thresholds,
+    };
+  }
+
+  // Declarative with no tasks and no judge — record as incomplete
+  return {
+    testId: testDef.title,
+    suitePath: testDef.suitePath ?? [],
+    timestamp: new Date().toISOString(),
+    agentRunner: runner.name,
+    judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+    score: 0,
+    pass: false,
+    status: "FAIL",
+    reason: "Declarative test completed without tasks or judge evaluation",
+    improvement: "Add ctx.addTask() calls to define evaluation criteria",
+    context: {
+      diff: ctx.diff,
+      commands: ctx.commands,
+    },
+    durationMs,
+    thresholds,
+  };
+}
+
+/**
+ * Build a ledger entry for the imperative pipeline (agent.run + optional expect).
+ */
+function buildImperativeEntry(
+  testDef: TestDefinition,
+  runner: AgentRunnerConfig,
+  ctx: EvalContext,
+  config: AgentEvalConfig,
+  start: number,
+  thresholds: import("./types.js").Thresholds,
+): LedgerEntry {
+  const durationMs = Date.now() - start;
+  const entry: LedgerEntry = {
+    testId: testDef.title,
+    suitePath: testDef.suitePath ?? [],
+    timestamp: new Date().toISOString(),
+    agentRunner: runner.name,
+    judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+    score: 0,
+    pass: false,
+    status: "FAIL",
+    reason: "Test completed without judge evaluation",
+    improvement: "",
+    context: {
+      diff: ctx.diff,
+      commands: ctx.commands,
+    },
+    durationMs,
+    thresholds,
+  };
+
+  const judgeResult = getLastJudgeResult();
+  if (judgeResult) {
+    entry.score = judgeResult.score;
+    entry.pass = judgeResult.pass;
+    entry.status = judgeResult.status ?? computeStatus(judgeResult.score, thresholds);
+    entry.reason = judgeResult.reason;
+    entry.improvement = judgeResult.improvement;
+    clearLastJudgeResult();
+  } else {
+    entry.status = computeStatus(entry.score, thresholds);
+    entry.pass = entry.status !== "FAIL";
+  }
+
+  return entry;
 }
 
 // ─── Global judge result store (set by expect().toPassJudge) ───
