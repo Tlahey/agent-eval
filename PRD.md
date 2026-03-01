@@ -14,7 +14,7 @@ Before building a UI, we must generate real data by running a true E2E evaluatio
 - **Requirements:**
 
 1. **Dummy Application (`apps/dummy-react-app`):** Scaffold a minimal React application (using Vite) within the monorepo. It should contain at least one component (e.g., `Banner.tsx`) and a basic Vitest setup.
-2. **Scenario Creation:** Write a real evaluation script (`apps/dummy-react-app/evals/button.eval.ts`) using the `@dkt/agent-eval` API.
+2. **Scenario Creation:** Write a real evaluation script (`apps/dummy-react-app/evals/button.eval.ts`) using the `agent-eval` API.
 
 - _Goal:_ Ask the agent to "Add a close button to the Banner component".
 - _Assertions:_ Verify the file was modified, run `pnpm test`, and use `expect(ctx).toPassJudge()`.
@@ -32,7 +32,7 @@ A standalone, lightweight web application served locally by the `agenteval ui` C
 
 - **Tech Stack:** React, Vite, Recharts (for graphs), Tailwind CSS.
 - **Architecture:**
-- **Local API:** The `@dkt/agent-eval` CLI will spin up a small server (e.g., Express or Hono) that reads `.agenteval/ledger.sqlite` and exposes JSON endpoints (e.g., `GET /api/runs`).
+- **Local API:** The `agent-eval` CLI will spin up a small server (e.g., Express or Hono) that reads `.agenteval/ledger.sqlite` and exposes JSON endpoints (e.g., `GET /api/runs`).
 - **Static Serving:** The UI will be pre-built and served as static files by this local CLI server.
 
 - **Key Views:**
@@ -111,7 +111,7 @@ When modifying or creating components for the Visual Dashboard, you MUST adhere 
 - [ ] Create `index.css` with CSS variables for the color palette.
 - [ ] Update `tailwind.config.js` to map colors to CSS variables.
 - [ ] Update `AGENTS.md` with the new UI styling rules.
-- [ ] Build the Express/Hono API server inside `@dkt/agent-eval` CLI to serve SQLite data.
+- [ ] Build the Express/Hono API server inside `agent-eval` CLI to serve SQLite data.
 - [ ] Build the React Views (Table, Recharts Graph, Diff Modal).
 - [ ] Connect the `agenteval ui` command to serve the built React static files and start the API.
 

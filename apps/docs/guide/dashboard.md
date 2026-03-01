@@ -107,7 +107,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph CLI["agenteval ui"]
-        API["Express API Server\nport 4747"]
+        API["Express API Server<br/>port 4747"]
     end
 
     subgraph DB["SQLite"]

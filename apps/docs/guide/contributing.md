@@ -16,9 +16,9 @@ Every commit is guarded by **four automated checks** via a Husky pre-commit hook
 ```mermaid
 flowchart TD
     A["git commit"] --> B["Husky pre-commit hook"]
-    B --> C["lint-staged\nESLint + Prettier"]
-    C --> D["pnpm test\n351 tests (agent-eval + eval-ui)"]
-    D --> E["pnpm build\ntsup (ESM + CJS + DTS)"]
+    B --> C["lint-staged<br/>ESLint + Prettier"]
+    C --> D["pnpm test<br/>351 tests (agent-eval + eval-ui)"]
+    D --> E["pnpm build<br/>tsup (ESM + CJS + DTS)"]
     E --> F{"All passed?"}
     F -- Yes --> G["✅ Commit created"]
     F -- No --> H["❌ Commit rejected"]
@@ -143,14 +143,14 @@ The framework follows [SOLID principles](/guide/architecture) for modularity and
 
 ## Architecture Decisions
 
-All major technical decisions are documented as ADRs in [`docs/adrs/`](https://github.com/dkt/agent-eval/tree/main/docs/adrs):
+All major technical decisions are documented as ADRs in [`docs/adrs/`](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs):
 
-| ADR                                                                                      | Decision                                               |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| [001](https://github.com/dkt/agent-eval/tree/main/docs/adrs/001-why-custom-framework.md) | Why a custom framework (not Vitest/Promptfoo/Langfuse) |
-| [002](https://github.com/dkt/agent-eval/tree/main/docs/adrs/002-sqlite-over-jsonl.md)    | SQLite over JSONL for the ledger                       |
-| [003](https://github.com/dkt/agent-eval/tree/main/docs/adrs/003-sequential-execution.md) | Sequential execution (no parallelism)                  |
-| [004](https://github.com/dkt/agent-eval/tree/main/docs/adrs/004-llm-as-judge.md)         | LLM-as-a-Judge with Vercel AI SDK                      |
-| [005](https://github.com/dkt/agent-eval/tree/main/docs/adrs/005-monorepo-layout.md)      | Monorepo layout (apps/ + packages/)                    |
-| [006](https://github.com/dkt/agent-eval/tree/main/docs/adrs/006-code-quality-gates.md)   | Code quality gates (ESLint + Prettier + Husky)         |
-| [007](https://github.com/dkt/agent-eval/tree/main/docs/adrs/007-solid-architecture.md)   | SOLID architecture principles                          |
+| ADR                                                                                         | Decision                                               |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| [001](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/001-why-custom-framework.md) | Why a custom framework (not Vitest/Promptfoo/Langfuse) |
+| [002](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/002-sqlite-over-jsonl.md)    | SQLite over JSONL for the ledger                       |
+| [003](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/003-sequential-execution.md) | Sequential execution (no parallelism)                  |
+| [004](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/004-llm-as-judge.md)         | LLM-as-a-Judge with Vercel AI SDK                      |
+| [005](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/005-monorepo-layout.md)      | Monorepo layout (apps/ + packages/)                    |
+| [006](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/006-code-quality-gates.md)   | Code quality gates (ESLint + Prettier + Husky)         |
+| [007](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/007-solid-architecture.md)   | SOLID architecture principles                          |

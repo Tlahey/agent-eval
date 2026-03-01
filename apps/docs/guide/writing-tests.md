@@ -7,9 +7,9 @@ Every eval test follows a precise lifecycle, driven by **environment plugins** a
 ```mermaid
 flowchart TD
     A["test() registers evaluation"] --> B["Runner picks up test"]
-    B --> B2["🔧 env.setup(cwd)\n(workspace reset via plugin)"]
-    B2 --> B3["📋 Config beforeEach\n(register common tasks)"]
-    B3 --> B4["📋 DSL beforeEach\n(register scoped tasks)"]
+    B --> B2["🔧 env.setup(cwd)<br/>(workspace reset via plugin)"]
+    B2 --> B3["📋 Config beforeEach<br/>(register common tasks)"]
+    B3 --> B4["📋 DSL beforeEach<br/>(register scoped tasks)"]
     B4 --> C{"Mode?"}
     C -- Declarative --> D1["🤖 agent.instruct(prompt)"]
     D1 --> D2["📸 Auto storeDiff()"]
@@ -115,9 +115,9 @@ flowchart TD
     ROOT --> STANDALONE["test('Standalone')"]
     UI --> BANNER["describe('Banner')"]
     UI --> SEARCH["describe('Search')"]
-    BANNER --> T1["test('Add close button')\nsuitePath: ['UI Components', 'Banner']"]
-    BANNER --> T2["test('Add animation')\nsuitePath: ['UI Components', 'Banner']"]
-    SEARCH --> T3["test('Add debounce')\nsuitePath: ['UI Components', 'Search']"]
+    BANNER --> T1["test('Add close button')<br/>suitePath: ['UI Components', 'Banner']"]
+    BANNER --> T2["test('Add animation')<br/>suitePath: ['UI Components', 'Banner']"]
+    SEARCH --> T3["test('Add debounce')<br/>suitePath: ['UI Components', 'Search']"]
     STANDALONE --> T4["suitePath: undefined"]
 
     style UI fill:#6366f1,color:#fff
@@ -136,8 +136,8 @@ The dashboard displays these suites as a collapsible tree in the sidebar, with b
 
 ```mermaid
 flowchart TD
-    A["1️⃣ Config-level beforeEach\n(agenteval.config.ts)"] --> B["2️⃣ File-level beforeEach\n(.eval.ts top-level)"]
-    B --> C["3️⃣ describe-level beforeEach\n(inside describe block)"]
+    A["1️⃣ Config-level beforeEach<br/>(agenteval.config.ts)"] --> B["2️⃣ File-level beforeEach<br/>(.eval.ts top-level)"]
+    B --> C["3️⃣ describe-level beforeEach<br/>(inside describe block)"]
     C --> D["Test function"]
 
     style A fill:#6366f1,color:#fff
@@ -428,7 +428,7 @@ If a judge call fails (score < fail threshold, default 0.5), it throws a `JudgeF
 
 ```mermaid
 flowchart LR
-    A["toPassJudge()"] --> B{"Resolve\nthresholds"}
+    A["toPassJudge()"] --> B{"Resolve<br/>thresholds"}
     B --> C{"score ≥ warn?"}
     C -- Yes --> D["✅ PASS — return"]
     C -- No --> E{"score ≥ fail?"}

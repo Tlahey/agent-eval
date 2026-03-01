@@ -13,7 +13,7 @@ flowchart TD
     D --> F["agenteval.config.js"]
     D --> G["agenteval.config.mts"]
     D --> H["agenteval.config.mjs"]
-    E & F & G & H --> I["jiti loader\n(TypeScript support)"]
+    E & F & G & H --> I["jiti loader<br/>(TypeScript support)"]
     C --> I
     I --> J["Merge with defaults"]
     J --> K["Validated config ready"]
@@ -193,10 +193,10 @@ Commands run **automatically** after each agent execution, before the judge eval
 
 ```mermaid
 flowchart LR
-    A["agent.run(prompt)"] --> B["📸 storeDiff()\n(automatic)"]
-    B --> C["⚙️ afterEach[0]\npnpm test"]
-    C --> D["⚙️ afterEach[1]\npnpm build"]
-    D --> E["Ready for\njudge evaluation"]
+    A["agent.run(prompt)"] --> B["📸 storeDiff()<br/>(automatic)"]
+    B --> C["⚙️ afterEach[0]<br/>pnpm test"]
+    C --> D["⚙️ afterEach[1]<br/>pnpm build"]
+    D --> E["Ready for<br/>judge evaluation"]
 
     style A fill:#f59e0b,color:#000
     style B fill:#6366f1,color:#fff
@@ -327,9 +327,9 @@ Only **FAIL** throws an error. **WARN** results are flagged but still count as p
 
 ```mermaid
 flowchart TD
-    PT["Per-test thresholds\n(JudgeOptions.thresholds)"] --> |"highest priority"| R["Resolved thresholds"]
-    GT["Global config thresholds\n(config.thresholds)"] --> |"fallback"| R
-    DT["Default thresholds\n({ warn: 0.8, fail: 0.5 })"] --> |"last resort"| R
+    PT["Per-test thresholds<br/>(JudgeOptions.thresholds)"] --> |"highest priority"| R["Resolved thresholds"]
+    GT["Global config thresholds<br/>(config.thresholds)"] --> |"fallback"| R
+    DT["Default thresholds<br/>({ warn: 0.8, fail: 0.5 })"] --> |"last resort"| R
 
     style PT fill:#6366f1,color:#fff
     style GT fill:#4f46e5,color:#fff

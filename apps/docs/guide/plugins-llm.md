@@ -198,8 +198,8 @@ The `llm` plugin and `judge` config option work together:
 
 ```mermaid
 flowchart LR
-    JC["judge config\n(provider, model)"] --> |"which model"| JP["Judge Prompt"]
-    LP["llm plugin\n(ILLMPlugin)"] --> |"how to call"| JP
+    JC["judge config<br/>(provider, model)"] --> |"which model"| JP["Judge Prompt"]
+    LP["llm plugin<br/>(ILLMPlugin)"] --> |"how to call"| JP
     JP --> R["JudgeResult"]
 
     style JC fill:#6366f1,color:#fff

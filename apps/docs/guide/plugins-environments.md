@@ -161,11 +161,11 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A["Which environment?"] --> B{"Need isolation\nfrom host?"}
-    B -- Yes --> C{"Docker\navailable?"}
+    A["Which environment?"] --> B{"Need isolation<br/>from host?"}
+    B -- Yes --> C{"Docker<br/>available?"}
     C -- Yes --> D["DockerEnvironment"]
-    C -- No --> E["Custom\n(SSH, VM, etc.)"]
-    B -- No --> F["LocalEnvironment\n(default)"]
+    C -- No --> E["Custom<br/>(SSH, VM, etc.)"]
+    B -- No --> F["LocalEnvironment<br/>(default)"]
 
     style D fill:#6366f1,color:#fff
     style E fill:#f59e0b,color:#000

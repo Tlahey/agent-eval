@@ -235,7 +235,7 @@ You can register `beforeEach` in two places — the config file or the eval file
 
 ```mermaid
 flowchart TD
-    A["Config beforeEach\n(agenteval.config.ts)"] -->|runs first| B["DSL beforeEach\n(.eval.ts files)"]
+    A["Config beforeEach<br/>(agenteval.config.ts)"] -->|runs first| B["DSL beforeEach<br/>(.eval.ts files)"]
     B --> C["Test function"]
     C --> D["Runner executes pipeline"]
 

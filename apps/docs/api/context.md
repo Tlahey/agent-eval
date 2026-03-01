@@ -6,9 +6,9 @@ The context object injected into every test function. Acts as a black box to sto
 
 ```mermaid
 flowchart LR
-    A["agent.run()"] --> B["storeDiff()\n(automatic)"]
-    B --> C["afterEach commands\n(automatic)"]
-    C --> D["ctx ready for\njudge evaluation"]
+    A["agent.run()"] --> B["storeDiff()<br/>(automatic)"]
+    B --> C["afterEach commands<br/>(automatic)"]
+    C --> D["ctx ready for<br/>judge evaluation"]
 
     style B fill:#6366f1,color:#fff
     style D fill:#10b981,color:#fff

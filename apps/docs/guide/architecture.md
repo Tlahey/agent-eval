@@ -6,19 +6,19 @@ AgentEval follows **SOLID principles** to stay modular, testable, and extensible
 
 ```mermaid
 flowchart TD
-    ROOT["agent-eval/\n(pnpm workspace)"]
-    ROOT --> PKG["packages/agent-eval\nCore framework (npm)"]
-    ROOT --> DOCS["apps/docs\nVitePress documentation"]
-    ROOT --> UI["apps/eval-ui\nReact dashboard"]
-    ROOT --> EXAMPLE["apps/example-target-app\nExample project"]
+    ROOT["agent-eval/<br/>(pnpm workspace)"]
+    ROOT --> PKG["packages/agent-eval<br/>Core framework (npm)"]
+    ROOT --> DOCS["apps/docs<br/>VitePress documentation"]
+    ROOT --> UI["apps/eval-ui<br/>React dashboard"]
+    ROOT --> EXAMPLE["apps/example-target-app<br/>Example project"]
 
-    PKG --> CORE["core/\ntypes, config, runner,\ncontext, expect"]
-    PKG --> GIT["git/\nisolation (reset, clean, diff)"]
-    PKG --> JUDGE["judge/\nLLM-as-a-Judge"]
-    PKG --> LEDGER["ledger/\nSQLite + JSON persistence"]
-    PKG --> LLM["llm/\nLLM provider plugins"]
-    PKG --> ENV["environment/\nexecution environments"]
-    PKG --> CLI["cli/\ncommand parsing + API server"]
+    PKG --> CORE["core/<br/>types, config, runner,<br/>context, expect"]
+    PKG --> GIT["git/<br/>isolation (reset, clean, diff)"]
+    PKG --> JUDGE["judge/<br/>LLM-as-a-Judge"]
+    PKG --> LEDGER["ledger/<br/>SQLite + JSON persistence"]
+    PKG --> LLM["llm/<br/>LLM provider plugins"]
+    PKG --> ENV["environment/<br/>execution environments"]
+    PKG --> CLI["cli/<br/>command parsing + API server"]
 
     style ROOT fill:#4f46e5,color:#fff
     style PKG fill:#6366f1,color:#fff
@@ -134,21 +134,21 @@ After the test completes, `env.teardown()` is called to clean up resources (no-o
 
 ```mermaid
 flowchart TB
-    A["agenteval run"] --> B["Load config\n(agenteval.config.ts)"]
-    B --> C["Discover test files\n(*.eval.ts, *.agent-eval.ts)"]
-    C --> D["Import files\n(registers tests via test())"]
-    D --> E{"For each\ntest × runner"}
+    A["agenteval run"] --> B["Load config<br/>(agenteval.config.ts)"]
+    B --> C["Discover test files<br/>(*.eval.ts, *.agent-eval.ts)"]
+    C --> D["Import files<br/>(registers tests via test())"]
+    D --> E{"For each<br/>test × runner"}
 
-    E --> F["🔧 Environment Setup\nenv.setup(cwd)"]
-    F --> F2["📋 Lifecycle Hooks\nconfig.beforeEach + DSL beforeEach"]
-    F2 --> G["🤖 Agent Execution\nagent.run/instruct(prompt)"]
-    G --> H["📸 Auto storeDiff()\ncaptures changes via env plugin"]
-    H --> I["⚙️ afterEach Commands\nfrom config + tasks"]
-    I --> J["⚖️ Judge Evaluation\nauto-judge or manual expect"]
-    J --> K["💾 Append to Ledger\nscore, reason, diff, commands"]
-    K --> K2["📋 afterEach Hooks\nDSL afterEach"]
+    E --> F["🔧 Environment Setup<br/>env.setup(cwd)"]
+    F --> F2["📋 Lifecycle Hooks<br/>config.beforeEach + DSL beforeEach"]
+    F2 --> G["🤖 Agent Execution<br/>agent.run/instruct(prompt)"]
+    G --> H["📸 Auto storeDiff()<br/>captures changes via env plugin"]
+    H --> I["⚙️ afterEach Commands<br/>from config + tasks"]
+    I --> J["⚖️ Judge Evaluation<br/>auto-judge or manual expect"]
+    J --> K["💾 Append to Ledger<br/>score, reason, diff, commands"]
+    K --> K2["📋 afterEach Hooks<br/>DSL afterEach"]
     K2 --> K3["🔧 env.teardown(cwd)"]
-    K3 --> L{"More\nrunners?"}
+    K3 --> L{"More<br/>runners?"}
     L -- Yes --> E
     L -- No --> M["📊 Print Summary"]
 
@@ -235,10 +235,10 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     A["Build Prompt"] --> B{"Judge Type?"}
-    B -- API --> C["generateObject()\nVercel AI SDK\n+ Zod schema"]
-    B -- CLI --> D["execSync(command)\nparse JSON output"]
+    B -- API --> C["generateObject()<br/>Vercel AI SDK<br/>+ Zod schema"]
+    B -- CLI --> D["execSync(command)<br/>parse JSON output"]
     D --> E{"Valid JSON?"}
-    E -- No --> F{"Retries\nleft?"}
+    E -- No --> F{"Retries<br/>left?"}
     F -- Yes --> D
     F -- No --> G["❌ Throw Error"]
     E -- Yes --> H["Zod Validation"]
@@ -246,7 +246,7 @@ flowchart LR
     H --> I{"score ≥ 0.7?"}
     I -- Yes --> J["✅ PASS"]
     I -- No --> K["❌ FAIL"]
-    J --> L["Return\n{ pass, score,\nreason, improvement }"]
+    J --> L["Return<br/>{ pass, score,<br/>reason, improvement }"]
     K --> L
 
     style J fill:#10b981,color:#fff

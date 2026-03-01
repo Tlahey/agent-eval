@@ -8,9 +8,9 @@ flowchart TD
     A --> C["ledger"]
     A --> D["ui / view"]
 
-    B --> B1["Execute eval tests\nDiscover + run + judge"]
-    C --> C1["View ledger entries\nTable or JSON format"]
-    D --> D1["Launch dashboard\nAPI server + React UI"]
+    B --> B1["Execute eval tests<br/>Discover + run + judge"]
+    C --> C1["View ledger entries<br/>Table or JSON format"]
+    D --> D1["Launch dashboard<br/>API server + React UI"]
 
     style A fill:#4f46e5,color:#fff
     style B fill:#f59e0b,color:#000
@@ -211,7 +211,7 @@ flowchart TD
     C --> D["Filter by -f and -t"]
     D --> E["Apply matrix filter"]
     E --> F{"tests × runners"}
-    F --> G["Sequential execution\n(no concurrency)"]
+    F --> G["Sequential execution<br/>(no concurrency)"]
     G --> H["Print summary table"]
 
     style A fill:#4f46e5,color:#fff

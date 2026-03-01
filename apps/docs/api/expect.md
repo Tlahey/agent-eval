@@ -80,11 +80,11 @@ flowchart TD
     B --> C["criteria + diff + commands + expectedFiles"]
     C --> D["Send to judge (API or CLI)"]
     D --> E["Receive { score, reason, improvement }"]
-    E --> F["Resolve thresholds\n(per-test → global → defaults)"]
+    E --> F["Resolve thresholds<br/>(per-test → global → defaults)"]
     F --> G{"score ≥ warn?"}
     G -- Yes --> H["✅ PASS — return JudgeResult"]
     G -- No --> I{"score ≥ fail?"}
-    I -- Yes --> J["⚠️ WARN — return JudgeResult\n(does not throw)"]
+    I -- Yes --> J["⚠️ WARN — return JudgeResult<br/>(does not throw)"]
     I -- No --> K["❌ FAIL — throw JudgeFailure"]
 
     style H fill:#10b981,color:#fff

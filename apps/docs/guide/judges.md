@@ -22,8 +22,8 @@ flowchart TD
     B --> C["Include: criteria + diff + commands + file scope"]
 
     C --> D{"Judge type?"}
-    D -- API --> E["generateObject()\nVercel AI SDK + Zod"]
-    D -- CLI --> F["execSync(command)\nparse JSON from stdout"]
+    D -- API --> E["generateObject()<br/>Vercel AI SDK + Zod"]
+    D -- CLI --> F["execSync(command)<br/>parse JSON from stdout"]
 
     F --> G{"Valid JSON?"}
     G -- No --> H{"Retries left?"}
@@ -32,7 +32,7 @@ flowchart TD
     G -- Yes --> J["Zod validation"]
 
     E --> J
-    J --> K{"Compute status\nvia thresholds"}
+    J --> K{"Compute status<br/>via thresholds"}
     K -- "score ≥ 0.8" --> L["✅ PASS"]
     K -- "score ≥ 0.5" --> L2["⚠️ WARN"]
     K -- "score < 0.5" --> M["❌ FAIL"]
@@ -194,7 +194,7 @@ The judge prompt includes a **file scope analysis** section:
 ```mermaid
 flowchart LR
     A["Expected files"] --> C["Compare"]
-    B["Actually changed files\n(from git diff)"] --> C
+    B["Actually changed files<br/>(from git diff)"] --> C
     C --> D{"Match?"}
     D -- "Extra files" --> E["⚠️ Flag scope creep"]
     D -- "Missing files" --> F["⚠️ Flag incomplete"]
@@ -257,11 +257,11 @@ The system prompt sent to the judge includes:
 
 ```mermaid
 flowchart TD
-    A["Judge Prompt"] --> B["1. Role\n'Expert code reviewer\nacting as a judge'"]
-    A --> C["2. Evaluation Criteria\nYour criteria from toPassJudge()"]
-    A --> D["3. Git Diff\nFull diff from storeDiff()"]
-    A --> E["4. Command Outputs\nstdout, stderr, exit codes"]
-    A --> F["5. File Scope Analysis\nExpected vs. actual files"]
+    A["Judge Prompt"] --> B["1. Role<br/>'Expert code reviewer<br/>acting as a judge'"]
+    A --> C["2. Evaluation Criteria<br/>Your criteria from toPassJudge()"]
+    A --> D["3. Git Diff<br/>Full diff from storeDiff()"]
+    A --> E["4. Command Outputs<br/>stdout, stderr, exit codes"]
+    A --> F["5. File Scope Analysis<br/>Expected vs. actual files"]
 
     style A fill:#6366f1,color:#fff
 ```

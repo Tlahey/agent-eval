@@ -123,9 +123,9 @@ export default defineConfig({
 ```mermaid
 flowchart TD
     A["Which ledger?"] --> B{"Node.js 22+?"}
-    B -- Yes --> C{"Need SQL\nqueries?"}
-    C -- Yes --> D["SqliteLedger\n(recommended)"]
-    C -- No --> E{"Portability\nimportant?"}
+    B -- Yes --> C{"Need SQL<br/>queries?"}
+    C -- Yes --> D["SqliteLedger<br/>(recommended)"]
+    C -- No --> E{"Portability<br/>important?"}
     E -- Yes --> F["JsonLedger"]
     E -- No --> D
     B -- No --> F

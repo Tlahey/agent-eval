@@ -10,9 +10,9 @@ flowchart TB
 
     subgraph Plugins["Three Plugin Axes"]
         direction LR
-        LLM["🤖 LLM Plugin\n(Models)"]
-        LEDGER["📦 Ledger Plugin\n(Storage)"]
-        ENV["🖥️ Environment Plugin\n(Execution)"]
+        LLM["🤖 LLM Plugin<br/>(Models)"]
+        LEDGER["📦 Ledger Plugin<br/>(Storage)"]
+        ENV["🖥️ Environment Plugin<br/>(Execution)"]
     end
 
     RUNNER --> LLM
