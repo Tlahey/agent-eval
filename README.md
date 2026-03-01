@@ -25,47 +25,18 @@
 - **Declarative Pipeline** — `agent.instruct()` + `ctx.addTask()` for zero-boilerplate evaluations
 - **Config-level Hooks** — `beforeEach` at config, file, or describe level for shared verification tasks
 - **Git Isolation** — automatic `git reset --hard` between runs for pristine environments
-- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, Ollama, or any custom `IModelPlugin`
+- **LLM-as-a-Judge** — structured evaluation via any `IModelPlugin` (Anthropic, OpenAI, Ollama, or custom)
 - **Model Matrix** — compare multiple agents/models on the same test suite
 - **Weighted Scoring** — tasks with weights for nuanced, multi-criteria evaluation
 - **Expected Files** — scope analysis detects agents that modify too many files
 - **Improvement Feedback** — judge returns actionable suggestions alongside scores
 - **SQLite Ledger** — local, privacy-first historical tracking of all evaluation results
 - **Visual Dashboard** — React dashboard with charts, diff viewer, and per-evaluation breakdowns
-- **Plugin Architecture** — swap ledger, LLM, or environment via SOLID plugin interfaces
+- **Plugin Architecture** — swap ledger, LLM, judge, or environment via SOLID plugin interfaces
 - **Dry-Run Mode** — preview execution plans without running agents
 - **CLI-first** — `agenteval run`, `agenteval view`, `agenteval ledger`
 
-## Why We Built This
-
-### The Paradigm Shift
-
-Testing an AI coding agent is **fundamentally different** from testing a standard JavaScript function.
-
-Traditional software testing evaluates deterministic inputs and outputs in memory. Testing AI coding agents, however, involves long-running tasks, heavy side-effects (mutating real files), and subjective evaluation criteria that require another LLM to act as a judge.
-
-No existing tool was designed for this.
-
-### Why not Vitest or Jest?
-
-While we love the Developer Experience (DX) of Vitest, these frameworks are built for extreme speed and parallel execution. AI agents mutate the actual file system and commit to Git. Running agent tests concurrently in Vitest instantly corrupts the local repository state. Furthermore, agent tasks take minutes to run, conflicting with the millisecond timeouts expected by standard test runners.
-
-### Why not Promptfoo?
-
-[Promptfoo](https://github.com/promptfoo/promptfoo) is an incredible tool for Text-in/Text-out evaluation (like RAGs or Chatbots). However, evaluating code-generating agents requires running CLI commands, capturing Git diffs, and reading compilation logs. Forcing Promptfoo to handle heavy side-effects required fragile workarounds (like complex Bash escaping and JSON parsing hacks). We needed a tool natively designed for file-system operations.
-
-### Why not Langfuse or Cloud LLMOps tools?
-
-[Langfuse](https://langfuse.com/) is perfect for production observability, but it is not a local test runner. Moreover, sending proprietary enterprise code, Next.js build logs, and Git diffs to a third-party cloud service for evaluation raised significant data privacy and security concerns.
-
-### What AgentEval Brings
-
-We built AgentEval to hit the perfect sweet spot:
-
-- **Familiar, Vitest-like syntax** — great Developer Experience with `test()` / `expect()` you already know.
-- **Strict, sequential execution** — automated Git state isolation (`git reset --hard`) between every test. No concurrency corruption.
-- **Provider-agnostic architecture** — easily switch between local CLIs, OpenAI, or Anthropic for both agents and LLM-as-a-Judge.
-- **Local, privacy-first ledger** — track historical performance in a local SQLite database without sending your source code to the cloud.
+> 📖 For a detailed comparison with Vitest, Promptfoo, and Langfuse, see [Why AgentEval?](https://tlahey.github.io/agent-eval/guide/getting-started#why-agentevalval)
 
 ---
 
@@ -82,41 +53,32 @@ We built AgentEval to hit the perfect sweet spot:
 pnpm add -D agent-eval
 ```
 
+Or install globally to use across projects:
+
+```bash
+pnpm add -g agent-eval
+agenteval --version
+```
+
 ### Configure
 
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
 import { OpenAIModel } from "agent-eval/providers/openai";
-import { LocalEnvironment } from "agent-eval/environment/local";
-import { DockerEnvironment } from "agent-eval/environment/docker";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
-import { JsonLedger } from "agent-eval/ledger/json";
-
-const useDocker = process.env.AGENTEVAL_ENV === "docker";
-const useJsonLedger = process.env.AGENTEVAL_LEDGER === "json";
 
 export default defineConfig({
   // Agent runners — plain objects, type inferred from shape
-  runners: [
-    {
-      name: "copilot",
-      command: 'gh copilot suggest "{{prompt}}"',
-    },
-  ],
+  runners: [{ name: "copilot", command: 'gh copilot suggest "{{prompt}}"' }],
 
   // Judge — LLM model used to score every test
   judge: {
     llm: new OpenAIModel({ model: "gpt-4o" }),
   },
 
-  // Execution environment plugin: local git workspace OR docker sandbox
-  environment: useDocker ? new DockerEnvironment({ image: "node:22" }) : new LocalEnvironment(),
-
-  // Ledger plugin: sqlite (default) OR json fallback
-  ledger: useJsonLedger
-    ? new JsonLedger({ outputDir: ".agenteval" })
-    : new SqliteLedger({ outputDir: ".agenteval" }),
+  // Ledger plugin (default: SQLite)
+  ledger: new SqliteLedger({ outputDir: ".agenteval" }),
 
   // Config-level beforeEach — register shared verification tasks
   beforeEach: ({ ctx }) => {
@@ -126,15 +88,11 @@ export default defineConfig({
       criteria: "All tests must pass",
       weight: 3,
     });
-    ctx.addTask({
-      name: "Build",
-      action: () => ctx.exec("pnpm build"),
-      criteria: "Build succeeds with zero errors",
-      weight: 2,
-    });
   },
 });
 ```
+
+> 📖 Full configuration reference: [Configuration Guide](https://tlahey.github.io/agent-eval/guide/configuration) · [defineConfig() API](https://tlahey.github.io/agent-eval/api/define-config)
 
 ### Write a test
 
@@ -142,158 +100,79 @@ export default defineConfig({
 // evals/banner.eval.ts
 import { test, expect } from "agent-eval";
 
-test("Add a Close button to the Banner", async ({ agent, ctx }) => {
-  // 1) Instruct the agent
+test("Add a Close button to the Banner", ({ agent, ctx }) => {
+  // 1) Instruct the agent (declarative pipeline)
   agent.instruct("Add a Close button to the Banner component");
 
-  // 2) Add a weighted verification task (criteria used by the judge)
+  // 2) Add a weighted verification task
   ctx.addTask({
-    name: "Close button renders and works",
+    name: "Close button renders",
     action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
-    criteria:
-      'A close button with aria-label="Close" is rendered when onClose is provided and calls onClose when clicked',
+    criteria: 'A close button with aria-label="Close" is rendered and calls onClose when clicked',
     weight: 3,
   });
 
   // 3) Required: define final judge criteria and expected scope
-  await expect(ctx).toPassJudge({
-    criteria: `
-      - Uses a proper close button component
-      - Has aria-label "Close"
-      - Calls onClose when clicked
-      - Existing tests still pass
-      - Build succeeds
-    `,
+  expect(ctx).toPassJudge({
+    criteria: "Uses a proper close button, has aria-label, existing tests pass, build succeeds",
     expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
   });
-
-  // Runner executes: agent instruction -> storeDiff -> optional tasks -> judge
 });
 ```
+
+> 📖 More examples: [Writing Tests](https://tlahey.github.io/agent-eval/guide/writing-tests) · [Declarative Pipeline](https://tlahey.github.io/agent-eval/guide/declarative-pipeline)
 
 ### Run
 
 ```bash
-# Run all eval tests
-npx agenteval run
-
-# Shorthand
-npx agenteval .
-
-# Filter by test title
-npx agenteval run -f banner
-
-# Filter by tag
-npx agenteval run -t ui
-
-# Preview execution plan without running agents
-npx agenteval run --dry-run
-
-# Override output directory
-npx agenteval run -o ./my-results
+npx agenteval run            # Run all eval tests
+npx agenteval run -f banner  # Filter by test title
+npx agenteval run --dry-run  # Preview execution plan
 ```
 
 ### View Results
 
 ```bash
-# Launch the dashboard API server (default port 4747)
-npx agenteval view
-
-# Or use the alias
-npx agenteval ui -p 8080
-
-# View ledger in terminal
-npx agenteval ledger
-
-# Export as JSON
-npx agenteval ledger --json > results.json
+npx agenteval view           # Launch dashboard (port 4747)
+npx agenteval ledger         # View results in terminal
+npx agenteval ledger --json  # Export as JSON
 ```
+
+> 📖 Full CLI reference: [CLI Guide](https://tlahey.github.io/agent-eval/guide/cli)
 
 ---
 
-## CLI Reference
+## Plugin Architecture
 
-| Command            | Description                                       |
-| ------------------ | ------------------------------------------------- |
-| `agenteval run`    | Discover and execute eval test files sequentially |
-| `agenteval .`      | Shorthand for `agenteval run`                     |
-| `agenteval view`   | Launch the dashboard API server                   |
-| `agenteval ui`     | Alias for `view`                                  |
-| `agenteval ledger` | View evaluation results in the terminal           |
+AgentEval is built around SOLID plugin interfaces. Every major concern is swappable without touching the core:
 
-### Global Options
+| Interface            | Purpose                  | Built-in Implementations                       |
+| -------------------- | ------------------------ | ---------------------------------------------- |
+| `IModelPlugin`       | LLM provider abstraction | `AnthropicModel`, `OpenAIModel`, `OllamaModel` |
+| `IRunnerPlugin`      | Agent execution          | `CLIRunner`, `APIRunner`                       |
+| `ILedgerPlugin`      | Result storage           | `SqliteLedger`, `JsonLedger`                   |
+| `IJudgePlugin`       | Custom evaluation logic  | _(bring your own)_                             |
+| `IEnvironmentPlugin` | Execution sandbox        | `LocalEnvironment`, `DockerEnvironment`        |
 
-| Flag                 | Description                              |
-| -------------------- | ---------------------------------------- |
-| `-o, --output <dir>` | Override ledger directory (all commands) |
-
-### `agenteval run` Options
-
-| Flag                     | Description                                   |
-| ------------------------ | --------------------------------------------- |
-| `-c, --config <path>`    | Path to config file                           |
-| `-f, --filter <pattern>` | Filter tests by title (substring match)       |
-| `-t, --tag <tag>`        | Filter tests by tag                           |
-| `--dry-run`              | Preview execution plan without running agents |
-
-### `agenteval view` / `agenteval ui` Options
-
-| Flag                | Description                      |
-| ------------------- | -------------------------------- |
-| `-p, --port <port>` | Port to serve on (default: 4747) |
-
-### Dashboard API Endpoints
-
-When `agenteval view` is running:
-
-| Endpoint         | Description                          |
-| ---------------- | ------------------------------------ |
-| `GET /api/runs`  | All runs (filter with `?testId=...`) |
-| `GET /api/tests` | List of unique test IDs              |
-| `GET /api/stats` | Aggregate stats per runner per test  |
-
----
-
-## Test File Discovery
-
-AgentEval discovers test files matching these patterns by default:
-
-```
-**/*.eval.{ts,js,mts,mjs}
-**/*.agent-eval.{ts,js,mts,mjs}
-```
-
-Customize in your config:
+All plugins are imported via **sub-path exports** — unused providers are never bundled:
 
 ```ts
-export default defineConfig({
-  testFiles: "evals/**/*.agent-eval.ts",
-  // or multiple patterns:
-  // testFiles: ["evals/**/*.eval.ts", "tests/**/*.agent-eval.ts"],
-});
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { OllamaModel } from "agent-eval/providers/ollama";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { APIRunner } from "agent-eval/runner/api";
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { JsonLedger } from "agent-eval/ledger/json";
+import { LocalEnvironment } from "agent-eval/environment/local";
+import { DockerEnvironment } from "agent-eval/environment/docker";
 ```
 
----
-
-## Database Location
-
-The SQLite ledger (`ledger.sqlite`) is stored in your project's output directory:
-
-| Priority | Method              | Example                         |
-| -------- | ------------------- | ------------------------------- |
-| 1        | CLI `--output` flag | `agenteval run -o ./my-results` |
-| 2        | Config `outputDir`  | `outputDir: "./custom-output"`  |
-| 3        | Default             | `.agenteval/ledger.sqlite`      |
-
-Add `.agenteval/` to your `.gitignore`.
+> 📖 How to create your own plugin: [Plugin Architecture](https://tlahey.github.io/agent-eval/guide/plugins) · [LLM Plugins](https://tlahey.github.io/agent-eval/guide/plugins-llm) · [Ledger Plugins](https://tlahey.github.io/agent-eval/guide/plugins-ledger) · [Environments](https://tlahey.github.io/agent-eval/guide/plugins-environments)
 
 ---
 
 ## Architecture
-
-AgentEval follows **SOLID principles** for modularity and extensibility. See the [Architecture docs](apps/docs/guide/architecture.md) and [ADR-007](docs/adrs/007-solid-architecture.md) for details.
-
-### Monorepo Structure
 
 ```
 agent-eval/
@@ -302,37 +181,40 @@ agent-eval/
 │   ├── eval-ui/               # Dashboard UI (React + Tailwind + Recharts)
 │   └── example-target-app/    # E2E target app for integration tests
 ├── packages/
-│   └── agent-eval/            # Core framework
+│   └── agent-eval/            # Core framework (npm package)
 │       └── src/
 │           ├── index.ts       # Public API (test, expect, defineConfig, beforeEach)
-│           ├── core/          # Types, config, context, runner, expect
-│           │   └── interfaces.ts  # Plugin interfaces (ILedgerPlugin, ILLMPlugin, IEnvironmentPlugin)
+│           ├── core/          # Types, config, context, runner, expect, interfaces
 │           ├── git/           # Git isolation (reset, diff)
-│           ├── judge/         # LLM-as-a-Judge (Vercel AI SDK)
-│           ├── ledger/        # SQLite ledger plugin (node:sqlite)
-│           ├── llm/           # LLM plugins (Anthropic, OpenAI, Ollama)
-│           ├── environment/   # Environment plugins (LocalEnvironment)
+│           ├── judge/         # LLM-as-a-Judge (Vercel AI SDK + structured output)
+│           ├── ledger/        # Ledger plugins (SQLite, JSON)
+│           ├── llm/           # Model plugins (Anthropic, OpenAI, Ollama)
+│           ├── runner/        # Runner plugins (CLI, API)
+│           ├── environment/   # Environment plugins (Local, Docker)
 │           └── cli/           # CLI binary (Commander.js)
 ├── docs/adrs/                 # Architecture Decision Records
-├── AGENTS.md                  # AI agent development guide
-└── PRD.md                     # Product requirements
+└── AGENTS.md                  # AI agent development guide
 ```
 
 ### Key Design Decisions
 
-| ADR                                          | Decision                                               |
-| -------------------------------------------- | ------------------------------------------------------ |
-| [001](docs/adrs/001-why-custom-framework.md) | Why a custom framework (not Vitest/Promptfoo/Langfuse) |
-| [002](docs/adrs/002-sqlite-over-jsonl.md)    | SQLite over JSONL for the ledger                       |
-| [003](docs/adrs/003-sequential-execution.md) | Sequential execution (no parallelism)                  |
-| [004](docs/adrs/004-llm-as-judge.md)         | LLM-as-a-Judge with Vercel AI SDK                      |
-| [005](docs/adrs/005-monorepo-layout.md)      | Monorepo layout (apps/ + packages/)                    |
-| [006](docs/adrs/006-code-quality-gates.md)   | Code quality gates (ESLint + Prettier + Husky)         |
-| [007](docs/adrs/007-solid-architecture.md)   | SOLID architecture principles                          |
+| ADR                                                | Decision                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------- |
+| [ADR-001](./docs/adrs/001-why-custom-framework.md) | Why a custom framework (not Vitest / Promptfoo / Langfuse) |
+| [ADR-002](./docs/adrs/002-sqlite-over-jsonl.md)    | SQLite over JSONL for the ledger                           |
+| [ADR-003](./docs/adrs/003-sequential-execution.md) | Sequential execution (no parallelism)                      |
+| [ADR-004](./docs/adrs/004-llm-as-judge.md)         | LLM-as-a-Judge with Vercel AI SDK                          |
+| [ADR-005](./docs/adrs/005-monorepo-layout.md)      | Monorepo layout (apps/ + packages/)                        |
+| [ADR-006](./docs/adrs/006-code-quality-gates.md)   | Code quality gates (ESLint + Prettier + Husky)             |
+| [ADR-007](./docs/adrs/007-solid-architecture.md)   | SOLID architecture principles                              |
+
+> 📖 Full architecture deep-dive: [Architecture Guide](https://tlahey.github.io/agent-eval/guide/architecture)
 
 ---
 
 ## Development
+
+> 📖 Full contributing guide: [Contributing](https://tlahey.github.io/agent-eval/guide/contributing)
 
 ### Prerequisites
 
@@ -342,7 +224,7 @@ agent-eval/
 ### Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Tlahey/agent-eval.git
 cd agent-eval
 pnpm install
 ```
@@ -352,7 +234,7 @@ pnpm install
 | Command                              | Description               |
 | ------------------------------------ | ------------------------- |
 | `pnpm build`                         | Build the core package    |
-| `pnpm test`                          | Run all tests (382 total) |
+| `pnpm test`                          | Run all tests (454 total) |
 | `pnpm lint`                          | Run ESLint                |
 | `pnpm lint:fix`                      | ESLint with auto-fix      |
 | `pnpm format`                        | Format with Prettier      |
@@ -364,12 +246,27 @@ pnpm install
 
 All 4 gates must pass before committing (enforced by Husky pre-commit hook):
 
-1. `pnpm lint:fix && pnpm format` — Lint & format
-2. `pnpm test` — All tests green
-3. `pnpm build` — Build succeeds
-4. `git add -A && git commit -m "type(scope): description"` — Commit when green ✅
+```bash
+pnpm lint:fix && pnpm format  # 1. Lint & format
+pnpm test                      # 2. All tests green
+pnpm build                     # 3. Build succeeds
+git add -A && git commit -m "type(scope): description"  # 4. Commit ✅
+```
 
 > ⚠️ Never use `--no-verify` to bypass the pre-commit hook.
+
+### Local Testing
+
+To test `agent-eval` in another project on your machine:
+
+```bash
+# Link globally from the monorepo
+cd packages/agent-eval && pnpm link --global
+
+# Use in any other project
+cd ~/my-other-project
+pnpm link --global agent-eval
+```
 
 ---
 
@@ -377,13 +274,19 @@ All 4 gates must pass before committing (enforced by Husky pre-commit hook):
 
 📖 **Full documentation:** [https://tlahey.github.io/agent-eval/](https://tlahey.github.io/agent-eval/)
 
-Or run the docs locally:
+| Section      | Topics                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Guide**    | [Getting Started](https://tlahey.github.io/agent-eval/guide/getting-started) · [Configuration](https://tlahey.github.io/agent-eval/guide/configuration) · [Writing Tests](https://tlahey.github.io/agent-eval/guide/writing-tests) · [Declarative Pipeline](https://tlahey.github.io/agent-eval/guide/declarative-pipeline) · [Runners](https://tlahey.github.io/agent-eval/guide/runners) · [Judges](https://tlahey.github.io/agent-eval/guide/judges) |
+| **Plugins**  | [Overview](https://tlahey.github.io/agent-eval/guide/plugins) · [LLM / Models](https://tlahey.github.io/agent-eval/guide/plugins-llm) · [Ledger / Storage](https://tlahey.github.io/agent-eval/guide/plugins-ledger) · [Environments](https://tlahey.github.io/agent-eval/guide/plugins-environments)                                                                                                                                                   |
+| **Tools**    | [CLI](https://tlahey.github.io/agent-eval/guide/cli) · [Dashboard](https://tlahey.github.io/agent-eval/guide/dashboard)                                                                                                                                                                                                                                                                                                                                 |
+| **API**      | [test()](https://tlahey.github.io/agent-eval/api/test) · [expect()](https://tlahey.github.io/agent-eval/api/expect) · [Context](https://tlahey.github.io/agent-eval/api/context) · [defineConfig()](https://tlahey.github.io/agent-eval/api/define-config) · [Types](https://tlahey.github.io/agent-eval/api/types) · [Ledger](https://tlahey.github.io/agent-eval/api/ledger)                                                                          |
+| **Advanced** | [Architecture](https://tlahey.github.io/agent-eval/guide/architecture) · [Contributing](https://tlahey.github.io/agent-eval/guide/contributing)                                                                                                                                                                                                                                                                                                         |
+
+Run the docs locally:
 
 ```bash
 pnpm dev
 ```
-
-Covers: [Getting Started](https://tlahey.github.io/agent-eval/guide/getting-started) · [Configuration](https://tlahey.github.io/agent-eval/guide/configuration) · [Writing Tests](https://tlahey.github.io/agent-eval/guide/writing-tests) · [Declarative Pipeline](https://tlahey.github.io/agent-eval/guide/declarative-pipeline) · [Runners](https://tlahey.github.io/agent-eval/guide/runners) · [Judges](https://tlahey.github.io/agent-eval/guide/judges) · [Plugin Architecture](https://tlahey.github.io/agent-eval/guide/plugin-architecture) · [Environments](https://tlahey.github.io/agent-eval/guide/environments) · [Dashboard](https://tlahey.github.io/agent-eval/guide/dashboard) · [CLI](https://tlahey.github.io/agent-eval/guide/cli) · [Contributing](https://tlahey.github.io/agent-eval/guide/contributing)
 
 ---
 

@@ -17,11 +17,11 @@ features:
   - title: 🔒 Environment Isolation
     details: Pluggable environment setup (local git reset, Docker containers, or custom) ensures pristine workspaces between tests.
   - title: ⚖️ LLM-as-a-Judge
-    details: Structured evaluation via Anthropic, OpenAI, Ollama, or any CLI tool as judge.
+    details: Structured evaluation via Anthropic, OpenAI, Ollama, or any custom IModelPlugin.
   - title: 📊 SQLite Ledger
     details: Local, privacy-first historical tracking with SQL-powered analytics.
   - title: 📈 Visual Dashboard
     details: Built-in React dashboard with score trends, runner comparison, and GitHub-style diff viewer.
-  - title: 🏗️ SOLID Architecture
-    details: Modular, extensible design. Add providers without touching core logic.
+  - title: 🏗️ Plugin Architecture
+    details: Swap LLM providers, storage backends, judges, and environments via SOLID interfaces — extend without touching core code.
 ---
