@@ -7,6 +7,26 @@ export interface CommandResult {
   durationMs: number;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+export interface TaskResult {
+  task: { name: string; criteria: string; weight?: number };
+  result: CommandResult;
+}
+
+export interface TimingData {
+  totalMs: number;
+  setupMs?: number;
+  agentMs?: number;
+  afterEachMs?: number;
+  tasksMs?: number;
+  judgeMs?: number;
+}
+
 export type TestStatus = "PASS" | "WARN" | "FAIL";
 
 export interface LedgerRun {
@@ -14,19 +34,29 @@ export interface LedgerRun {
   testId: string;
   suitePath: string[];
   timestamp: string;
+  // Execution data
   agentRunner: string;
+  instruction: string;
+  diff: string | null;
+  changedFiles: string[];
+  commands: CommandResult[];
+  taskResults: TaskResult[];
+  agentTokenUsage?: TokenUsage;
+  timing: TimingData;
+  agentOutput?: string;
+  logs: string;
+  // Judgment data
   judgeModel: string;
   score: number;
   pass: boolean;
   status: TestStatus;
   reason: string;
   improvement: string;
-  context: {
-    diff: string | null;
-    commands: CommandResult[];
-  };
-  durationMs: number;
+  judgeTokenUsage?: TokenUsage;
+  criteria: string;
+  expectedFiles?: string[];
   thresholds: { warn: number; fail: number };
+  durationMs: number;
   override?: ScoreOverride;
 }
 

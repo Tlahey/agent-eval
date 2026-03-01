@@ -1,7 +1,6 @@
 import { judge as runJudge, buildJudgePrompt, extractChangedFiles } from "../judge/judge.js";
 import { setLastJudgeOptions, setLastJudgeResult } from "./runner.js";
 import type {
-  ExecutionData,
   ExpectChain,
   JudgeConfig,
   JudgeOptions,

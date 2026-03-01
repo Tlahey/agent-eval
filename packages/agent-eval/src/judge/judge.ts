@@ -1,11 +1,9 @@
 import { generateObject, type LanguageModelV1 } from "ai";
 import { z } from "zod";
 import type {
-  CommandResult,
   ExecutionData,
   JudgeConfig,
   JudgeResult,
-  TaskDefinition,
   TestContext,
   TokenUsage,
 } from "../core/types.js";

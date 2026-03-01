@@ -398,4 +398,88 @@ describe("ledger (SQLite)", () => {
     const overrides = getRunOverrides(tmpDir, entries[0].id!);
     expect(overrides).toEqual([]);
   });
+
+  // ─── New columns: tokens, timing, tasks, etc. ───
+
+  it("stores and retrieves token usage data", () => {
+    const agentTokens = { inputTokens: 1500, outputTokens: 800, totalTokens: 2300 };
+    const judgeTokens = { inputTokens: 2200, outputTokens: 350, totalTokens: 2550 };
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ agentTokenUsage: agentTokens, judgeTokenUsage: judgeTokens }),
+    );
+
+    const entries = readLedger(tmpDir);
+    expect(entries[0].agentTokenUsage).toEqual(agentTokens);
+    expect(entries[0].judgeTokenUsage).toEqual(judgeTokens);
+  });
+
+  it("handles missing token usage gracefully", () => {
+    appendLedgerEntry(tmpDir, makeEntry({}));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].agentTokenUsage).toBeUndefined();
+    expect(entries[0].judgeTokenUsage).toBeUndefined();
+  });
+
+  it("stores and retrieves timing breakdown", () => {
+    const timing = {
+      totalMs: 45000,
+      setupMs: 500,
+      agentMs: 30000,
+      afterEachMs: 200,
+      tasksMs: 7000,
+      judgeMs: 7300,
+    };
+    appendLedgerEntry(tmpDir, makeEntry({ timing }));
+
+    const entries = readLedger(tmpDir);
+    expect(entries[0].timing).toEqual(timing);
+  });
+
+  it("stores and retrieves task results", () => {
+    const taskResults = [
+      {
+        task: { name: "unit tests", criteria: "All tests pass", weight: 2 },
+        result: {
+          name: "unit tests",
+          command: "pnpm test",
+          stdout: "OK",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 3000,
+        },
+      },
+    ];
+    appendLedgerEntry(tmpDir, makeEntry({ taskResults }));
+
+    const entries = readLedger(tmpDir);
+    expect(entries[0].taskResults).toEqual(taskResults);
+  });
+
+  it("stores and retrieves changed files and expected files", () => {
+    const changedFiles = ["src/Banner.tsx", "src/Banner.test.tsx"];
+    const expectedFiles = ["src/Banner.tsx"];
+    appendLedgerEntry(tmpDir, makeEntry({ changedFiles, expectedFiles }));
+
+    const entries = readLedger(tmpDir);
+    expect(entries[0].changedFiles).toEqual(changedFiles);
+    expect(entries[0].expectedFiles).toEqual(expectedFiles);
+  });
+
+  it("stores instruction and criteria", () => {
+    appendLedgerEntry(
+      tmpDir,
+      makeEntry({ instruction: "Add a close button", criteria: "Button must be accessible" }),
+    );
+
+    const entries = readLedger(tmpDir);
+    expect(entries[0].instruction).toBe("Add a close button");
+    expect(entries[0].criteria).toBe("Button must be accessible");
+  });
+
+  it("stores agent output", () => {
+    appendLedgerEntry(tmpDir, makeEntry({ agentOutput: "I added the button as requested" }));
+    const entries = readLedger(tmpDir);
+    expect(entries[0].agentOutput).toBe("I added the button as requested");
+  });
 });

@@ -45,7 +45,7 @@ describe("Overview", () => {
       expect(screen.getByText("Total Runs")).toBeInTheDocument();
       expect(screen.getByText("Avg Score")).toBeInTheDocument();
       expect(screen.getByText("Pass Rate")).toBeInTheDocument();
-      expect(screen.getByText("Warnings")).toBeInTheDocument();
+      expect(screen.getByText("Total Tokens")).toBeInTheDocument();
       expect(screen.getByText("Failures")).toBeInTheDocument();
     });
   });

@@ -453,14 +453,6 @@ export interface LedgerEntry {
   /** Duration of the agent run in ms (alias for timing.totalMs, kept for backward compat) */
   durationMs: number;
 
-  /**
-   * @deprecated Use top-level fields instead. Kept for backward compatibility with older ledger DBs.
-   */
-  context?: {
-    diff: string | null;
-    commands: CommandResult[];
-  };
-
   /** Human override (if any). Present only when reading from DB. */
   override?: ScoreOverride;
 }

@@ -11,7 +11,6 @@ import type {
   AgentEvalConfig,
   AgentHandle,
   CommandResult,
-  ExecutionData,
   JudgeOptions,
   JudgeResult,
   LedgerEntry,
