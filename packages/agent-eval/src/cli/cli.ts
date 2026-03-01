@@ -175,7 +175,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
             }
           }
           console.log(
-            `    Runners: ${plan.runners.map((r) => `${r.name} (${r.type})`).join(", ")}`,
+            `    Runners: ${plan.runners.map((r) => `${r.name} (${r.model})`).join(", ")}`,
           );
           if (plan.beforeEachHooks > 0) {
             console.log(`    beforeEach hooks: ${plan.beforeEachHooks}`);

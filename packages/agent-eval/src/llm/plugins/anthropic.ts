@@ -1,38 +1,42 @@
-import type { AgentRunnerConfig, JudgeConfig } from "../../core/types.js";
+import type { IModelPlugin } from "../../core/interfaces.js";
 
-export interface AnthropicProviderOptions {
-  name?: string;
+export interface AnthropicModelOptions {
+  /** Model identifier (default: "claude-sonnet-4-20250514") */
   model?: string;
-  baseURL?: string;
+  /** API key (falls back to ANTHROPIC_API_KEY env var) */
   apiKey?: string;
+  /** Custom base URL */
+  baseURL?: string;
 }
 
-export class AnthropicProvider implements AgentRunnerConfig, JudgeConfig {
-  public readonly name: string;
-  public readonly type = "api" as const;
-  public readonly provider = "anthropic" as const;
-  public readonly model: string;
-  public readonly baseURL?: string;
-  public readonly apiKey?: string;
+/**
+ * Anthropic LLM model plugin.
+ * Uses @ai-sdk/anthropic under the hood (dynamic import — install as peer dep).
+ *
+ * @example
+ * ```ts
+ * import { AnthropicModel } from "agent-eval";
+ * const model = new AnthropicModel({ model: "claude-sonnet-4-20250514" });
+ * ```
+ */
+export class AnthropicModel implements IModelPlugin {
+  readonly name = "anthropic";
+  readonly modelId: string;
+  private apiKey?: string;
+  private baseURL?: string;
 
-  public readonly api: {
-    provider: "anthropic";
-    model: string;
-    baseURL?: string;
-    apiKey?: string;
-  };
-
-  constructor(options: AnthropicProviderOptions = {}) {
-    this.name = options.name ?? "anthropic";
-    this.model = options.model ?? "claude-3-5-sonnet-latest";
-    this.baseURL = options.baseURL;
+  constructor(options: AnthropicModelOptions = {}) {
+    this.modelId = options.model ?? "claude-sonnet-4-20250514";
     this.apiKey = options.apiKey;
+    this.baseURL = options.baseURL;
+  }
 
-    this.api = {
-      provider: this.provider,
-      model: this.model,
-      baseURL: this.baseURL,
-      apiKey: this.apiKey,
-    };
+  async createModel() {
+    const { createAnthropic } = await import("@ai-sdk/anthropic");
+    const provider = createAnthropic({
+      apiKey: this.apiKey ?? process.env.ANTHROPIC_API_KEY,
+      ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+    });
+    return provider(this.modelId);
   }
 }

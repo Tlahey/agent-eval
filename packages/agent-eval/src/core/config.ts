@@ -39,7 +39,7 @@ export async function loadConfig(
       ...DEFAULT_CONFIG,
       rootDir: cwd,
       runners: [],
-      judge: { provider: "openai", model: "gpt-4o" },
+      judge: {},
     } as AgentEvalConfig;
   }
 

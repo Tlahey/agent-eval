@@ -1,5 +1,9 @@
 // ─── Agent Configuration ───
 
+/**
+ * @deprecated Use IRunnerPlugin instances directly in `runners[]`.
+ * Kept temporarily for backward compatibility during migration.
+ */
 export interface AgentRunnerConfig {
   /** Unique name for the agent (e.g., "copilot", "cursor") */
   name: string;
@@ -19,13 +23,26 @@ export interface AgentRunnerConfig {
 // ─── Judge Configuration ───
 
 export interface JudgeConfig {
-  /** Type of judge: API call (default) or CLI command */
+  /**
+   * LLM plugin for API-based judging.
+   * When provided, `type`, `provider`, `model`, `apiKey`, `baseURL` are ignored.
+   *
+   * @example
+   * ```ts
+   * import { OpenAIModel } from "agent-eval";
+   * judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }
+   * ```
+   */
+  llm?: import("./interfaces.js").IModelPlugin;
+  /** @deprecated Use `llm` with an IModelPlugin instead. Type of judge: API call (default) or CLI command */
   type?: "api" | "cli";
-  /** Provider for API judges */
+  /** @deprecated Use `llm` with an IModelPlugin instead. */
   provider?: "anthropic" | "openai" | "ollama";
-  /** Model name for API judges */
+  /** @deprecated Use `llm` with an IModelPlugin instead. */
   model?: string;
+  /** @deprecated Use `llm` with an IModelPlugin instead. */
   baseURL?: string;
+  /** @deprecated Use `llm` with an IModelPlugin instead. */
   apiKey?: string;
   /**
    * CLI command template for CLI judges.
@@ -76,8 +93,20 @@ export interface AgentEvalConfig {
   rootDir?: string;
   /** Glob pattern(s) to discover test files */
   testFiles?: string | string[];
-  /** Agent runners to test against */
-  runners: AgentRunnerConfig[];
+  /**
+   * Agent runners to test against.
+   * Each runner is an IRunnerPlugin instance (CLIRunner, APIRunner, or custom).
+   *
+   * @example
+   * ```ts
+   * import { CLIRunner, APIRunner, AnthropicModel } from "agent-eval";
+   * runners: [
+   *   new CLIRunner({ name: "copilot", command: "gh copilot suggest {{prompt}}" }),
+   *   new APIRunner({ name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) }),
+   * ]
+   * ```
+   */
+  runners: import("./interfaces.js").IRunnerPlugin[];
   /** Judge configuration for LLM-as-a-Judge evaluation */
   judge: JudgeConfig;
   /** Model matrix: override which models to test per-run */

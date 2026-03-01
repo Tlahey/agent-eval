@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { generateObject } from "ai";
+import { generateObject, type LanguageModelV1 } from "ai";
 import { z } from "zod";
 import type {
   CommandResult,
@@ -22,10 +22,23 @@ const JudgeResultSchema = z.object({
 });
 
 /**
- * Resolve the AI SDK model instance from provider + model name.
+ * Resolve the AI SDK model instance from judge config.
+ * Prefers the new `llm` plugin, falls back to legacy `provider` + `model` fields.
  */
-async function resolveModel(config: JudgeConfig, modelOverride?: string) {
-  const modelName = modelOverride ?? config.model!;
+async function resolveModel(config: JudgeConfig, modelOverride?: string): Promise<LanguageModelV1> {
+  // New plugin-based path
+  if (config.llm) {
+    return (await config.llm.createModel()) as LanguageModelV1;
+  }
+
+  // Legacy path — hardcoded provider resolution (deprecated)
+  if (!config.provider || !config.model) {
+    throw new Error(
+      'Judge requires an "llm" plugin, or legacy "provider" and "model" fields in judge config.',
+    );
+  }
+
+  const modelName = modelOverride ?? config.model;
 
   switch (config.provider) {
     case "anthropic": {
@@ -310,8 +323,10 @@ export async function judge(
   }
 
   // API judge path (default)
-  if (!config.provider || !config.model) {
-    throw new Error('API judge requires "provider" and "model" fields in judge config.');
+  if (!config.llm && (!config.provider || !config.model)) {
+    throw new Error(
+      'API judge requires an "llm" plugin, or legacy "provider" and "model" fields in judge config.',
+    );
   }
 
   const model = await resolveModel(config, modelOverride);

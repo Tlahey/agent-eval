@@ -187,7 +187,7 @@ describe("judge", () => {
     const config: JudgeConfig = { type: "api" };
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      'API judge requires "provider" and "model"',
+      'API judge requires an "llm" plugin',
     );
   });
 });

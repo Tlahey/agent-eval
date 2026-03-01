@@ -227,6 +227,10 @@ export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
 // ─── Plugin interfaces & implementations ───
 
 export type {
+  IModelPlugin,
+  IRunnerPlugin,
+  RunnerContext,
+  RunnerExecResult,
   ILedgerPlugin,
   IJudgePlugin,
   IEnvironmentPlugin,
@@ -240,6 +244,24 @@ export {
   validateLedgerPlugin,
   validateJudgePlugin,
   validateEnvironmentPlugin,
+  validateModelPlugin,
+  validateRunnerPlugin,
   formatPluginErrors,
 } from "./core/plugin-validator.js";
 export type { PluginValidationError } from "./core/plugin-validator.js";
+
+// ─── Built-in Runner Plugins ───
+
+export { CLIRunner } from "./runner/plugins/cli.js";
+export type { CLIRunnerOptions } from "./runner/plugins/cli.js";
+export { APIRunner } from "./runner/plugins/api.js";
+export type { APIRunnerOptions } from "./runner/plugins/api.js";
+
+// ─── Built-in Model Plugins ───
+
+export { AnthropicModel } from "./llm/plugins/anthropic.js";
+export type { AnthropicModelOptions } from "./llm/plugins/anthropic.js";
+export { OpenAIModel } from "./llm/plugins/openai.js";
+export type { OpenAIModelOptions } from "./llm/plugins/openai.js";
+export { OllamaModel } from "./llm/plugins/ollama.js";
+export type { OllamaModelOptions } from "./llm/plugins/ollama.js";

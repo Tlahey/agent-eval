@@ -1,5 +1,3 @@
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { EvalContext } from "./context.js";
 import { getGlobalThresholds } from "./expect.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
@@ -12,7 +10,6 @@ import {
 import type {
   AgentEvalConfig,
   AgentHandle,
-  AgentRunnerConfig,
   CommandResult,
   JudgeOptions,
   JudgeResult,
@@ -21,127 +18,39 @@ import type {
   TestDefinition,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
-import type { ILedgerPlugin, IEnvironmentPlugin } from "./interfaces.js";
+import type { ILedgerPlugin, IEnvironmentPlugin, IRunnerPlugin } from "./interfaces.js";
 import { LocalEnvironment } from "../environment/plugins/local.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 
-// ─── File operation types for API runner structured output ───
-
-interface FileOperation {
-  path: string;
-  content: string;
-}
-
-interface ApiAgentResponse {
-  files: FileOperation[];
-}
-
 /**
- * Resolve the AI SDK model for an API runner.
- */
-async function resolveRunnerModel(api: NonNullable<AgentRunnerConfig["api"]>) {
-  switch (api.provider) {
-    case "anthropic": {
-      const { createAnthropic } = await import("@ai-sdk/anthropic");
-      const provider = createAnthropic({
-        apiKey: api.apiKey ?? process.env.ANTHROPIC_API_KEY,
-        ...(api.baseURL ? { baseURL: api.baseURL } : {}),
-      });
-      return provider(api.model);
-    }
-    case "openai": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        apiKey: api.apiKey ?? process.env.OPENAI_API_KEY,
-        ...(api.baseURL ? { baseURL: api.baseURL } : {}),
-      });
-      return provider(api.model);
-    }
-    case "ollama": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        baseURL: api.baseURL ?? "http://localhost:11434/v1",
-        apiKey: "ollama",
-      });
-      return provider(api.model);
-    }
-    default:
-      throw new Error(`Unsupported API runner provider: ${api.provider}`);
-  }
-}
-
-/**
- * Create the raw AgentHandle for a given runner config.
- * Uses built-in resolveRunnerModel for API runners.
- * CLI runners delegate to the environment plugin for command execution.
+ * Create the raw AgentHandle for a given runner plugin.
+ * Delegates execution entirely to the IRunnerPlugin.
  */
 function createRawAgent(
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   reporter: Reporter,
   testId: string,
-  config: AgentEvalConfig,
   env: IEnvironmentPlugin,
 ): Omit<AgentHandle, "instruct"> {
   return {
     name: runner.name,
-    model: runner.api?.model ?? runner.command ?? "unknown",
+    model: runner.model,
 
     async run(prompt: string) {
-      if (runner.type === "cli") {
-        if (!runner.command) {
-          throw new Error(`Runner "${runner.name}" has type "cli" but no command defined`);
+      const result = await runner.execute(prompt, { cwd, env, timeout: 600_000 });
+
+      // Report errors from CLI execution
+      if (result.exitCode !== undefined && result.exitCode !== 0 && result.stderr) {
+        reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
+      }
+
+      // Report files written by API runners
+      if (result.filesWritten) {
+        for (const filePath of result.filesWritten) {
+          reporter.onFileWrite({ testId, runner: runner.name }, filePath);
         }
-        const cmd = runner.command.replace("{{prompt}}", prompt);
-        // Use environment plugin for CLI execution
-        const result = await env.execute(cmd, cwd, { timeout: 600_000 });
-        if (result.exitCode !== 0 && result.stderr) {
-          // Log stderr but don't throw — agent may produce partial output
-          reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
-        }
-      } else if (runner.type === "api") {
-        if (!runner.api) {
-          throw new Error(`Runner "${runner.name}" has type "api" but no api config defined`);
-        }
-
-        const { generateObject } = await import("ai");
-        const { z } = await import("zod");
-
-        const model = await resolveRunnerModel(runner.api);
-
-        const FileOperationSchema = z.object({
-          files: z
-            .array(
-              z.object({
-                path: z.string().describe("Relative file path from project root"),
-                content: z.string().describe("Full file content to write"),
-              }),
-            )
-            .describe("Files to create or modify"),
-        });
-
-        const { object } = await generateObject({
-          model,
-          schema: FileOperationSchema,
-          prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
-
-Task: ${prompt}
-
-Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
-        });
-
-        const response = object as ApiAgentResponse;
-
-        // Write files to disk
-        for (const file of response.files) {
-          const fullPath = resolve(cwd, file.path);
-          mkdirSync(dirname(fullPath), { recursive: true });
-          writeFileSync(fullPath, file.content, "utf-8");
-          reporter.onFileWrite({ testId, runner: runner.name }, file.path);
-        }
-      } else {
-        throw new Error(`Unknown runner type: ${(runner as AgentRunnerConfig).type}`);
       }
     },
   };
@@ -162,7 +71,7 @@ interface AgentState {
  * Enforces the Single-Instruct Policy and mutual exclusivity of the two modes.
  */
 function createAgent(
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
@@ -170,7 +79,7 @@ function createAgent(
   testId: string,
   env: IEnvironmentPlugin,
 ): { agent: AgentHandle; state: AgentState } {
-  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
+  const raw = createRawAgent(runner, cwd, reporter, testId, env);
   const state: AgentState = {
     instruction: null,
     isDeclarative: false,
@@ -223,15 +132,14 @@ function createAgent(
  * Used by the declarative pipeline where the runner controls the full lifecycle.
  */
 async function executeRawAgent(
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   prompt: string,
   reporter: Reporter,
   testId: string,
-  config: AgentEvalConfig,
   env: IEnvironmentPlugin,
 ): Promise<void> {
-  const raw = createRawAgent(runner, cwd, reporter, testId, config, env);
+  const raw = createRawAgent(runner, cwd, reporter, testId, env);
   await raw.run(prompt);
 }
 
@@ -250,7 +158,6 @@ export interface DryRunPlan {
   suitePath?: string[];
   runners: Array<{
     name: string;
-    type: string;
     model: string;
   }>;
   mode: "declarative" | "imperative" | "unknown";
@@ -351,8 +258,7 @@ export async function dryRunTest(
     suitePath: testDef.suitePath,
     runners: runners.map((r) => ({
       name: r.name,
-      type: r.type,
-      model: r.api?.model ?? r.command ?? "unknown",
+      model: r.model,
     })),
     mode,
     instruction,
@@ -495,7 +401,8 @@ export async function runTest(
         suitePath: testDef.suitePath ?? [],
         timestamp: new Date().toISOString(),
         agentRunner: runner.name,
-        judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+        judgeModel:
+          config.judge.llm?.modelId ?? config.judge.model ?? config.judge.command ?? "unknown",
         score: 0,
         pass: false,
         status: "FAIL",
@@ -548,7 +455,7 @@ export async function runTest(
  */
 async function executeDeclarativePipeline(
   instruction: string,
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
@@ -571,7 +478,7 @@ async function executeDeclarativePipeline(
 
   // 1. Execute the agent instruction
   reporter.onPipelineStep(event, "agent", "running");
-  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, config, env);
+  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, env);
   reporter.onPipelineStep(event, "agent", "done");
 
   // 2. Auto storeDiff
@@ -620,7 +527,8 @@ async function executeDeclarativePipeline(
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
     agentRunner: runner.name,
-    judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+    judgeModel:
+      config.judge.llm?.modelId ?? config.judge.model ?? config.judge.command ?? "unknown",
     score: judgeResult.score,
     pass: status !== "FAIL",
     status,
@@ -641,7 +549,7 @@ async function executeDeclarativePipeline(
  */
 function buildImperativeEntry(
   testDef: TestDefinition,
-  runner: AgentRunnerConfig,
+  runner: IRunnerPlugin,
   ctx: EvalContext,
   config: AgentEvalConfig,
   start: number,
@@ -659,7 +567,8 @@ function buildImperativeEntry(
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
     agentRunner: runner.name,
-    judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
+    judgeModel:
+      config.judge.llm?.modelId ?? config.judge.model ?? config.judge.command ?? "unknown",
     score: judgeResult.score,
     pass: judgeResult.pass,
     status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
