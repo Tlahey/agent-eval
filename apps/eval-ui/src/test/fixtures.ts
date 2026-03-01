@@ -17,14 +17,8 @@ export function createMockRun(overrides: Partial<LedgerRun> = {}): LedgerRun {
     suitePath: ["UI Components", "Banner"],
     timestamp: "2026-02-20T10:00:00.000Z",
     agentRunner: "copilot",
-    judgeModel: "gpt-4o",
-    score,
-    pass: status !== "FAIL",
-    status,
-    reason: "The close button was added correctly with proper event handling.",
-    improvement: "Consider adding an aria-label for accessibility.",
-    context: {
-      diff: `diff --git a/src/Banner.tsx b/src/Banner.tsx
+    instruction: "Add a close button to the Banner component",
+    diff: `diff --git a/src/Banner.tsx b/src/Banner.tsx
 index 1234567..abcdefg 100644
 --- a/src/Banner.tsx
 +++ b/src/Banner.tsx
@@ -41,8 +35,29 @@ index 1234567..abcdefg 100644
 +    </div>
 +  );
  };`,
-      commands: [
-        {
+    changedFiles: ["src/Banner.tsx"],
+    commands: [
+      {
+        name: "unit tests",
+        command: "pnpm test",
+        stdout: "Tests: 5 passed",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 4200,
+      },
+      {
+        name: "type check",
+        command: "tsc --noEmit",
+        stdout: "",
+        stderr: "error TS2345: Argument of type...",
+        exitCode: 1,
+        durationMs: 3100,
+      },
+    ],
+    taskResults: [
+      {
+        task: { name: "unit tests", criteria: "All unit tests should pass", weight: 1 },
+        result: {
           name: "unit tests",
           command: "pnpm test",
           stdout: "Tests: 5 passed",
@@ -50,16 +65,20 @@ index 1234567..abcdefg 100644
           exitCode: 0,
           durationMs: 4200,
         },
-        {
-          name: "type check",
-          command: "tsc --noEmit",
-          stdout: "",
-          stderr: "error TS2345: Argument of type...",
-          exitCode: 1,
-          durationMs: 3100,
-        },
-      ],
-    },
+      },
+    ],
+    agentTokenUsage: { inputTokens: 1500, outputTokens: 800, totalTokens: 2300 },
+    judgeTokenUsage: { inputTokens: 2200, outputTokens: 350, totalTokens: 2550 },
+    timing: { totalMs: 45000, setupMs: 500, agentMs: 30000, tasksMs: 7300, judgeMs: 7200 },
+    logs: "",
+    judgeModel: "gpt-4o",
+    score,
+    pass: status !== "FAIL",
+    status,
+    reason: "The close button was added correctly with proper event handling.",
+    improvement: "Consider adding an aria-label for accessibility.",
+    criteria: "The close button should dismiss the banner and be accessible",
+    expectedFiles: ["src/Banner.tsx"],
     durationMs: 45000,
     thresholds,
     ...overrides,

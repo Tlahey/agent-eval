@@ -49,12 +49,14 @@ describe("RunDetailPanel", () => {
     expect(screen.getByText("FAIL")).toBeInTheDocument();
   });
 
-  it("renders all 5 tab buttons", () => {
+  it("renders all 7 tab buttons", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
     expect(screen.getByText("Reason")).toBeInTheDocument();
     expect(screen.getByText("Improve")).toBeInTheDocument();
     expect(screen.getByText("Diff")).toBeInTheDocument();
-    expect(screen.getByText("Commands")).toBeInTheDocument();
+    expect(screen.getByText("Cmds")).toBeInTheDocument();
+    expect(screen.getByText("Tasks")).toBeInTheDocument();
+    expect(screen.getByText("Metrics")).toBeInTheDocument();
     expect(screen.getByText("History")).toBeInTheDocument();
   });
 
@@ -94,17 +96,16 @@ describe("RunDetailPanel", () => {
     const user = userEvent.setup();
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
 
-    await user.click(screen.getByText("Commands"));
+    await user.click(screen.getByText("Cmds"));
     expect(screen.getByText("unit tests")).toBeInTheDocument();
     expect(screen.getByText("type check")).toBeInTheDocument();
   });
 
   it("shows command count badge on Commands tab", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-    // The Commands tab button contains the label "Commands" and a badge with the count
     const commandsBtn = screen
       .getAllByRole("button")
-      .find((btn) => btn.textContent?.includes("Commands"));
+      .find((btn) => btn.textContent?.includes("Cmds"));
     expect(commandsBtn?.textContent).toContain("2");
   });
 
@@ -112,17 +113,17 @@ describe("RunDetailPanel", () => {
     const user = userEvent.setup();
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
 
-    await user.click(screen.getByText("Commands"));
+    await user.click(screen.getByText("Cmds"));
     expect(screen.getByText("✓")).toBeInTheDocument(); // exitCode 0
     expect(screen.getByText("✗")).toBeInTheDocument(); // exitCode 1
   });
 
   it("shows no commands placeholder when commands array is empty", async () => {
     const user = userEvent.setup();
-    const run = createMockRun({ context: { diff: null, commands: [] } });
+    const run = createMockRun({ commands: [] });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
 
-    await user.click(screen.getByText("Commands"));
+    await user.click(screen.getByText("Cmds"));
     expect(screen.getByText("No commands recorded")).toBeInTheDocument();
   });
 

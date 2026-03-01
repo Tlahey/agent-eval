@@ -216,6 +216,7 @@ export function EvalDetail() {
                 tickLine={false}
               />
               <Tooltip
+                cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
                 contentStyle={{
                   backgroundColor: "var(--color-surface-2)",
                   border: "1px solid var(--color-border)",
@@ -272,6 +273,7 @@ export function EvalDetail() {
               <XAxis dataKey="range" stroke="var(--color-text-muted)" fontSize={11} />
               <YAxis stroke="var(--color-text-muted)" fontSize={11} allowDecimals={false} />
               <Tooltip
+                cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
                 contentStyle={{
                   backgroundColor: "var(--color-surface-2)",
                   border: "1px solid var(--color-border)",
@@ -408,7 +410,7 @@ function HighlightCard({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-4 rounded-xl border ${border} ${bg} p-4 text-left transition-colors hover:border-border-hover`}
+      className={`flex items-center gap-4 rounded-xl border ${border} ${bg} p-4 text-left transition-colors hover:border-border`}
     >
       <ScoreRing value={run.score} size={44} strokeWidth={3} />
       <div className="min-w-0 flex-1">

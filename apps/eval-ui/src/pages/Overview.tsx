@@ -7,6 +7,8 @@ import {
   XCircle,
   AlertTriangle,
   ArrowRight,
+  Coins,
+  Clock,
 } from "lucide-react";
 import {
   AreaChart,
@@ -69,6 +71,12 @@ export function Overview() {
   const avgScore = totalRuns > 0 ? runs.reduce((s, r) => s + r.score, 0) / totalRuns : 0;
   const recentRuns = [...runs].slice(0, 8);
 
+  // Token & timing aggregates
+  const totalAgentTokens = runs.reduce((s, r) => s + (r.agentTokenUsage?.totalTokens ?? 0), 0);
+  const totalJudgeTokens = runs.reduce((s, r) => s + (r.judgeTokenUsage?.totalTokens ?? 0), 0);
+  const totalTokens = totalAgentTokens + totalJudgeTokens;
+  const avgDuration = totalRuns > 0 ? runs.reduce((s, r) => s + r.durationMs, 0) / totalRuns : 0;
+
   // Score trend data
   const trendData = buildTrendData(runs);
 
@@ -88,7 +96,7 @@ export function Overview() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
         <KPICard
           icon={<BarChart3 size={18} />}
           label="Total Runs"
@@ -109,26 +117,52 @@ export function Overview() {
           sub={`${passCount} passed`}
         />
         <KPICard
-          icon={<AlertTriangle size={18} />}
-          label="Warnings"
-          value={warnCount.toString()}
-          accent={warnCount > 0 ? "warn" : "ok"}
-          sub={
-            warnCount > 0
-              ? `${((warnCount / totalRuns) * 100).toFixed(0)}% warn rate`
-              : "No warnings"
-          }
-        />
-        <KPICard
           icon={<XCircle size={18} />}
           label="Failures"
           value={failCount.toString()}
           accent={failCount > 0 ? "err" : "ok"}
+          sub={warnCount > 0 ? `+ ${warnCount} warnings` : "No warnings"}
+        />
+        <KPICard
+          icon={<Coins size={18} />}
+          label="Total Tokens"
+          value={totalTokens > 0 ? formatTokens(totalTokens) : "—"}
+          accent="primary"
           sub={
-            failCount > 0
-              ? `${((failCount / totalRuns) * 100).toFixed(0)}% fail rate`
-              : "Clean slate!"
+            totalTokens > 0
+              ? `Agent: ${formatTokens(totalAgentTokens)} · Judge: ${formatTokens(totalJudgeTokens)}`
+              : undefined
           }
+        />
+        <KPICard
+          icon={<Coins size={18} />}
+          label="Avg Tokens / Run"
+          value={
+            totalRuns > 0 && totalTokens > 0
+              ? formatTokens(Math.round(totalTokens / totalRuns))
+              : "—"
+          }
+          accent="primary"
+          sub={
+            totalRuns > 0 && totalAgentTokens > 0
+              ? `Agent: ${formatTokens(Math.round(totalAgentTokens / totalRuns))} avg`
+              : undefined
+          }
+        />
+        <KPICard
+          icon={<Clock size={18} />}
+          label="Avg Duration"
+          value={avgDuration > 0 ? `${(avgDuration / 1000).toFixed(1)}s` : "—"}
+          accent="primary"
+        />
+        <KPICard
+          icon={<AlertTriangle size={18} />}
+          label="Warn Rate"
+          value={
+            totalRuns > 0 && warnCount > 0 ? `${((warnCount / totalRuns) * 100).toFixed(0)}%` : "0%"
+          }
+          accent={warnCount > 0 ? "warn" : "ok"}
+          sub={`${warnCount} warnings`}
         />
       </div>
 
@@ -162,6 +196,7 @@ export function Overview() {
                   tickLine={false}
                 />
                 <Tooltip
+                  cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
                   contentStyle={{
                     backgroundColor: "var(--color-surface-2)",
                     border: "1px solid var(--color-border)",
@@ -265,6 +300,7 @@ export function Overview() {
               tickLine={false}
             />
             <Tooltip
+              cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
               contentStyle={{
                 backgroundColor: "var(--color-surface-2)",
                 border: "1px solid var(--color-border)",
@@ -334,6 +370,12 @@ function KPICard({
       </div>
     </div>
   );
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return n.toString();
 }
 
 function buildTrendData(runs: LedgerRun[]) {

@@ -29,22 +29,32 @@ function initDb(): InstanceType<typeof DatabaseSync> {
   const db = new DatabaseSync(DB_PATH);
   db.exec(`
     CREATE TABLE IF NOT EXISTS runs (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      test_id         TEXT    NOT NULL,
-      suite_path      TEXT    NOT NULL DEFAULT '[]',
-      timestamp       TEXT    NOT NULL,
-      agent_runner    TEXT    NOT NULL,
-      judge_model     TEXT    NOT NULL,
-      score           REAL    NOT NULL,
-      pass            INTEGER NOT NULL,
-      status          TEXT    NOT NULL DEFAULT 'FAIL',
-      reason          TEXT    NOT NULL,
-      improvement     TEXT    NOT NULL DEFAULT '',
-      diff            TEXT,
-      commands        TEXT,
-      duration_ms     INTEGER NOT NULL,
-      warn_threshold  REAL    NOT NULL DEFAULT 0.8,
-      fail_threshold  REAL    NOT NULL DEFAULT 0.5
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      test_id             TEXT    NOT NULL,
+      suite_path          TEXT    NOT NULL DEFAULT '[]',
+      timestamp           TEXT    NOT NULL,
+      agent_runner        TEXT    NOT NULL,
+      instruction         TEXT    NOT NULL DEFAULT '',
+      diff                TEXT,
+      changed_files       TEXT    NOT NULL DEFAULT '[]',
+      commands            TEXT,
+      task_results        TEXT    NOT NULL DEFAULT '[]',
+      agent_token_usage   TEXT,
+      timing              TEXT    NOT NULL DEFAULT '{}',
+      agent_output        TEXT,
+      logs                TEXT    NOT NULL DEFAULT '',
+      judge_model         TEXT    NOT NULL,
+      score               REAL    NOT NULL,
+      pass                INTEGER NOT NULL,
+      status              TEXT    NOT NULL DEFAULT 'FAIL',
+      reason              TEXT    NOT NULL,
+      improvement         TEXT    NOT NULL DEFAULT '',
+      judge_token_usage   TEXT,
+      criteria            TEXT    NOT NULL DEFAULT '',
+      expected_files      TEXT,
+      warn_threshold      REAL    NOT NULL DEFAULT 0.8,
+      fail_threshold      REAL    NOT NULL DEFAULT 0.5,
+      duration_ms         INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_runs_test_id  ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs(timestamp);
@@ -790,13 +800,134 @@ function generateCommands(score: number): CmdTemplate[] {
   return [makeTestCommand(testPass), makeTscCommand(tscPass), makeLintCommand(lintPass)];
 }
 
+// ── new data generators ──────────────────────────────────────────────────────
+
+const INSTRUCTIONS: Record<string, string> = {
+  "add close button to Banner":
+    "Add a dismissible close button to the Banner component. It should hide the banner when clicked and support an onClose callback prop.",
+  "implement search with debounce":
+    "Create a useSearch hook with debounced API calls. Support configurable debounce delay and minimum query length.",
+  "add loading spinner":
+    "Add a loading spinner component that displays during async operations. Support size and color variants.",
+  "create dark mode toggle":
+    "Implement a dark mode toggle that persists user preference in localStorage and uses CSS custom properties.",
+  "refactor API service layer":
+    "Refactor the API service to use a centralized HTTP client with interceptors for auth, retry, and error handling.",
+};
+
+const CHANGED_FILES: Record<string, string[][]> = {
+  "add close button to Banner": [
+    ["src/components/Banner.tsx", "src/components/Banner.module.css"],
+    ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
+  ],
+  "implement search with debounce": [
+    ["src/hooks/useSearch.ts", "src/hooks/useSearch.test.ts"],
+    ["src/hooks/useSearch.ts", "src/components/SearchBar.tsx"],
+  ],
+  "add loading spinner": [
+    ["src/components/Spinner.tsx", "src/components/Spinner.css"],
+    ["src/components/Spinner.tsx"],
+  ],
+  "create dark mode toggle": [
+    ["src/hooks/useDarkMode.ts", "src/components/ThemeToggle.tsx", "src/styles/theme.css"],
+    ["src/context/ThemeContext.tsx", "src/components/DarkModeSwitch.tsx"],
+  ],
+  "refactor API service layer": [
+    ["src/services/api.ts", "src/services/http-client.ts", "src/services/interceptors.ts"],
+    ["src/lib/api-client.ts", "src/lib/request.ts"],
+  ],
+};
+
+const CRITERIA_TEMPLATES: Record<string, string> = {
+  "add close button to Banner":
+    "Banner has a visible close button, clicking it hides the banner, onClose callback is invoked, accessible via aria-label.",
+  "implement search with debounce":
+    "Search debounces input with configurable delay, respects minLength, cancels pending requests on unmount.",
+  "add loading spinner":
+    "Spinner renders with correct size/color, shows during loading state, hides when loaded.",
+  "create dark mode toggle":
+    "Toggle switches theme, preference persists across page reloads, uses CSS custom properties.",
+  "refactor API service layer":
+    "HTTP client handles auth headers, retries on 5xx, transforms errors consistently.",
+};
+
+function generateTokenUsage(type: "agent" | "judge"): {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+} {
+  const input = type === "agent" ? randInt(800, 4500) : randInt(1500, 3500);
+  const output = type === "agent" ? randInt(300, 2200) : randInt(100, 500);
+  return { inputTokens: input, outputTokens: output, totalTokens: input + output };
+}
+
+function generateTiming(durationMs: number): {
+  totalMs: number;
+  setupMs: number;
+  agentMs: number;
+  afterEachMs: number;
+  tasksMs: number;
+  judgeMs: number;
+} {
+  const setupMs = randInt(200, 1000);
+  const judgeMs = randInt(3000, 15000);
+  const tasksMs = randInt(2000, 12000);
+  const afterEachMs = randInt(50, 500);
+  const agentMs = Math.max(1000, durationMs - setupMs - judgeMs - tasksMs - afterEachMs);
+  return { totalMs: durationMs, setupMs, agentMs, afterEachMs, tasksMs, judgeMs };
+}
+
+function generateTaskResults(
+  score: number,
+  testId: string,
+): Array<{
+  task: { name: string; criteria: string; weight?: number };
+  result: CmdTemplate;
+}> {
+  const tasks = [
+    { name: "unit tests", criteria: "All unit tests pass without errors", weight: 2 },
+    { name: "type check", criteria: "TypeScript compiles with no errors" },
+    { name: "lint", criteria: "ESLint reports no errors" },
+  ];
+  // Sometimes add a 4th accessibility task
+  if (testId.includes("button") || testId.includes("toggle")) {
+    tasks.push({
+      name: "a11y audit",
+      criteria: "No critical accessibility violations",
+    });
+  }
+  return tasks.map((t) => ({
+    task: { name: t.name, criteria: t.criteria, weight: t.weight },
+    result: {
+      name: t.name,
+      command:
+        t.name === "unit tests"
+          ? "pnpm test"
+          : t.name === "type check"
+            ? "tsc --noEmit"
+            : "pnpm lint",
+      stdout: Math.random() < score ? "OK" : "",
+      stderr: Math.random() < score ? "" : "error found",
+      exitCode: Math.random() < score ? 0 : 1,
+      durationMs: randInt(1000, 5000),
+    },
+  }));
+}
+
 // ── main seed logic ──────────────────────────────────────────────────────────
 function seed(): void {
   const db = initDb();
 
   const stmt = db.prepare(`
-    INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, status, reason, improvement, diff, commands, duration_ms, warn_threshold, fail_threshold)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO runs (
+      test_id, suite_path, timestamp, agent_runner, instruction,
+      diff, changed_files, commands, task_results,
+      agent_token_usage, timing, agent_output, logs,
+      judge_model, score, pass, status, reason, improvement,
+      judge_token_usage, criteria, expected_files,
+      warn_threshold, fail_threshold, duration_ms
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
@@ -830,23 +961,41 @@ function seed(): void {
         const diff = pick(DIFF_TEMPLATES[testId]);
         const commands = generateCommands(score);
         const durationMs = randInt(10_000, 120_000);
+        const instruction = INSTRUCTIONS[testId] ?? "";
+        const changedFiles = pick(CHANGED_FILES[testId] ?? [[]]);
+        const taskResults = generateTaskResults(score, testId);
+        const agentTokens = generateTokenUsage("agent");
+        const judgeTokens = generateTokenUsage("judge");
+        const timing = generateTiming(durationMs);
+        const criteria = CRITERIA_TEMPLATES[testId] ?? "";
+        const expectedFiles = changedFiles.slice(0, 1); // first file is always expected
 
         stmt.run(
           testId,
           JSON.stringify(SUITE_PATHS[testId] ?? []),
           ts.toISOString(),
           runner,
+          instruction,
+          diff,
+          JSON.stringify(changedFiles),
+          JSON.stringify(commands),
+          JSON.stringify(taskResults),
+          JSON.stringify(agentTokens),
+          JSON.stringify(timing),
+          null, // agent_output
+          "", // logs
           pick(JUDGE_MODELS),
           score,
           pass ? 1 : 0,
           status,
           feedback.reason,
           feedback.improvement,
-          diff,
-          JSON.stringify(commands),
-          durationMs,
+          JSON.stringify(judgeTokens),
+          criteria,
+          JSON.stringify(expectedFiles),
           warnThreshold,
           failThreshold,
+          durationMs,
         );
 
         totalEntries++;

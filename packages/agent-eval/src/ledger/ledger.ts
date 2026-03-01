@@ -7,6 +7,9 @@ import type {
   ScoreOverride,
   TestStatus,
   Thresholds,
+  TokenUsage,
+  TaskResult,
+  TimingData,
 } from "../core/types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "../core/types.js";
 
@@ -26,56 +29,36 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS runs (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      test_id      TEXT    NOT NULL,
-      suite_path   TEXT    NOT NULL DEFAULT '[]',
-      timestamp    TEXT    NOT NULL,
-      agent_runner TEXT    NOT NULL,
-      judge_model  TEXT    NOT NULL,
-      score        REAL    NOT NULL,
-      pass         INTEGER NOT NULL,
-      reason       TEXT    NOT NULL,
-      improvement  TEXT    NOT NULL DEFAULT '',
-      diff         TEXT,
-      commands     TEXT,
-      duration_ms  INTEGER NOT NULL
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      test_id             TEXT    NOT NULL,
+      suite_path          TEXT    NOT NULL DEFAULT '[]',
+      timestamp           TEXT    NOT NULL,
+      agent_runner        TEXT    NOT NULL,
+      instruction         TEXT    NOT NULL DEFAULT '',
+      diff                TEXT,
+      changed_files       TEXT    NOT NULL DEFAULT '[]',
+      commands            TEXT,
+      task_results        TEXT    NOT NULL DEFAULT '[]',
+      agent_token_usage   TEXT,
+      timing              TEXT    NOT NULL DEFAULT '{}',
+      agent_output        TEXT,
+      logs                TEXT    NOT NULL DEFAULT '',
+      judge_model         TEXT    NOT NULL,
+      score               REAL    NOT NULL,
+      pass                INTEGER NOT NULL,
+      status              TEXT    NOT NULL DEFAULT 'FAIL',
+      reason              TEXT    NOT NULL,
+      improvement         TEXT    NOT NULL DEFAULT '',
+      judge_token_usage   TEXT,
+      criteria            TEXT    NOT NULL DEFAULT '',
+      expected_files      TEXT,
+      warn_threshold      REAL    NOT NULL DEFAULT 0.8,
+      fail_threshold      REAL    NOT NULL DEFAULT 0.5,
+      duration_ms         INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_runs_test_id   ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp  ON runs(timestamp);
   `);
-
-  // Migrate: add improvement column if missing (backward compat with older DBs)
-  try {
-    db.exec(`ALTER TABLE runs ADD COLUMN improvement TEXT NOT NULL DEFAULT ''`);
-  } catch {
-    // Column already exists — ignore
-  }
-
-  // Migrate: add suite_path column if missing (backward compat with older DBs)
-  try {
-    db.exec(`ALTER TABLE runs ADD COLUMN suite_path TEXT NOT NULL DEFAULT '[]'`);
-  } catch {
-    // Column already exists — ignore
-  }
-
-  // Migrate: add status column if missing
-  try {
-    db.exec(`ALTER TABLE runs ADD COLUMN status TEXT NOT NULL DEFAULT 'FAIL'`);
-  } catch {
-    // Column already exists — ignore
-  }
-
-  // Migrate: add threshold columns if missing
-  try {
-    db.exec(`ALTER TABLE runs ADD COLUMN warn_threshold REAL NOT NULL DEFAULT 0.8`);
-  } catch {
-    // Column already exists — ignore
-  }
-  try {
-    db.exec(`ALTER TABLE runs ADD COLUMN fail_threshold REAL NOT NULL DEFAULT 0.5`);
-  } catch {
-    // Column already exists — ignore
-  }
 
   // Score overrides table (HITL — human-in-the-loop)
   db.exec(`
@@ -91,13 +74,6 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
     CREATE INDEX IF NOT EXISTS idx_overrides_run_id ON score_overrides(run_id);
   `);
 
-  // Migrate: add status to score_overrides if missing
-  try {
-    db.exec(`ALTER TABLE score_overrides ADD COLUMN status TEXT NOT NULL DEFAULT 'FAIL'`);
-  } catch {
-    // Column already exists — ignore
-  }
-
   return db;
 }
 
@@ -109,17 +85,27 @@ interface RunRow {
   suite_path: string;
   timestamp: string;
   agent_runner: string;
+  instruction: string;
+  diff: string | null;
+  changed_files: string;
+  commands: string | null;
+  task_results: string;
+  agent_token_usage: string | null;
+  timing: string;
+  agent_output: string | null;
+  logs: string;
   judge_model: string;
   score: number;
   pass: number;
   status: string;
   reason: string;
   improvement: string;
-  diff: string | null;
-  commands: string | null;
-  duration_ms: number;
+  judge_token_usage: string | null;
+  criteria: string;
+  expected_files: string | null;
   warn_threshold: number;
   fail_threshold: number;
+  duration_ms: number;
   /* Override columns (nullable, from LEFT JOIN) */
   override_score: number | null;
   override_pass: number | null;
@@ -155,12 +141,18 @@ function rowToEntry(row: RunRow): LedgerEntry {
     warn: row.warn_threshold ?? DEFAULT_THRESHOLDS.warn,
     fail: row.fail_threshold ?? DEFAULT_THRESHOLDS.fail,
   };
-  // Backward compat: if status is missing or default, recompute from score
   const status =
     row.status === "PASS" || row.status === "WARN" || row.status === "FAIL"
       ? (row.status as TestStatus)
       : computeStatus(row.score, thresholds);
   const commands = row.commands ? (JSON.parse(row.commands) as CommandResult[]) : [];
+  const changedFiles = safeJsonParse<string[]>(row.changed_files, []);
+  const taskResults = safeJsonParse<TaskResult[]>(row.task_results, []);
+  const agentTokenUsage = safeJsonParse<TokenUsage | undefined>(row.agent_token_usage, undefined);
+  const judgeTokenUsage = safeJsonParse<TokenUsage | undefined>(row.judge_token_usage, undefined);
+  const timing = safeJsonParse<TimingData>(row.timing, { totalMs: row.duration_ms });
+  const expectedFiles = safeJsonParse<string[] | undefined>(row.expected_files, undefined);
+
   const entry: LedgerEntry = {
     id: row.id,
     testId: row.test_id,
@@ -168,12 +160,15 @@ function rowToEntry(row: RunRow): LedgerEntry {
     timestamp: row.timestamp,
     // Execution data
     agentRunner: row.agent_runner,
+    instruction: row.instruction ?? "",
     diff: row.diff,
-    changedFiles: [],
+    changedFiles,
     commands,
-    taskResults: [],
-    timing: { totalMs: row.duration_ms },
-    logs: "",
+    taskResults,
+    agentTokenUsage,
+    timing,
+    agentOutput: row.agent_output ?? undefined,
+    logs: row.logs ?? "",
     // Judgment data
     judgeModel: row.judge_model,
     score: row.score,
@@ -181,14 +176,11 @@ function rowToEntry(row: RunRow): LedgerEntry {
     status,
     reason: row.reason,
     improvement: row.improvement ?? "",
-    criteria: "",
+    judgeTokenUsage,
+    criteria: row.criteria ?? "",
+    expectedFiles,
     thresholds,
     durationMs: row.duration_ms,
-    // Backward compat
-    context: {
-      diff: row.diff,
-      commands,
-    },
   };
   if (row.override_score != null) {
     const overrideStatus =
@@ -208,6 +200,15 @@ function rowToEntry(row: RunRow): LedgerEntry {
   return entry;
 }
 
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * Append a single entry to the SQLite ledger.
  */
@@ -215,25 +216,42 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
   const db = openDb(outputDir);
   try {
     const stmt = db.prepare(`
-      INSERT INTO runs (test_id, suite_path, timestamp, agent_runner, judge_model, score, pass, status, reason, improvement, diff, commands, duration_ms, warn_threshold, fail_threshold)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO runs (
+        test_id, suite_path, timestamp, agent_runner, instruction,
+        diff, changed_files, commands, task_results,
+        agent_token_usage, timing, agent_output, logs,
+        judge_model, score, pass, status, reason, improvement,
+        judge_token_usage, criteria, expected_files,
+        warn_threshold, fail_threshold, duration_ms
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
       JSON.stringify(entry.suitePath ?? []),
       entry.timestamp,
       entry.agentRunner,
+      entry.instruction ?? "",
+      entry.diff,
+      JSON.stringify(entry.changedFiles ?? []),
+      JSON.stringify(entry.commands),
+      JSON.stringify(entry.taskResults ?? []),
+      entry.agentTokenUsage ? JSON.stringify(entry.agentTokenUsage) : null,
+      JSON.stringify(entry.timing ?? { totalMs: entry.durationMs }),
+      entry.agentOutput ?? null,
+      entry.logs ?? "",
       entry.judgeModel,
       entry.score,
       entry.pass ? 1 : 0,
       entry.status,
       entry.reason,
       entry.improvement,
-      entry.diff,
-      JSON.stringify(entry.commands),
-      entry.durationMs,
+      entry.judgeTokenUsage ? JSON.stringify(entry.judgeTokenUsage) : null,
+      entry.criteria ?? "",
+      entry.expectedFiles ? JSON.stringify(entry.expectedFiles) : null,
       entry.thresholds.warn,
       entry.thresholds.fail,
+      entry.durationMs,
     );
   } finally {
     db.close();

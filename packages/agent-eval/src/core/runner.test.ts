@@ -9,6 +9,7 @@ import {
   dryRunTest,
 } from "./runner.js";
 import type { AgentEvalConfig, TestDefinition, JudgeResult, RunnerConfig } from "./types.js";
+import type { EvalContext } from "./context.js";
 
 // Mock external deps
 vi.mock("../git/git.js", () => ({
@@ -321,6 +322,107 @@ describe("runner - createAgent via runTest", () => {
     // Should not crash; error is reported gracefully
     const results = await runTest(testDef, config);
     expect(results).toHaveLength(1);
+  });
+
+  it("CLI runner with parseOutput extracts token usage", async () => {
+    const jsonOutput = JSON.stringify({
+      result: "Files updated successfully",
+      usage: { input_tokens: 2500, output_tokens: 900 },
+    });
+    mockEnvInstance.execute.mockReturnValueOnce({
+      stdout: jsonOutput,
+      stderr: "",
+      exitCode: 0,
+    });
+
+    const runner: RunnerConfig = {
+      name: "claude-code",
+      model: {
+        type: "cli" as const,
+        name: "claude-code",
+        command: 'claude -p "{{prompt}}" --output-format json',
+        parseOutput: ({ stdout }) => {
+          const json = JSON.parse(stdout);
+          return {
+            tokenUsage: json.usage
+              ? {
+                  inputTokens: json.usage.input_tokens,
+                  outputTokens: json.usage.output_tokens,
+                  totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+                }
+              : undefined,
+            agentOutput: json.result,
+          };
+        },
+      },
+    };
+
+    const config: AgentEvalConfig = {
+      rootDir: "/tmp/test",
+      outputDir: "/tmp/test/.agenteval",
+      runners: [runner],
+      judge: {},
+    };
+
+    let capturedCtx: EvalContext | null = null;
+    const testDef: TestDefinition = {
+      title: "test-parseOutput",
+      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
+        capturedCtx = ctx as unknown as EvalContext;
+        await agent.run("fix the bug");
+      }),
+    };
+
+    await runTest(testDef, config);
+
+    // Token usage should have been captured via parseOutput
+    expect(capturedCtx).not.toBeNull();
+    expect(capturedCtx!.agentTokenUsage).toEqual({
+      inputTokens: 2500,
+      outputTokens: 900,
+      totalTokens: 3400,
+    });
+  });
+
+  it("CLI runner without parseOutput has no token usage", async () => {
+    mockEnvInstance.execute.mockReturnValueOnce({
+      stdout: "some plain output",
+      stderr: "",
+      exitCode: 0,
+    });
+
+    const runner: RunnerConfig = {
+      name: "copilot",
+      model: {
+        type: "cli" as const,
+        name: "copilot",
+        command: 'gh copilot suggest "{{prompt}}"',
+        // no parseOutput — tokens not available
+      },
+    };
+
+    const config: AgentEvalConfig = {
+      rootDir: "/tmp/test",
+      outputDir: "/tmp/test/.agenteval",
+      runners: [runner],
+      judge: {},
+    };
+
+    let capturedCtx: EvalContext | null = null;
+    const testDef: TestDefinition = {
+      title: "test-no-parseOutput",
+      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
+        capturedCtx = ctx as unknown as EvalContext;
+        await agent.run("do something");
+      }),
+    };
+
+    await runTest(testDef, config);
+
+    // No parseOutput = no token data, but agent output is captured from stdout
+    expect(capturedCtx).not.toBeNull();
+    expect(capturedCtx!.agentTokenUsage).toBeUndefined();
+    expect(capturedCtx!.agentOutput).toBe("some plain output");
   });
 
   it("multiple runners execute sequentially", async () => {

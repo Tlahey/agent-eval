@@ -11,7 +11,6 @@ import type {
   AgentEvalConfig,
   AgentHandle,
   CommandResult,
-  ExecutionData,
   JudgeOptions,
   JudgeResult,
   LedgerEntry,
@@ -46,6 +45,22 @@ async function executeRunner(
     // CLI execution: replace {{prompt}} and run via environment
     const cmd = runner.model.command.replace("{{prompt}}", prompt);
     const result = await env.execute(cmd, cwd, { timeout: timeout ?? 600_000 });
+
+    // If the CLI model has a parseOutput function, use it to extract metrics
+    if (runner.model.parseOutput) {
+      const metrics = runner.model.parseOutput({
+        stdout: result.stdout,
+        stderr: result.stderr,
+      });
+      return {
+        stdout: metrics.agentOutput ?? result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        tokenUsage: metrics.tokenUsage,
+        output: metrics.agentOutput,
+      };
+    }
+
     return {
       stdout: result.stdout,
       stderr: result.stderr,

@@ -26,7 +26,7 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
     <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border bg-surface-2/50">
+          <tr className="border-b border-border bg-surface-2">
             {!compact && (
               <th className="px-4 py-2.5 text-left text-xs font-medium text-txt-muted">Eval</th>
             )}
@@ -44,7 +44,7 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
             <tr
               key={run.id ?? i}
               onClick={() => onSelect(run)}
-              className="group cursor-pointer border-b border-border/50 transition-colors hover:bg-surface-2/70"
+              className="group cursor-pointer border-b border-border transition-colors hover:bg-surface-2"
             >
               {!compact && (
                 <td className="px-4 py-3">

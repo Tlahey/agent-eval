@@ -9,8 +9,8 @@
   --color-surface-2: #161822;
   --color-surface-3: #1e2030;
   --color-surface-4: #262940;
-  --color-border: rgba(255, 255, 255, 0.06);
-  --color-border-hover: rgba(255, 255, 255, 0.12);
+  --color-border: #1c1f2e;
+  --color-border-hover: #2a2e42;
   --color-text-base: #f0f0f3;
   --color-text-secondary: #a0a3b1;
   --color-text-muted: #5f6278;

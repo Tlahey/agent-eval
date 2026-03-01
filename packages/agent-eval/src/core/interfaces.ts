@@ -12,7 +12,14 @@
  * high-level modules (Runner, CLI) depend on abstractions, not concrete implementations.
  */
 
-import type { LedgerEntry, ScoreOverride, TestContext, JudgeResult, JudgeConfig } from "./types.js";
+import type {
+  LedgerEntry,
+  ScoreOverride,
+  TestContext,
+  JudgeResult,
+  JudgeConfig,
+  TokenUsage,
+} from "./types.js";
 
 // ─── Model Plugin ───
 
@@ -74,6 +81,24 @@ export interface IModelPlugin {
  * });
  * ```
  */
+/**
+ * Metrics extracted from CLI command output.
+ * Returned by `ICliModel.parseOutput()` when the CLI tool exposes usage data.
+ */
+export interface CliOutputMetrics {
+  /** Token usage extracted from the CLI output (undefined if not available) */
+  tokenUsage?: TokenUsage;
+  /** Cleaned agent output (e.g., extracted from JSON wrapper) */
+  agentOutput?: string;
+}
+
+/**
+ * Parser function type for CLI output.
+ * Each CLI tool may expose metrics in a different format — the parser
+ * is responsible for extracting structured data from raw stdout/stderr.
+ */
+export type CliOutputParser = (output: { stdout: string; stderr: string }) => CliOutputMetrics;
+
 export interface ICliModel {
   /** Always "cli" — used to discriminate from IModelPlugin */
   readonly type: "cli";
@@ -81,6 +106,36 @@ export interface ICliModel {
   readonly name: string;
   /** Shell command template with {{prompt}} placeholder */
   readonly command: string;
+
+  /**
+   * Optional output parser — extracts token usage and cleaned output from raw CLI output.
+   *
+   * Each CLI tool reports metrics differently (or not at all):
+   * - Claude Code (`--output-format json`): structured JSON with `usage` field
+   * - Aider: prints "Tokens: Xk sent, Yk received" in stdout
+   * - Copilot CLI: no token reporting — leave parseOutput undefined
+   *
+   * When undefined, the runner uses raw stdout as agent output with no token data.
+   *
+   * @example
+   * ```ts
+   * const claudeCode = new CliModel({
+   *   command: 'claude -p "{{prompt}}" --output-format json',
+   *   parseOutput: ({ stdout }) => {
+   *     const json = JSON.parse(stdout);
+   *     return {
+   *       tokenUsage: json.usage ? {
+   *         inputTokens: json.usage.input_tokens,
+   *         outputTokens: json.usage.output_tokens,
+   *         totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+   *       } : undefined,
+   *       agentOutput: json.result,
+   *     };
+   *   },
+   * });
+   * ```
+   */
+  parseOutput?: CliOutputParser;
 }
 
 /**

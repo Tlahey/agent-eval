@@ -23,7 +23,7 @@ The dashboard is available at `http://localhost:4747` by default.
 
 The overview page shows aggregate statistics across all evaluations:
 
-- **Total runs**, **average score**, **pass rate**
+- **8 KPI cards** in a 4-column grid: Total Runs, Avg Score, Pass Rate, Fail Rate, Total Tokens, Avg Tokens/Run, Avg Duration, Warn Rate
 - **Score distribution chart** (Recharts bar chart)
 - **Recent runs** with quick status indicators
 
@@ -66,15 +66,25 @@ Suite nodes can be collapsed/expanded. Tests without a `describe()` wrapper appe
 
 ### Run Detail Panel
 
-Click any run to see the full details:
+Click any run to see the full details in a **7-tab panel**:
+
+- **Reason** — Judge reasoning (full markdown)
+- **Improve** — Improvement suggestions from the judge
+- **Diff** — GitHub-style diff viewer with syntax highlighting
+- **Cmds** — Command outputs (test results, build logs, exit codes)
+- **Tasks** — Task results with pass/fail status per task
+- **Metrics** — Token usage breakdown (agent + judge tokens) and **TimingBar** visualization (stacked horizontal bar showing Setup → Agent → Tasks → AfterEach → Judge phases)
+- **History** — All score overrides (audit trail)
+
+Additional features:
 
 - **Score and pass/fail status** (uses override score if present)
-- **Judge reasoning** (full markdown)
-- **Improvement suggestions** from the judge
-- **GitHub-style diff viewer** with syntax highlighting
-- **Command outputs** (test results, build logs, exit codes)
+- **Token count badge** in the panel header
 - **Override score** button (pencil icon) to manually adjust the score
-- **History tab** showing all score overrides (audit trail)
+
+::: tip Token metrics
+The Metrics tab shows token usage for both the agent and the judge. For CLI models without `parseOutput`, agent tokens display as "N/A". API models always report full token data.
+:::
 
 ### Human-in-the-Loop (HITL) Score Overrides
 

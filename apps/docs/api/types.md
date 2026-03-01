@@ -284,7 +284,58 @@ See [Plugins](/guide/plugins) for full documentation. Quick reference:
 | Interface            | Key Methods                                        | Import              |
 | -------------------- | -------------------------------------------------- | ------------------- |
 | `IModelPlugin`       | `createModel()`, `name`, `modelId`                 | `from "agent-eval"` |
+| `ICliModel`          | `command`, `name`, `type`, `parseOutput?()`        | `from "agent-eval"` |
 | `RunnerConfig`       | `name`, `model` (plain config object)              | `from "agent-eval"` |
 | `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.     | `from "agent-eval"` |
 | `IJudgePlugin`       | `judge(ctx, criteria, config)`, `name`             | `from "agent-eval"` |
 | `IEnvironmentPlugin` | `setup()`, `execute()`, `getDiff()`, `teardown?()` | `from "agent-eval"` |
+
+## ICliModel
+
+The interface for CLI-based agent models. CLI models execute a shell command with a `{{prompt}}` placeholder.
+
+```ts
+interface ICliModel {
+  /** Always "cli" — used to discriminate from IModelPlugin */
+  readonly type: "cli";
+  /** Human-readable name (e.g., "aider", "copilot") */
+  readonly name: string;
+  /** Shell command template with {{prompt}} placeholder */
+  readonly command: string;
+  /**
+   * Optional output parser — extracts token usage and cleaned output
+   * from raw CLI output. When undefined, raw stdout is used as-is.
+   */
+  parseOutput?: CliOutputParser;
+}
+```
+
+## CliOutputMetrics
+
+Structured metrics extracted from CLI command output by `parseOutput`.
+
+```ts
+interface CliOutputMetrics {
+  /** Token usage extracted from the CLI output (undefined if not available) */
+  tokenUsage?: TokenUsage;
+  /** Cleaned agent output (e.g., extracted from JSON wrapper) */
+  agentOutput?: string;
+}
+```
+
+## CliOutputParser
+
+Parser function type for extracting `CliOutputMetrics` from raw CLI stdout/stderr.
+
+```ts
+type CliOutputParser = (output: { stdout: string; stderr: string }) => CliOutputMetrics;
+```
+
+::: tip
+Import these types from `agent-eval`:
+
+```ts
+import type { ICliModel, CliOutputMetrics, CliOutputParser } from "agent-eval";
+```
+
+:::
