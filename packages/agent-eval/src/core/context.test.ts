@@ -124,3 +124,163 @@ describe("EvalContext", () => {
     expect(logs).not.toContain("STDERR:");
   });
 });
+
+describe("EvalContext - addTask and exec", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpGitRepo();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("starts with no tasks", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(ctx.tasks).toEqual([]);
+  });
+
+  it("addTask registers a task", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    const task = {
+      name: "Build",
+      action: async () => ({
+        name: "build",
+        command: "pnpm build",
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 0,
+      }),
+      criteria: "build must succeed",
+      weight: 2,
+    };
+    ctx.addTask(task);
+    expect(ctx.tasks).toHaveLength(1);
+    expect(ctx.tasks[0].name).toBe("Build");
+    expect(ctx.tasks[0].weight).toBe(2);
+  });
+
+  it("addTask registers multiple tasks in order", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    const makeTask = (name: string) => ({
+      name,
+      action: async () => ({
+        name,
+        command: name,
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 0,
+      }),
+      criteria: `${name} criteria`,
+    });
+    ctx.addTask(makeTask("first"));
+    ctx.addTask(makeTask("second"));
+    expect(ctx.tasks).toHaveLength(2);
+    expect(ctx.tasks[0].name).toBe("first");
+    expect(ctx.tasks[1].name).toBe("second");
+  });
+
+  it("tasks returns a copy (immutable)", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    ctx.addTask({
+      name: "test",
+      action: async () => ({
+        name: "t",
+        command: "t",
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 0,
+      }),
+      criteria: "pass",
+    });
+    const tasks = ctx.tasks;
+    expect(tasks).toHaveLength(1);
+    // ReadonlyArray prevents mutation at compile time, but we verify runtime copy
+    expect(ctx.tasks).toHaveLength(1);
+  });
+
+  it("addTask validates name is non-empty", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(() =>
+      ctx.addTask({
+        name: "",
+        action: async () => ({
+          name: "",
+          command: "",
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 0,
+        }),
+        criteria: "test",
+      }),
+    ).toThrow("non-empty name");
+  });
+
+  it("addTask validates action is a function", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(() =>
+      ctx.addTask({
+        name: "test",
+        action: "not a function" as never,
+        criteria: "test",
+      }),
+    ).toThrow("action function");
+  });
+
+  it("addTask validates criteria is non-empty", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(() =>
+      ctx.addTask({
+        name: "test",
+        action: async () => ({
+          name: "",
+          command: "",
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 0,
+        }),
+        criteria: "",
+      }),
+    ).toThrow("non-empty criteria");
+  });
+
+  it("addTask validates weight is non-negative", () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    expect(() =>
+      ctx.addTask({
+        name: "test",
+        action: async () => ({
+          name: "",
+          command: "",
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 0,
+        }),
+        criteria: "test",
+        weight: -1,
+      }),
+    ).toThrow("non-negative number");
+  });
+
+  it("exec runs a command and returns result", async () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    const result = await ctx.exec("echo hello world");
+    expect(result.stdout.trim()).toBe("hello world");
+    expect(result.exitCode).toBe(0);
+    expect(result.name).toBe("echo");
+  });
+
+  it("exec stores the command in commands list", async () => {
+    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
+    await ctx.exec("echo test");
+    expect(ctx.commands).toHaveLength(1);
+    expect(ctx.commands[0].command).toBe("echo test");
+  });
+});

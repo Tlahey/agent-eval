@@ -117,9 +117,41 @@ The `test()` function receives an object with:
 
 The `agent` object exposes:
 
-- `agent.run(prompt)` — trigger the agent with a prompt
+- `agent.run(prompt)` — trigger the agent with a prompt (imperative mode)
+- `agent.instruct(prompt)` — declare what the agent should do (declarative mode) — see [Declarative Pipeline](./declarative-pipeline.md)
 - `agent.name` — the runner's name (e.g., `"copilot"`)
 - `agent.model` — the runner's model (e.g., `"claude-sonnet-4-20250514"`)
+
+## Declarative vs Imperative
+
+AgentEval supports two test styles:
+
+**Imperative** (original) — you control execution:
+
+```ts
+test("task", async ({ agent, ctx }) => {
+  await agent.run("Add close button");
+  await expect(ctx).toPassJudge({ criteria: "works" });
+});
+```
+
+**Declarative** (new) — you declare, the runner executes:
+
+```ts
+test("task", ({ agent, ctx }) => {
+  agent.instruct("Add close button");
+  ctx.addTask({
+    name: "Build",
+    action: () => ctx.exec("pnpm build"),
+    criteria: "build succeeds",
+    weight: 2,
+  });
+});
+```
+
+::: tip
+See the full [Declarative Pipeline guide](./declarative-pipeline.md) for details on `addTask()`, weighted scoring, hooks, and dry-run mode.
+:::
 
 ## Capturing Context
 

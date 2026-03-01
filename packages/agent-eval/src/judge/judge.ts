@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { generateObject } from "ai";
 import { z } from "zod";
-import type { JudgeConfig, JudgeResult, TestContext } from "../core/types.js";
+import type {
+  CommandResult,
+  JudgeConfig,
+  JudgeResult,
+  TaskDefinition,
+  TestContext,
+} from "../core/types.js";
 
 const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),
@@ -220,6 +226,59 @@ async function judgeCli(
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Build the judge prompt for declarative pipeline mode.
+ * Incorporates the agent instruction, task results with weighted criteria, and context.
+ */
+export function buildDeclarativeJudgePrompt(
+  instruction: string,
+  taskResults: Array<{ task: TaskDefinition; result: CommandResult }>,
+  ctx: TestContext,
+  expectedFiles?: string[],
+): string {
+  const changedFiles = extractChangedFiles(ctx.diff);
+  const fileScopeSection = buildFileScopeSection(changedFiles, expectedFiles);
+
+  const taskSections = taskResults
+    .map((tr, i) => {
+      const weight = tr.task.weight ?? 1;
+      return `### Task ${i + 1}: ${tr.task.name} (weight: ${weight})
+**Criteria:** ${tr.task.criteria}
+**Exit code:** ${tr.result.exitCode}
+**Output:**
+\`\`\`
+${tr.result.stdout.slice(0, 2000)}${tr.result.stderr ? `\nSTDERR:\n${tr.result.stderr.slice(0, 500)}` : ""}
+\`\`\``;
+    })
+    .join("\n\n");
+
+  const totalWeight = taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
+
+  return `You are an expert code reviewer acting as a Judge for an AI coding agent evaluation.
+
+## Agent Instruction
+The agent was asked to: "${instruction}"
+
+## Task Results (${taskResults.length} tasks, total weight: ${totalWeight})
+${taskSections || "(no tasks registered)"}
+
+## Code Changes
+${ctx.logs || "(no logs captured)"}
+${fileScopeSection}
+
+## Scoring Instructions
+- Evaluate whether the agent's code changes correctly fulfill the instruction.
+- For each task, assess whether its criteria were met. Weight the scores accordingly.
+- Score from 0.0 (complete failure) to 1.0 (perfect execution).
+- Set pass=true if the overall score is satisfactory.
+- A task with exit code 0 and output matching its criteria should score positively.
+- A task with non-zero exit code should score negatively unless the criteria explicitly allow it.
+- Provide a detailed Markdown explanation in "reason".
+- Provide actionable Markdown suggestions in "improvement".
+- Be strict but fair. Partial credit is encouraged.
+- Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string, "improvement": string }`;
 }
 
 /**

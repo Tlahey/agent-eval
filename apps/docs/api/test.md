@@ -10,10 +10,10 @@ function test(title: string, fn: TestFn): void;
 
 ## Parameters
 
-| Param   | Type     | Description                                      |
-| ------- | -------- | ------------------------------------------------ |
-| `title` | `string` | Test title (used as the test ID in the ledger)   |
-| `fn`    | `TestFn` | Async function receiving `{ agent, ctx, judge }` |
+| Param   | Type     | Description                                                                                  |
+| ------- | -------- | -------------------------------------------------------------------------------------------- |
+| `title` | `string` | Test title (used as the test ID in the ledger)                                               |
+| `fn`    | `TestFn` | Function receiving `{ agent, ctx, judge }`. Can be async (imperative) or sync (declarative). |
 
 The `fn` callback receives:
 
@@ -146,3 +146,61 @@ test("Standalone test", async ({ agent, ctx }) => {
 3. After the callback, the suite name is popped from the stack
 4. If the callback throws, the stack is still cleaned up (try/finally)
 5. The `suitePath` is stored in the ledger as a JSON array in the `suite_path` column
+
+## beforeEach() / afterEach()
+
+Register lifecycle hooks that run around each test. Follows Vitest-style scoping.
+
+### Signature
+
+```ts
+function beforeEach(fn: HookFn): void;
+function afterEach(fn: HookFn): void;
+
+type HookFn = (ctx: HookContext) => void | Promise<void>;
+```
+
+### Hook Scoping
+
+- **Top-level hooks** run for every test
+- **Hooks inside `describe()`** run only for tests in that suite and nested suites
+- `afterEach` hooks run even when the test fails
+
+```ts
+import { test, describe, beforeEach, afterEach } from "agent-eval";
+
+beforeEach(async (ctx) => {
+  // Runs before ALL tests
+});
+
+describe("UI", () => {
+  beforeEach(async (ctx) => {
+    // Runs before UI tests only
+  });
+
+  afterEach(async (ctx) => {
+    // Runs after UI tests, even on failure
+  });
+
+  test("task", ({ agent, ctx }) => {
+    agent.instruct("do something");
+    ctx.addTask({ name: "t", action: () => ctx.exec("echo ok"), criteria: "pass" });
+  });
+});
+```
+
+## AgentHandle
+
+The `agent` parameter exposes two mutually exclusive execution modes:
+
+| Method                   | Mode        | Description                                                        |
+| ------------------------ | ----------- | ------------------------------------------------------------------ |
+| `agent.run(prompt)`      | Imperative  | Execute agent and return. Use with manual `expect().toPassJudge()` |
+| `agent.instruct(prompt)` | Declarative | Declare instruction. Runner auto-executes and judges               |
+
+### Single-Instruct Policy
+
+- `agent.instruct()` can only be called **once** per test
+- You cannot mix `run()` and `instruct()` in the same test
+
+See [Declarative Pipeline](/guide/declarative-pipeline) for details.

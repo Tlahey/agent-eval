@@ -1,9 +1,10 @@
 import type { IEnvironmentPlugin } from "./interfaces.js";
-import type { CommandResult, TestContext } from "./types.js";
+import type { CommandResult, TaskDefinition, TestContext } from "./types.js";
 
 export class EvalContext implements TestContext {
   private _diff: string | null = null;
   private _commands: CommandResult[] = [];
+  private _tasks: TaskDefinition[] = [];
   private _cwd: string;
   private _env: IEnvironmentPlugin;
 
@@ -45,12 +46,37 @@ export class EvalContext implements TestContext {
     return cmd;
   }
 
+  addTask(task: TaskDefinition): void {
+    if (!task.name || typeof task.name !== "string") {
+      throw new Error("Task must have a non-empty name");
+    }
+    if (typeof task.action !== "function") {
+      throw new Error(`Task "${task.name}" must have an action function`);
+    }
+    if (!task.criteria || typeof task.criteria !== "string") {
+      throw new Error(`Task "${task.name}" must have non-empty criteria`);
+    }
+    if (task.weight !== undefined && (typeof task.weight !== "number" || task.weight < 0)) {
+      throw new Error(`Task "${task.name}" weight must be a non-negative number`);
+    }
+    this._tasks.push(task);
+  }
+
+  async exec(command: string): Promise<CommandResult> {
+    const shortName = command.split(/\s+/)[0];
+    return this.runCommand(shortName, command);
+  }
+
   get diff(): string | null {
     return this._diff;
   }
 
   get commands(): CommandResult[] {
     return [...this._commands];
+  }
+
+  get tasks(): ReadonlyArray<TaskDefinition> {
+    return [...this._tasks];
   }
 
   get logs(): string {
