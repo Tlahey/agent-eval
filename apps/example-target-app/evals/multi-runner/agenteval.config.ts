@@ -1,6 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { CLIRunner } from "agent-eval/runner/cli";
-import { APIRunner } from "agent-eval/runner/api";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 
@@ -34,19 +33,15 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new APIRunner({
-      name: "claude-sonnet",
-      model: claude,
-    }),
-    new APIRunner({
-      name: "gpt-4o",
-      model: new OpenAIModel({ model: "gpt-4o" }),
-    }),
-    new CLIRunner({
+    { name: "claude-sonnet", model: claude },
+    { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
+    {
       name: "aider",
-      command:
-        'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
-    }),
+      model: new CliModel({
+        command:
+          'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
+      }),
+    },
   ],
 
   // Use the same model for judging all runners

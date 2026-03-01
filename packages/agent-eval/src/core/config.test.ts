@@ -8,13 +8,16 @@ import {
   validateRunnerNames,
   assertValidPlugins,
 } from "../core/config.js";
-import type { IRunnerPlugin } from "../core/interfaces.js";
-import type { AgentEvalConfig } from "../core/types.js";
+import type { AgentEvalConfig, RunnerConfig } from "../core/types.js";
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `agenteval-cfg-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function makeCliRunner(name: string, command = `echo "{{prompt}}"`): RunnerConfig {
+  return { name, model: { type: "cli" as const, name: "cli", command } };
 }
 
 describe("config", () => {
@@ -80,28 +83,15 @@ describe("config", () => {
   });
 
   describe("validateRunnerNames", () => {
-    it("accepts runners with unique names", async () => {
-      const { CLIRunner } = await import("../runner/plugins/cli.js");
-      const r1 = new CLIRunner({ name: "copilot", command: "copilot --prompt={{prompt}}" });
-      const r2: IRunnerPlugin = {
-        name: "custom",
-        model: "custom-model",
-        execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
-      };
+    it("accepts runners with unique names", () => {
+      const r1 = makeCliRunner("copilot", "copilot --prompt={{prompt}}");
+      const r2 = makeCliRunner("custom", "custom-cmd {{prompt}}");
       expect(() => validateRunnerNames([r1, r2])).not.toThrow();
     });
 
     it("throws on duplicate runner names", () => {
-      const r1: IRunnerPlugin = {
-        name: "copilot",
-        model: "m1",
-        execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
-      };
-      const r2: IRunnerPlugin = {
-        name: "copilot",
-        model: "m2",
-        execute: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
-      };
+      const r1 = makeCliRunner("copilot", "cmd1 {{prompt}}");
+      const r2 = makeCliRunner("copilot", "cmd2 {{prompt}}");
       expect(() => validateRunnerNames([r1, r2])).toThrow('Duplicate runner name "copilot"');
     });
 
@@ -115,7 +105,7 @@ describe("config", () => {
       const config: AgentEvalConfig = {
         rootDir: tmpDir,
         outputDir: ".agenteval",
-        runners: [{ name: "test", model: "echo", execute: async () => ({}) } as IRunnerPlugin],
+        runners: [makeCliRunner("test")],
         judge: {},
       };
       expect(() => assertValidPlugins(config)).not.toThrow();

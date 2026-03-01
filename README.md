@@ -65,12 +65,15 @@ agenteval --version
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { CliModel } from "agent-eval/providers/cli";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 
 export default defineConfig({
-  // Agent runners — CLI shorthand or IRunnerPlugin instances
-  runners: [{ name: "copilot", command: 'gh copilot suggest "{{prompt}}"' }],
+  // Agent runners — plain { name, model } objects
+  runners: [
+    { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
+  ],
 
   // Judge — LLM model used to score every test
   judge: {
@@ -149,7 +152,7 @@ AgentEval is built around SOLID plugin interfaces. Every major concern is swappa
 | Interface            | Purpose                  | Built-in Implementations                       |
 | -------------------- | ------------------------ | ---------------------------------------------- |
 | `IModelPlugin`       | LLM provider abstraction | `AnthropicModel`, `OpenAIModel`, `OllamaModel` |
-| `IRunnerPlugin`      | Agent execution          | `CLIRunner`, `APIRunner`                       |
+| `ICliModel`          | CLI command execution    | `CliModel`                                     |
 | `ILedgerPlugin`      | Result storage           | `SqliteLedger`, `JsonLedger`                   |
 | `IJudgePlugin`       | Custom evaluation logic  | _(bring your own)_                             |
 | `IEnvironmentPlugin` | Execution sandbox        | `LocalEnvironment`, `DockerEnvironment`        |
@@ -160,8 +163,7 @@ All plugins are imported via **sub-path exports** — unused providers are never
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { OllamaModel } from "agent-eval/providers/ollama";
-import { CLIRunner } from "agent-eval/runner/cli";
-import { APIRunner } from "agent-eval/runner/api";
+import { CliModel } from "agent-eval/providers/cli";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { JsonLedger } from "agent-eval/ledger/json";
 import { LocalEnvironment } from "agent-eval/environment/local";

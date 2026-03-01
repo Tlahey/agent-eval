@@ -1,5 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { CLIRunner } from "agent-eval/runner/cli";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -16,10 +16,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new CLIRunner({
+    {
       name: "mock-agent",
-      command: 'node scripts/mock-agent.mjs "{{prompt}}"',
-    }),
+      model: new CliModel({ command: 'node scripts/mock-agent.mjs "{{prompt}}"' }),
+    },
   ],
 
   judge: {

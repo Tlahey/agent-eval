@@ -1,5 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { CLIRunner } from "agent-eval/runner/cli";
+import { CliModel } from "agent-eval/providers/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
@@ -21,10 +21,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new CLIRunner({
+    {
       name: "copilot",
-      command: 'gh copilot suggest -t shell "{{prompt}}"',
-    }),
+      model: new CliModel({ command: 'gh copilot suggest -t shell "{{prompt}}"' }),
+    },
   ],
 
   // ⚠️ Use a strong model for the judge — it needs to understand code,

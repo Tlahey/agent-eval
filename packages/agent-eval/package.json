@@ -30,6 +30,11 @@
       "import": "./dist/providers/ollama.js",
       "require": "./dist/providers/ollama.cjs"
     },
+    "./providers/cli": {
+      "types": "./dist/providers/cli.d.ts",
+      "import": "./dist/providers/cli.js",
+      "require": "./dist/providers/cli.cjs"
+    },
     "./environment/local": {
       "types": "./dist/environment/local.d.ts",
       "import": "./dist/environment/local.js",
@@ -49,16 +54,6 @@
       "types": "./dist/ledger/json.d.ts",
       "import": "./dist/ledger/json.js",
       "require": "./dist/ledger/json.cjs"
-    },
-    "./runner/cli": {
-      "types": "./dist/runner/cli.d.ts",
-      "import": "./dist/runner/cli.js",
-      "require": "./dist/runner/cli.cjs"
-    },
-    "./runner/api": {
-      "types": "./dist/runner/api.d.ts",
-      "import": "./dist/runner/api.js",
-      "require": "./dist/runner/api.cjs"
     }
   },
   "files": [

@@ -38,9 +38,6 @@ const ENV_REQUIRED_METHODS = ["setup", "execute", "getDiff"] as const;
 const MODEL_REQUIRED_PROPERTIES = ["name", "modelId"] as const;
 const MODEL_REQUIRED_METHODS = ["createModel"] as const;
 
-const RUNNER_REQUIRED_PROPERTIES = ["name", "model"] as const;
-const RUNNER_REQUIRED_METHODS = ["execute"] as const;
-
 // ─── Validators ───
 
 function checkMembers(
@@ -108,11 +105,6 @@ export function validateModelPlugin(plugin: unknown): PluginValidationError[] {
   return checkMembers(plugin, "ModelPlugin", MODEL_REQUIRED_PROPERTIES, MODEL_REQUIRED_METHODS);
 }
 
-/** Validate that an object satisfies the IRunnerPlugin contract */
-export function validateRunnerPlugin(plugin: unknown): PluginValidationError[] {
-  return checkMembers(plugin, "RunnerPlugin", RUNNER_REQUIRED_PROPERTIES, RUNNER_REQUIRED_METHODS);
-}
-
 /**
  * Validate all plugins in a config object.
  * Returns an array of errors (empty = valid).
@@ -156,7 +148,7 @@ export function validatePlugins(config: {
     errors.push(...validateEnvironmentPlugin(config.environment));
   }
 
-  // Validate each runner (must be IRunnerPlugin instances)
+  // Validate each runner (must be { name, model } objects)
   if (config.runners) {
     for (let i = 0; i < config.runners.length; i++) {
       const runner = config.runners[i] as Record<string, unknown>;
@@ -165,7 +157,7 @@ export function validatePlugins(config: {
           plugin: `Runner[${i}]`,
           member: "(self)",
           expected: "property",
-          message: `Runner[${i}] must be a non-null object (IRunnerPlugin)`,
+          message: `Runner[${i}] must be a non-null object { name, model }`,
         });
         continue;
       }
@@ -180,14 +172,27 @@ export function validatePlugins(config: {
         });
       }
 
-      // All runners must have an execute method
-      if (!("execute" in runner) || typeof runner.execute !== "function") {
+      // All runners must have a model (IModelPlugin or ICliModel)
+      if (!runner.model || typeof runner.model !== "object") {
         errors.push({
           plugin: `Runner[${i}]`,
-          member: "execute",
-          expected: "method",
-          message: `Runner[${i}] is missing required method 'execute' (function). Use CLIRunner or APIRunner from sub-path imports.`,
+          member: "model",
+          expected: "property",
+          message: `Runner[${i}] is missing required property 'model'. Use an IModelPlugin (e.g. AnthropicModel) or CliModel from sub-path imports.`,
         });
+      } else {
+        const model = runner.model as Record<string, unknown>;
+        // Must be either ICliModel (has type: "cli" + command) or IModelPlugin (has createModel)
+        const isCliType = model.type === "cli" && typeof model.command === "string";
+        const isModelPlugin = typeof model.createModel === "function";
+        if (!isCliType && !isModelPlugin) {
+          errors.push({
+            plugin: `Runner[${i}]`,
+            member: "model",
+            expected: "property",
+            message: `Runner[${i}].model must be an IModelPlugin (with createModel()) or CliModel (with type: "cli" and command). Import from agent-eval/providers/*.`,
+          });
+        }
       }
     }
   }

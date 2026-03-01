@@ -15,25 +15,98 @@ import type {
   JudgeOptions,
   JudgeResult,
   LedgerEntry,
+  RunnerConfig,
   TaskDefinition,
   TaskResult,
   TestDefinition,
   TimingData,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
-import type { ILedgerPlugin, IEnvironmentPlugin, IRunnerPlugin } from "./interfaces.js";
+import type { ILedgerPlugin, IEnvironmentPlugin, RunnerExecResult } from "./interfaces.js";
+import { isCliModel } from "./interfaces.js";
 import { validateRunnerNames } from "./config.js";
 import { LocalEnvironment } from "../environment/plugins/local.js";
 import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 /**
- * Create the raw AgentHandle for a given runner plugin.
- * Delegates execution entirely to the IRunnerPlugin.
- * Captures agent output and token usage into context.
+ * Execute a runner config against a prompt.
+ * Dispatches to CLI or API execution based on the model type.
+ */
+async function executeRunner(
+  runner: RunnerConfig,
+  prompt: string,
+  cwd: string,
+  env: IEnvironmentPlugin,
+  timeout?: number,
+): Promise<RunnerExecResult> {
+  if (isCliModel(runner.model)) {
+    // CLI execution: replace {{prompt}} and run via environment
+    const cmd = runner.model.command.replace("{{prompt}}", prompt);
+    const result = await env.execute(cmd, cwd, { timeout: timeout ?? 600_000 });
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+    };
+  } else {
+    // API execution: call LLM via generateObject, write files to disk
+    const { generateObject } = await import("ai");
+    const { z } = await import("zod");
+
+    const model = await runner.model.createModel();
+
+    const FileOperationSchema = z.object({
+      files: z
+        .array(
+          z.object({
+            path: z.string().describe("Relative file path from project root"),
+            content: z.string().describe("Full file content to write"),
+          }),
+        )
+        .describe("Files to create or modify"),
+    });
+
+    const { object } = await generateObject({
+      model: model as Parameters<typeof generateObject>[0]["model"],
+      schema: FileOperationSchema,
+      prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
+
+Task: ${prompt}
+
+Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
+    });
+
+    const response = object as { files: Array<{ path: string; content: string }> };
+    const filesWritten: string[] = [];
+
+    for (const file of response.files) {
+      const fullPath = resolve(cwd, file.path);
+      mkdirSync(dirname(fullPath), { recursive: true });
+      writeFileSync(fullPath, file.content, "utf-8");
+      filesWritten.push(file.path);
+    }
+
+    return { filesWritten };
+  }
+}
+
+/** Get the model display string for a runner */
+function getRunnerModelId(runner: RunnerConfig): string {
+  if (isCliModel(runner.model)) {
+    return runner.model.command;
+  }
+  return runner.model.modelId;
+}
+
+/**
+ * Create the raw AgentHandle for a given runner config.
+ * Dispatches execution to CLI or API based on model type.
  */
 function createRawAgent(
-  runner: IRunnerPlugin,
+  runner: RunnerConfig,
   cwd: string,
   reporter: Reporter,
   testId: string,
@@ -42,10 +115,10 @@ function createRawAgent(
 ): Omit<AgentHandle, "instruct"> {
   return {
     name: runner.name,
-    model: runner.model,
+    model: getRunnerModelId(runner),
 
     async run(prompt: string) {
-      const result = await runner.execute(prompt, { cwd, env, timeout: 600_000 });
+      const result = await executeRunner(runner, prompt, cwd, env);
 
       // Capture agent output into context
       if (result.stdout) {
@@ -54,7 +127,7 @@ function createRawAgent(
         ctx.setAgentOutput(result.output);
       }
 
-      // Capture token usage (API runners)
+      // Capture token usage (API models)
       if (result.tokenUsage) {
         ctx.setAgentTokenUsage(result.tokenUsage);
       }
@@ -64,7 +137,7 @@ function createRawAgent(
         reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
       }
 
-      // Report files written by API runners
+      // Report files written by API models
       if (result.filesWritten) {
         for (const filePath of result.filesWritten) {
           reporter.onFileWrite({ testId, runner: runner.name }, filePath);
@@ -89,7 +162,7 @@ interface AgentState {
  * Enforces the Single-Instruct Policy and mutual exclusivity of the two modes.
  */
 function createAgent(
-  runner: IRunnerPlugin,
+  runner: RunnerConfig,
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
@@ -100,7 +173,7 @@ function createAgent(
   const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
 
   // Store runner info into context
-  ctx.setRunnerInfo({ name: runner.name, model: runner.model });
+  ctx.setRunnerInfo({ name: runner.name, model: getRunnerModelId(runner) });
 
   const state: AgentState = {
     instruction: null,
@@ -156,7 +229,7 @@ function createAgent(
  * Used by the declarative pipeline where the runner controls the full lifecycle.
  */
 async function executeRawAgent(
-  runner: IRunnerPlugin,
+  runner: RunnerConfig,
   cwd: string,
   prompt: string,
   reporter: Reporter,
@@ -284,7 +357,7 @@ export async function dryRunTest(
     suitePath: testDef.suitePath,
     runners: runners.map((r) => ({
       name: r.name,
-      model: r.model,
+      model: getRunnerModelId(r),
     })),
     mode,
     instruction,
@@ -494,7 +567,7 @@ export async function runTest(
  */
 async function executeDeclarativePipeline(
   instruction: string,
-  runner: IRunnerPlugin,
+  runner: RunnerConfig,
   cwd: string,
   ctx: EvalContext,
   config: AgentEvalConfig,
@@ -631,7 +704,7 @@ async function executeDeclarativePipeline(
  */
 function buildImperativeEntry(
   testDef: TestDefinition,
-  runner: IRunnerPlugin,
+  runner: RunnerConfig,
   ctx: EvalContext,
   config: AgentEvalConfig,
   start: number,

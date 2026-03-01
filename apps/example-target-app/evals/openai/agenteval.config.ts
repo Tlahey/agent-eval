@@ -1,5 +1,4 @@
 import { defineConfig } from "agent-eval";
-import { APIRunner } from "agent-eval/runner/api";
 import { OpenAIModel } from "agent-eval/providers/openai";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
@@ -20,10 +19,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    new APIRunner({
+    {
       name: "gpt-4o",
       model: new OpenAIModel({ model: "gpt-4o" }),
-    }),
+    },
   ],
 
   judge: {

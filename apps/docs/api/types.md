@@ -284,7 +284,7 @@ See [Plugins](/guide/plugins) for full documentation. Quick reference:
 | Interface            | Key Methods                                        | Import              |
 | -------------------- | -------------------------------------------------- | ------------------- |
 | `IModelPlugin`       | `createModel()`, `name`, `modelId`                 | `from "agent-eval"` |
-| `IRunnerPlugin`      | `execute(prompt, context)`, `name`, `model`        | `from "agent-eval"` |
+| `RunnerConfig`       | `name`, `model` (plain config object)              | `from "agent-eval"` |
 | `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.     | `from "agent-eval"` |
 | `IJudgePlugin`       | `judge(ctx, criteria, config)`, `name`             | `from "agent-eval"` |
 | `IEnvironmentPlugin` | `setup()`, `execute()`, `getDiff()`, `teardown?()` | `from "agent-eval"` |

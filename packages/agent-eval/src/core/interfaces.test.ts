@@ -3,12 +3,11 @@ import type {
   ILedgerPlugin,
   IJudgePlugin,
   IModelPlugin,
-  IRunnerPlugin,
+  ICliModel,
   RunnerStats,
   TestTreeNode,
-  RunnerContext,
-  RunnerExecResult,
 } from "./interfaces.js";
+import { isCliModel } from "./interfaces.js";
 
 describe("Plugin Interfaces", () => {
   describe("ILedgerPlugin contract", () => {
@@ -145,38 +144,36 @@ describe("Plugin Interfaces", () => {
     });
   });
 
-  describe("IRunnerPlugin contract", () => {
-    it("defines the required shape for a runner plugin", () => {
-      const mockRunner: IRunnerPlugin = {
-        name: "copilot",
-        model: "gh copilot suggest",
-        execute: async (_prompt: string, _ctx: RunnerContext): Promise<RunnerExecResult> => ({
-          stdout: "done",
-          exitCode: 0,
-        }),
+  describe("ICliModel contract", () => {
+    it("defines the required shape for a CLI model", () => {
+      const cliModel: ICliModel = {
+        type: "cli",
+        name: "aider",
+        command: 'aider --message "{{prompt}}" --yes',
       };
-      expect(mockRunner.name).toBe("copilot");
-      expect(mockRunner.model).toBe("gh copilot suggest");
-      expect(typeof mockRunner.execute).toBe("function");
+      expect(cliModel.type).toBe("cli");
+      expect(cliModel.name).toBe("aider");
+      expect(cliModel.command).toContain("{{prompt}}");
+    });
+  });
+
+  describe("isCliModel type guard", () => {
+    it("returns true for CLI models", () => {
+      const cliModel: ICliModel = { type: "cli", name: "test", command: "echo {{prompt}}" };
+      expect(isCliModel(cliModel)).toBe(true);
     });
 
-    it("execute returns RunnerExecResult with optional fields", async () => {
-      const runner: IRunnerPlugin = {
-        name: "api",
-        model: "gpt-4o",
-        execute: async () => ({ filesWritten: ["src/file.ts"] }),
+    it("returns false for IModelPlugin", () => {
+      const apiModel: IModelPlugin = {
+        name: "openai",
+        modelId: "gpt-4o",
+        createModel: () => ({}) as never,
       };
-      const result = await runner.execute("prompt", {
-        cwd: "/tmp",
-        env: {
-          name: "mock",
-          setup: () => {},
-          execute: () => ({ stdout: "", stderr: "", exitCode: 0 }),
-          getDiff: () => "",
-        },
-      });
-      expect(result.filesWritten).toEqual(["src/file.ts"]);
-      expect(result.exitCode).toBeUndefined();
+      expect(isCliModel(apiModel)).toBe(false);
+    });
+
+    it("returns false for objects without type property", () => {
+      expect(isCliModel({ name: "test" })).toBe(false);
     });
   });
 });

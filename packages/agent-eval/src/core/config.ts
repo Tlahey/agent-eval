@@ -1,8 +1,7 @@
 import { createJiti } from "jiti";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
-import type { AgentEvalConfig } from "./types.js";
-import type { IRunnerPlugin } from "./interfaces.js";
+import type { AgentEvalConfig, RunnerConfig } from "./types.js";
 import { validatePlugins, formatPluginErrors } from "./plugin-validator.js";
 
 const CONFIG_FILENAMES = ["agenteval.config.ts", "agenteval.config.js", "agenteval.config.mjs"];
@@ -18,7 +17,7 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
  *
  * @throws Error if duplicate runner names are found
  */
-export function validateRunnerNames(runners: IRunnerPlugin[]): void {
+export function validateRunnerNames(runners: RunnerConfig[]): void {
   const names = new Set<string>();
   for (const runner of runners) {
     if (names.has(runner.name)) {
