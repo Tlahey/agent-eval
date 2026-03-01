@@ -19,6 +19,31 @@
 
 ---
 
+## Dashboard
+
+<p align="center">
+  <img src="assets/screenshots/overview.png" alt="Overview — KPIs, score trends, and runner comparison" width="100%" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/eval-detail.png" alt="Eval Detail — per-test breakdown with charts" width="100%" />
+</p>
+
+<details>
+<summary>More screenshots</summary>
+
+<p align="center">
+  <img src="assets/screenshots/all-runs.png" alt="All Runs — filterable table of every evaluation run" width="100%" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/run-detail.png" alt="Run Detail — diff viewer, commands, tasks, and judge reasoning" width="100%" />
+</p>
+
+</details>
+
+---
+
 ## Features
 
 - **Vitest-like API** — `test()` / `expect()` syntax designed for evaluating AI agents
@@ -191,7 +216,6 @@ agent-eval/
 │           ├── judge/         # LLM-as-a-Judge (Vercel AI SDK + structured output)
 │           ├── ledger/        # Ledger plugins (SQLite, JSON)
 │           ├── llm/           # Model plugins (Anthropic, OpenAI, Ollama)
-│           ├── runner/        # Runner plugins (CLI, API)
 │           ├── environment/   # Environment plugins (Local, Docker)
 │           └── cli/           # CLI binary (Commander.js)
 ├── docs/adrs/                 # Architecture Decision Records
