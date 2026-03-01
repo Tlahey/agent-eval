@@ -38,7 +38,13 @@ function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     status,
     reason: "Looks good",
     improvement: "No improvement needed.",
-    context: { diff: null, commands: [] },
+    diff: null,
+    changedFiles: [],
+    commands: [],
+    taskResults: [],
+    timing: { totalMs: 1000 },
+    logs: "",
+    criteria: "test criteria",
     durationMs: 1000,
     thresholds,
     ...overrides,
@@ -150,27 +156,25 @@ describe("ledger (SQLite)", () => {
 
   it("preserves command results through JSON serialization", () => {
     const entry = makeEntry({
-      context: {
-        diff: "--- a/file.ts\n+++ b/file.ts",
-        commands: [
-          {
-            name: "vitest",
-            command: "npx vitest run",
-            stdout: "Tests: 5 passed",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 2000,
-          },
-        ],
-      },
+      diff: "--- a/file.ts\n+++ b/file.ts",
+      commands: [
+        {
+          name: "vitest",
+          command: "npx vitest run",
+          stdout: "Tests: 5 passed",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 2000,
+        },
+      ],
     });
     appendLedgerEntry(tmpDir, entry);
 
     const entries = readLedger(tmpDir);
-    expect(entries[0].context.diff).toBe("--- a/file.ts\n+++ b/file.ts");
-    expect(entries[0].context.commands).toHaveLength(1);
-    expect(entries[0].context.commands[0].name).toBe("vitest");
-    expect(entries[0].context.commands[0].stdout).toBe("Tests: 5 passed");
+    expect(entries[0].diff).toBe("--- a/file.ts\n+++ b/file.ts");
+    expect(entries[0].commands).toHaveLength(1);
+    expect(entries[0].commands[0].name).toBe("vitest");
+    expect(entries[0].commands[0].stdout).toBe("Tests: 5 passed");
   });
 
   it("computes runner stats with aggregates", () => {

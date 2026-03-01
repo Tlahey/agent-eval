@@ -11,11 +11,14 @@ import type {
   AgentEvalConfig,
   AgentHandle,
   CommandResult,
+  ExecutionData,
   JudgeOptions,
   JudgeResult,
   LedgerEntry,
   TaskDefinition,
+  TaskResult,
   TestDefinition,
+  TimingData,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 import type { ILedgerPlugin, IEnvironmentPlugin, IRunnerPlugin } from "./interfaces.js";
@@ -27,6 +30,7 @@ import { SilentReporter } from "./reporter.js";
 /**
  * Create the raw AgentHandle for a given runner plugin.
  * Delegates execution entirely to the IRunnerPlugin.
+ * Captures agent output and token usage into context.
  */
 function createRawAgent(
   runner: IRunnerPlugin,
@@ -34,6 +38,7 @@ function createRawAgent(
   reporter: Reporter,
   testId: string,
   env: IEnvironmentPlugin,
+  ctx: EvalContext,
 ): Omit<AgentHandle, "instruct"> {
   return {
     name: runner.name,
@@ -41,6 +46,18 @@ function createRawAgent(
 
     async run(prompt: string) {
       const result = await runner.execute(prompt, { cwd, env, timeout: 600_000 });
+
+      // Capture agent output into context
+      if (result.stdout) {
+        ctx.setAgentOutput(result.stdout);
+      } else if (result.output) {
+        ctx.setAgentOutput(result.output);
+      }
+
+      // Capture token usage (API runners)
+      if (result.tokenUsage) {
+        ctx.setAgentTokenUsage(result.tokenUsage);
+      }
 
       // Report errors from CLI execution
       if (result.exitCode !== undefined && result.exitCode !== 0 && result.stderr) {
@@ -80,7 +97,11 @@ function createAgent(
   testId: string,
   env: IEnvironmentPlugin,
 ): { agent: AgentHandle; state: AgentState } {
-  const raw = createRawAgent(runner, cwd, reporter, testId, env);
+  const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
+
+  // Store runner info into context
+  ctx.setRunnerInfo({ name: runner.name, model: runner.model });
+
   const state: AgentState = {
     instruction: null,
     isDeclarative: false,
@@ -102,6 +123,7 @@ function createAgent(
       }
       state.instruction = prompt;
       state.isDeclarative = true;
+      ctx.setInstruction(prompt);
     },
 
     async run(prompt: string) {
@@ -109,6 +131,7 @@ function createAgent(
         throw new Error("Cannot use run() after instruct(). Choose one API style per test.");
       }
       state.isImperative = true;
+      ctx.setInstruction(prompt);
 
       // Execute the agent
       await raw.run(prompt);
@@ -139,8 +162,9 @@ async function executeRawAgent(
   reporter: Reporter,
   testId: string,
   env: IEnvironmentPlugin,
+  ctx: EvalContext,
 ): Promise<void> {
-  const raw = createRawAgent(runner, cwd, reporter, testId, env);
+  const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
   await raw.run(prompt);
 }
 
@@ -313,10 +337,12 @@ export async function runTest(
     rep.onTestStart(event);
 
     // Setup workspace via environment plugin (git reset, docker create, etc.)
+    const setupStart = Date.now();
     rep.onPipelineStep(event, "setup", "running");
     rep.onGitReset(event);
     await env.setup(cwd);
     rep.onPipelineStep(event, "setup", "done");
+    const setupMs = Date.now() - setupStart;
 
     const ctx = new EvalContext(cwd, env);
     const { agent, state } = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
@@ -351,6 +377,7 @@ export async function runTest(
           testDef,
           env,
           start,
+          setupMs,
           thresholds,
         );
       } else {
@@ -368,7 +395,7 @@ export async function runTest(
               `Add a toPassJudge() call after agent.run() with your evaluation criteria.`,
           );
         }
-        entry = buildImperativeEntry(testDef, runner, ctx, config, start, thresholds);
+        entry = buildImperativeEntry(testDef, runner, ctx, config, start, setupMs, thresholds);
       }
 
       await record(entry);
@@ -403,19 +430,27 @@ export async function runTest(
         testId: testDef.title,
         suitePath: testDef.suitePath ?? [],
         timestamp: new Date().toISOString(),
+        // Execution data
         agentRunner: runner.name,
+        instruction: ctx.instruction || undefined,
+        diff: ctx.diff,
+        changedFiles: [],
+        commands: ctx.commands,
+        taskResults: [],
+        agentTokenUsage: ctx.agentTokenUsage,
+        timing: { totalMs: durationMs, setupMs },
+        agentOutput: ctx.agentOutput,
+        logs: ctx.logs,
+        // Judgment data (error case)
         judgeModel: config.judge.llm?.modelId ?? "unknown",
         score: 0,
         pass: false,
         status: "FAIL",
         reason: `Execution error: ${errorMsg}`,
         improvement: "",
-        context: {
-          diff: ctx.diff,
-          commands: ctx.commands,
-        },
-        durationMs,
+        criteria: "",
         thresholds,
+        durationMs,
       };
 
       await record(entry);
@@ -454,6 +489,8 @@ export async function runTest(
  * 3. Run config afterEach commands
  * 4. Execute registered tasks
  * 5. Judge evaluation using required expect(ctx).toPassJudge() criteria
+ *
+ * Tracks per-phase timing and builds a complete LedgerEntry with all execution + judgment data.
  */
 async function executeDeclarativePipeline(
   instruction: string,
@@ -465,6 +502,7 @@ async function executeDeclarativePipeline(
   testDef: TestDefinition,
   env: IEnvironmentPlugin,
   start: number,
+  setupMs: number,
   thresholds: import("./types.js").Thresholds,
 ): Promise<LedgerEntry> {
   const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
@@ -479,9 +517,11 @@ async function executeDeclarativePipeline(
   }
 
   // 1. Execute the agent instruction
+  const agentStart = Date.now();
   reporter.onPipelineStep(event, "agent", "running");
-  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, env);
+  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, env, ctx);
   reporter.onPipelineStep(event, "agent", "done");
+  const agentMs = Date.now() - agentStart;
 
   // 2. Auto storeDiff
   reporter.onPipelineStep(event, "diff", "running");
@@ -489,35 +529,57 @@ async function executeDeclarativePipeline(
   reporter.onPipelineStep(event, "diff", "done");
 
   // 3. Run config afterEach commands
+  let afterEachMs: number | undefined;
   if (config.afterEach) {
+    const afterEachStart = Date.now();
     reporter.onPipelineStep(event, "afterEach", "running");
     for (const cmd of config.afterEach) {
       await ctx.runCommand(cmd.name, cmd.command);
     }
     reporter.onPipelineStep(event, "afterEach", "done");
+    afterEachMs = Date.now() - afterEachStart;
   }
 
   // 4. Execute registered tasks and collect results
-  const taskResults: Array<{ task: TaskDefinition; result: CommandResult }> = [];
+  const tasksStart = Date.now();
+  const taskResults: TaskResult[] = [];
   for (const task of ctx.tasks) {
     reporter.onPipelineStep(event, "task", "running", task.name);
     const result = await task.action();
     taskResults.push({ task, result });
     reporter.onPipelineStep(event, "task", "done", task.name);
   }
+  const tasksMs = taskResults.length > 0 ? Date.now() - tasksStart : undefined;
 
-  // 5. Judge evaluation (criteria from expect().toPassJudge + optional task evidence)
-  const durationMs = Date.now() - start;
+  // 5. Build execution data
+  const timing: TimingData = {
+    totalMs: Date.now() - start,
+    setupMs,
+    agentMs,
+    afterEachMs,
+    tasksMs,
+  };
+  const executionData = ctx.buildExecutionData(taskResults, timing);
+
+  // 6. Judge evaluation
+  const judgeStart = Date.now();
   reporter.onPipelineStep(event, "judge", "running");
   const prompt = buildJudgePrompt({
     criteria: judgeOptions.criteria,
-    ctx,
-    instruction,
-    taskResults,
+    execution: executionData,
     expectedFiles: judgeOptions.expectedFiles,
   });
-  const judgeResult = await runJudge(ctx, prompt, config.judge);
+  const { result: judgeResult, tokenUsage: judgeTokenUsage } = await runJudge(
+    ctx,
+    prompt,
+    config.judge,
+  );
   reporter.onPipelineStep(event, "judge", "done");
+  const judgeMs = Date.now() - judgeStart;
+
+  // Update timing with judge phase
+  timing.judgeMs = judgeMs;
+  timing.totalMs = Date.now() - start;
 
   const effectiveThresholds = judgeOptions.thresholds ?? thresholds;
   const status = computeStatus(judgeResult.score, effectiveThresholds);
@@ -528,19 +590,29 @@ async function executeDeclarativePipeline(
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
+    // Execution data
     agentRunner: runner.name,
+    instruction,
+    diff: ctx.diff,
+    changedFiles: executionData.changedFiles,
+    commands: ctx.commands,
+    taskResults,
+    agentTokenUsage: ctx.agentTokenUsage,
+    timing,
+    agentOutput: ctx.agentOutput,
+    logs: ctx.logs,
+    // Judgment data
     judgeModel: config.judge.llm?.modelId ?? "unknown",
     score: judgeResult.score,
     pass: status !== "FAIL",
     status,
     reason: judgeResult.reason,
     improvement: judgeResult.improvement,
-    context: {
-      diff: ctx.diff,
-      commands: ctx.commands,
-    },
-    durationMs,
+    judgeTokenUsage,
+    criteria: judgeOptions.criteria,
+    expectedFiles: judgeOptions.expectedFiles,
     thresholds: effectiveThresholds,
+    durationMs: timing.totalMs,
   };
 }
 
@@ -554,6 +626,7 @@ function buildImperativeEntry(
   ctx: EvalContext,
   config: AgentEvalConfig,
   start: number,
+  setupMs: number,
   thresholds: import("./types.js").Thresholds,
 ): LedgerEntry {
   const durationMs = Date.now() - start;
@@ -563,23 +636,38 @@ function buildImperativeEntry(
   clearLastJudgeResult();
   clearLastJudgeOptions();
 
+  const timing: TimingData = {
+    totalMs: durationMs,
+    setupMs,
+  };
+  const executionData = ctx.buildExecutionData([], timing);
+
   return {
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
+    // Execution data
     agentRunner: runner.name,
+    instruction: ctx.instruction,
+    diff: ctx.diff,
+    changedFiles: executionData.changedFiles,
+    commands: ctx.commands,
+    taskResults: [],
+    agentTokenUsage: ctx.agentTokenUsage,
+    timing,
+    agentOutput: ctx.agentOutput,
+    logs: ctx.logs,
+    // Judgment data
     judgeModel: config.judge.llm?.modelId ?? "unknown",
     score: judgeResult.score,
     pass: judgeResult.pass,
     status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
     reason: judgeResult.reason,
     improvement: judgeResult.improvement,
-    context: {
-      diff: ctx.diff,
-      commands: ctx.commands,
-    },
-    durationMs,
+    criteria: judgeOptions?.criteria ?? "",
+    expectedFiles: judgeOptions?.expectedFiles,
     thresholds: effectiveThresholds,
+    durationMs,
   };
 }
 

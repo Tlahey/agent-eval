@@ -2,10 +2,12 @@ import { generateObject, type LanguageModelV1 } from "ai";
 import { z } from "zod";
 import type {
   CommandResult,
+  ExecutionData,
   JudgeConfig,
   JudgeResult,
   TaskDefinition,
   TestContext,
+  TokenUsage,
 } from "../core/types.js";
 
 const JudgeResultSchema = z.object({
@@ -75,25 +77,20 @@ function buildFileScopeSection(changedFiles: string[], expectedFiles?: string[])
 
 /**
  * Options for building the unified judge prompt.
- * All fields except `criteria` and `ctx` are optional — the prompt adapts
- * dynamically based on what is available.
+ * Uses ExecutionData as the single source of truth for all execution context.
  */
 export interface JudgePromptOptions {
   /** Evaluation criteria (from toPassJudge) */
   criteria: string;
-  /** Test context (diff, logs, commands) */
-  ctx: TestContext;
-  /** Agent instruction (from instruct()) — included when available */
-  instruction?: string;
-  /** Task results with definitions — included when tasks were registered */
-  taskResults?: Array<{ task: TaskDefinition; result: CommandResult }>;
+  /** Unified execution data (diff, commands, tasks, timing, tokens, etc.) */
+  execution: ExecutionData;
   /** Expected files — triggers file scope analysis */
   expectedFiles?: string[];
 }
 
 /**
  * Build the single, unified judge prompt.
- * Adapts dynamically based on available context:
+ * Adapts dynamically based on available context in ExecutionData:
  * - Always: role, criteria, code changes, scoring instructions
  * - If instruction provided: agent instruction section
  * - If tasks provided: task results with weighted criteria
@@ -101,19 +98,19 @@ export interface JudgePromptOptions {
  */
 export function buildJudgePrompt(opts: JudgePromptOptions): string;
 export function buildJudgePrompt(opts: JudgePromptOptions): string {
-  const changedFiles = extractChangedFiles(opts.ctx.diff);
-  const fileScopeSection = buildFileScopeSection(changedFiles, opts.expectedFiles);
+  const { execution } = opts;
+  const fileScopeSection = buildFileScopeSection(execution.changedFiles, opts.expectedFiles);
 
   // Build instruction section (only in declarative mode)
-  const instructionSection = opts.instruction
-    ? `\n## Agent Instruction\nThe agent was asked to: "${opts.instruction}"\n`
+  const instructionSection = execution.instruction
+    ? `\n## Agent Instruction\nThe agent was asked to: "${execution.instruction}"\n`
     : "";
 
   // Build task results section (only when tasks are registered)
   let taskSection = "";
-  if (opts.taskResults && opts.taskResults.length > 0) {
-    const totalWeight = opts.taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
-    const taskBlocks = opts.taskResults
+  if (execution.taskResults.length > 0) {
+    const totalWeight = execution.taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
+    const taskBlocks = execution.taskResults
       .map((tr, i) => {
         const weight = tr.task.weight ?? 1;
         return `### Task ${i + 1}: ${tr.task.name} (weight: ${weight})
@@ -126,13 +123,13 @@ ${tr.result.stdout.slice(0, 2000)}${tr.result.stderr ? `\nSTDERR:\n${tr.result.s
       })
       .join("\n\n");
 
-    taskSection = `\n## Task Results (${opts.taskResults.length} tasks, total weight: ${totalWeight})
+    taskSection = `\n## Task Results (${execution.taskResults.length} tasks, total weight: ${totalWeight})
 ${taskBlocks}\n`;
   }
 
   // Build scoring instructions — adapt to task presence
   const taskScoringInstructions =
-    opts.taskResults && opts.taskResults.length > 0
+    execution.taskResults.length > 0
       ? `- For each task, assess whether its criteria were met. Weight the scores accordingly.
 - A task with exit code 0 and output matching its criteria should score positively.
 - A task with non-zero exit code should score negatively unless the criteria explicitly allow it.`
@@ -144,7 +141,7 @@ ${taskBlocks}\n`;
 ${opts.criteria}
 ${instructionSection}${taskSection}
 ## Code Changes
-${opts.ctx.logs || "(no logs captured)"}
+${execution.logs || "(no logs captured)"}
 ${fileScopeSection}
 
 ## Scoring Instructions
@@ -158,17 +155,24 @@ ${taskScoringInstructions}
 - Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string, "improvement": string }`;
 }
 
+/** Result from judge() including token usage */
+export interface JudgeCallResult {
+  result: JudgeResult;
+  tokenUsage?: TokenUsage;
+}
+
 const DEFAULT_MAX_RETRIES = 2;
 
 /**
  * Execute LLM-as-a-Judge evaluation with retry logic.
  * Retries on invalid/unparseable responses to guarantee valid structured output.
+ * Returns both the judge result and token usage.
  */
 export async function judge(
   _ctx: TestContext,
   prompt: string,
   config: JudgeConfig,
-): Promise<JudgeResult> {
+): Promise<JudgeCallResult> {
   const model = await resolveModel(config);
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
 
@@ -176,13 +180,21 @@ export async function judge(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const { object } = await generateObject({
+      const response = await generateObject({
         model,
         schema: JudgeResultSchema,
         prompt,
       });
 
-      return object;
+      const tokenUsage: TokenUsage | undefined = response.usage
+        ? {
+            inputTokens: response.usage.promptTokens,
+            outputTokens: response.usage.completionTokens,
+            totalTokens: response.usage.totalTokens,
+          }
+        : undefined;
+
+      return { result: response.object, tokenUsage };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
 

@@ -75,6 +75,10 @@ export interface RunnerExecResult {
   exitCode?: number;
   /** Files written to disk (API runners) */
   filesWritten?: string[];
+  /** Token usage from the LLM call (API runners) */
+  tokenUsage?: import("./types.js").TokenUsage;
+  /** Raw output text (LLM response body for API runners) */
+  output?: string;
 }
 
 /**

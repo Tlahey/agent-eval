@@ -1,5 +1,14 @@
 import type { IEnvironmentPlugin } from "./interfaces.js";
-import type { CommandResult, TaskDefinition, TestContext } from "./types.js";
+import { extractChangedFiles } from "../judge/judge.js";
+import type {
+  CommandResult,
+  ExecutionData,
+  TaskDefinition,
+  TaskResult,
+  TestContext,
+  TimingData,
+  TokenUsage,
+} from "./types.js";
 
 export class EvalContext implements TestContext {
   private _diff: string | null = null;
@@ -7,10 +16,50 @@ export class EvalContext implements TestContext {
   private _tasks: TaskDefinition[] = [];
   private _cwd: string;
   private _env: IEnvironmentPlugin;
+  private _agentOutput: string | undefined;
+  private _agentTokenUsage: TokenUsage | undefined;
+  private _instruction: string = "";
+  private _runnerInfo: { name: string; model: string } = { name: "unknown", model: "unknown" };
 
   constructor(cwd: string, env: IEnvironmentPlugin) {
     this._cwd = cwd;
     this._env = env;
+  }
+
+  /** Store the raw agent output (stdout for CLI, response for API) */
+  setAgentOutput(output: string): void {
+    this._agentOutput = output;
+  }
+
+  /** Store the agent's token usage (API runners) */
+  setAgentTokenUsage(usage: TokenUsage): void {
+    this._agentTokenUsage = usage;
+  }
+
+  /** Store the instruction given to the agent */
+  setInstruction(instruction: string): void {
+    this._instruction = instruction;
+  }
+
+  /** Store runner metadata */
+  setRunnerInfo(info: { name: string; model: string }): void {
+    this._runnerInfo = info;
+  }
+
+  get agentOutput(): string | undefined {
+    return this._agentOutput;
+  }
+
+  get agentTokenUsage(): TokenUsage | undefined {
+    return this._agentTokenUsage;
+  }
+
+  get instruction(): string {
+    return this._instruction;
+  }
+
+  get runnerInfo(): { name: string; model: string } {
+    return this._runnerInfo;
   }
 
   storeDiff(): void {
@@ -93,5 +142,27 @@ export class EvalContext implements TestContext {
     }
 
     return parts.join("\n\n");
+  }
+
+  /**
+   * Build the unified ExecutionData from all collected context.
+   * Called by the runner to pass to the judge and store in the ledger.
+   */
+  buildExecutionData(
+    taskResults: TaskResult[],
+    timing: TimingData,
+  ): ExecutionData {
+    return {
+      instruction: this._instruction,
+      runner: { ...this._runnerInfo },
+      diff: this._diff,
+      changedFiles: extractChangedFiles(this._diff),
+      commands: [...this._commands],
+      taskResults,
+      tokenUsage: this._agentTokenUsage,
+      timing,
+      agentOutput: this._agentOutput,
+      logs: this.logs,
+    };
   }
 }

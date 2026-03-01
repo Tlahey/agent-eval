@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { TestContext, JudgeConfig } from "../core/types.js";
+import type { TestContext, JudgeConfig, ExecutionData } from "../core/types.js";
 import type { IModelPlugin } from "../core/interfaces.js";
 
 // Mock the AI SDK
@@ -15,6 +15,29 @@ function createMockModel(modelId = "test-model"): IModelPlugin {
     name: "mock",
     modelId,
     createModel: vi.fn().mockResolvedValue({ modelId, provider: "mock" }),
+  };
+}
+
+function createMockExecution(overrides: Partial<ExecutionData> = {}): ExecutionData {
+  return {
+    instruction: "",
+    runner: { name: "test", model: "test" },
+    diff: "diff --git a/test.ts b/test.ts\n+const x = 1;",
+    changedFiles: ["test.ts"],
+    commands: [
+      {
+        name: "test",
+        command: "pnpm test",
+        stdout: "Tests passed",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 500,
+      },
+    ],
+    taskResults: [],
+    timing: { totalMs: 0 },
+    logs: "=== Diff ===\ndiff content\n=== test ===\nTests passed",
+    ...overrides,
   };
 }
 
@@ -63,9 +86,9 @@ describe("judge", () => {
 
     const config: JudgeConfig = { llm: createMockModel("claude-sonnet-4-20250514") };
     const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "has close button", ctx });
+    const prompt = buildJudgePrompt({ criteria: "has close button", execution: createMockExecution() });
 
-    const result = await judge(ctx, prompt, config);
+    const { result } = await judge(ctx, prompt, config);
 
     expect(result).toEqual(mockResult);
     expect(generateObject).toHaveBeenCalledOnce();
@@ -96,9 +119,9 @@ describe("judge", () => {
 
     const ctx = createMockContext({ logs: "", diff: null, commands: [] });
     const config: JudgeConfig = { llm: createMockModel() };
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution({ logs: "", diff: null, changedFiles: [], commands: [] }) });
 
-    const result = await judge(ctx, prompt, config);
+    const { result } = await judge(ctx, prompt, config);
     expect(result.pass).toBe(false);
 
     const callArgs = vi.mocked(generateObject).mock.calls[0][0];
@@ -120,7 +143,7 @@ describe("judge", () => {
       .mockResolvedValueOnce({ object: mockResult } as never);
 
     const config: JudgeConfig = { llm: createMockModel(), maxRetries: 2 };
-    const result = await judge(createMockContext(), "criteria", config);
+    const { result } = await judge(createMockContext(), "criteria", config);
 
     expect(result).toEqual(mockResult);
     expect(generateObject).toHaveBeenCalledTimes(2);
@@ -176,13 +199,13 @@ index 123..456 100644`;
 
 describe("buildJudgePrompt - expectedFiles", () => {
   it("includes file scope section when expectedFiles are provided", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code",
-    });
-
+    const diff = "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code";
     const prompt = buildJudgePrompt({
       criteria: "criteria",
-      ctx,
+      execution: createMockExecution({
+        diff,
+        changedFiles: ["src/Banner.tsx"],
+      }),
       expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
     });
 
@@ -193,19 +216,18 @@ describe("buildJudgePrompt - expectedFiles", () => {
   });
 
   it("does not include file scope when no expectedFiles", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution() });
     expect(prompt).not.toContain("File Scope Analysis");
   });
 
   it("flags unexpected file changes", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep",
-    });
-
+    const diff = "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep";
     const prompt = buildJudgePrompt({
       criteria: "criteria",
-      ctx,
+      execution: createMockExecution({
+        diff,
+        changedFiles: ["src/Banner.tsx", "package.json"],
+      }),
       expectedFiles: ["src/Banner.tsx"],
     });
 
@@ -214,13 +236,13 @@ describe("buildJudgePrompt - expectedFiles", () => {
   });
 
   it("shows no warnings when all expected files match", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code",
-    });
-
+    const diff = "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code";
     const prompt = buildJudgePrompt({
       criteria: "criteria",
-      ctx,
+      execution: createMockExecution({
+        diff,
+        changedFiles: ["src/A.tsx", "src/B.tsx"],
+      }),
       expectedFiles: ["src/A.tsx", "src/B.tsx"],
     });
 
@@ -232,11 +254,11 @@ describe("buildJudgePrompt - expectedFiles", () => {
 
 describe("buildJudgePrompt - unified adaptive prompt", () => {
   it("includes instruction section when provided", () => {
-    const ctx = createMockContext();
     const prompt = buildJudgePrompt({
       criteria: "test criteria",
-      ctx,
-      instruction: "Add a close button to the Banner component",
+      execution: createMockExecution({
+        instruction: "Add a close button to the Banner component",
+      }),
     });
 
     expect(prompt).toContain("## Agent Instruction");
@@ -245,14 +267,12 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
   });
 
   it("excludes instruction section when not provided", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution() });
 
     expect(prompt).not.toContain("## Agent Instruction");
   });
 
   it("includes task results section with weights when tasks provided", () => {
-    const ctx = createMockContext();
     const taskAction = async () => ({
       name: "x",
       command: "x",
@@ -263,31 +283,32 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
     });
     const prompt = buildJudgePrompt({
       criteria: "criteria",
-      ctx,
-      taskResults: [
-        {
-          task: { name: "Tests", action: taskAction, criteria: "All tests pass", weight: 3 },
-          result: {
-            name: "Tests",
-            command: "pnpm test",
-            stdout: "All tests passed",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 100,
+      execution: createMockExecution({
+        taskResults: [
+          {
+            task: { name: "Tests", action: taskAction, criteria: "All tests pass", weight: 3 },
+            result: {
+              name: "Tests",
+              command: "pnpm test",
+              stdout: "All tests passed",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 100,
+            },
           },
-        },
-        {
-          task: { name: "Build", action: taskAction, criteria: "Build succeeds", weight: 1 },
-          result: {
-            name: "Build",
-            command: "pnpm build",
-            stdout: "Build succeeded",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 200,
+          {
+            task: { name: "Build", action: taskAction, criteria: "Build succeeds", weight: 1 },
+            result: {
+              name: "Build",
+              command: "pnpm build",
+              stdout: "Build succeeded",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 200,
+            },
           },
-        },
-      ],
+        ],
+      }),
     });
 
     expect(prompt).toContain("## Task Results (2 tasks, total weight: 4)");
@@ -298,17 +319,14 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
   });
 
   it("excludes task section when no tasks provided", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "criteria", ctx });
+    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution() });
 
     expect(prompt).not.toContain("## Task Results");
     expect(prompt).not.toContain("Weight the scores accordingly");
   });
 
   it("includes all sections when fully populated", () => {
-    const ctx = createMockContext({
-      diff: "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code",
-    });
+    const diff = "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code";
     const taskAction = async () => ({
       name: "x",
       command: "x",
@@ -320,21 +338,24 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
 
     const prompt = buildJudgePrompt({
       criteria: "component quality",
-      ctx,
-      instruction: "Add close button",
-      taskResults: [
-        {
-          task: { name: "Tests", action: taskAction, criteria: "pass", weight: 2 },
-          result: {
-            name: "Tests",
-            command: "test",
-            stdout: "ok",
-            stderr: "",
-            exitCode: 0,
-            durationMs: 0,
+      execution: createMockExecution({
+        instruction: "Add close button",
+        diff,
+        changedFiles: ["src/Banner.tsx"],
+        taskResults: [
+          {
+            task: { name: "Tests", action: taskAction, criteria: "pass", weight: 2 },
+            result: {
+              name: "Tests",
+              command: "test",
+              stdout: "ok",
+              stderr: "",
+              exitCode: 0,
+              durationMs: 0,
+            },
           },
-        },
-      ],
+        ],
+      }),
       expectedFiles: ["src/Banner.tsx"],
     });
 
@@ -347,8 +368,7 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
   });
 
   it("works with the object overload", () => {
-    const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "test", ctx });
+    const prompt = buildJudgePrompt({ criteria: "test", execution: createMockExecution() });
 
     expect(prompt).toContain("## Evaluation Criteria");
     expect(prompt).toContain("test");

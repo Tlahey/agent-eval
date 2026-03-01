@@ -48,8 +48,9 @@ vi.mock("../environment/plugins/local.js", () => ({
 }));
 
 vi.mock("../judge/judge.js", () => ({
-  judge: vi.fn(() => ({ pass: true, score: 0.85, reason: "good", improvement: "none" })),
+  judge: vi.fn(() => ({ result: { pass: true, score: 0.85, reason: "good", improvement: "none" } })),
   buildJudgePrompt: vi.fn(() => "mock judge prompt"),
+  extractChangedFiles: vi.fn(() => []),
 }));
 
 // Mock the index module for hook registration
@@ -392,7 +393,7 @@ describe("runner - auto storeDiff and afterEach", () => {
     };
 
     const results = await runTest(testDef, config);
-    expect(results[0].entries[0].context.diff).toBe("mock diff content");
+    expect(results[0].entries[0].diff).toBe("mock diff content");
   });
 
   it("runs afterEach commands from config after agent.run()", async () => {

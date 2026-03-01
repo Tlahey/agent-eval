@@ -223,6 +223,12 @@ export type {
   RunnerConfig,
   CLIRunnerConfig,
   APIRunnerConfig,
+  TokenUsage,
+  TaskResult,
+  TimingData,
+  ExecutionData,
+  JudgmentData,
+  RunReport,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
 export { resolveRunners } from "./core/config.js";
