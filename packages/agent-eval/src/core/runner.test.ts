@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  clearLastJudgeOptions,
   setLastJudgeResult,
+  setLastJudgeOptions,
   getLastJudgeResult,
   clearLastJudgeResult,
   runTest,
@@ -87,6 +89,7 @@ import { getMatchingHooks } from "../index.js";
 describe("runner - judge result store", () => {
   beforeEach(() => {
     clearLastJudgeResult();
+    clearLastJudgeOptions();
   });
 
   it("starts with null", () => {
@@ -117,6 +120,7 @@ describe("runner - runTest", () => {
 
   beforeEach(() => {
     clearLastJudgeResult();
+    clearLastJudgeOptions();
     vi.clearAllMocks();
     mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
     mockEnvInstance.getDiff.mockReturnValue("mock diff content");
@@ -196,6 +200,7 @@ describe("runner - runTest", () => {
 describe("runner - createAgent via runTest", () => {
   beforeEach(() => {
     clearLastJudgeResult();
+    clearLastJudgeOptions();
     vi.clearAllMocks();
     mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
     mockEnvInstance.getDiff.mockReturnValue("mock diff content");
@@ -416,6 +421,7 @@ describe("runner - createAgent via runTest", () => {
 describe("runner - auto storeDiff and afterEach", () => {
   beforeEach(() => {
     clearLastJudgeResult();
+    clearLastJudgeOptions();
     vi.clearAllMocks();
     mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
     mockEnvInstance.getDiff.mockReturnValue("mock diff content");
@@ -525,6 +531,7 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
 
   beforeEach(() => {
     clearLastJudgeResult();
+    clearLastJudgeOptions();
     vi.clearAllMocks();
     mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
     mockEnvInstance.getDiff.mockReturnValue("mock diff content");
@@ -535,6 +542,7 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
       title: "test-declarative",
       fn: ({ agent, ctx }) => {
         agent.instruct("Add a close button to the Banner");
+        setLastJudgeOptions({ criteria: "Banner close button should work", expectedFiles: [] });
         ctx.addTask({
           name: "Build",
           action: () =>
@@ -602,7 +610,7 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
     expect(results[0].entries[0].reason).toContain("Cannot use instruct() after run()");
   });
 
-  it("declarative with no tasks records as incomplete", async () => {
+  it("declarative without toPassJudge criteria fails with explicit error", async () => {
     const testDef: TestDefinition = {
       title: "test-no-tasks",
       fn: ({ agent }) => {
@@ -612,7 +620,8 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
 
     const results = await runTest(testDef, baseConfig);
     expect(results[0].passed).toBe(false);
-    expect(results[0].entries[0].reason).toContain("without tasks or judge evaluation");
+    expect(results[0].entries[0].reason).toContain("completed without judge criteria");
+    expect(results[0].entries[0].reason).toContain("toPassJudge");
   });
 
   it("declarative test function is sync (no async needed)", async () => {
@@ -624,6 +633,7 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
       ctx: { addTask: (t: unknown) => void };
     }) => {
       agent.instruct("sync instruction");
+      setLastJudgeOptions({ criteria: "Sync declarative instruction is correctly implemented" });
       ctx.addTask({
         name: "test",
         action: () =>
@@ -659,6 +669,7 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
       title: "test-declarative-after-each",
       fn: ({ agent, ctx }) => {
         agent.instruct("task");
+        setLastJudgeOptions({ criteria: "Task and lint command both execute successfully" });
         ctx.addTask({
           name: "build",
           action: () =>
@@ -692,6 +703,7 @@ describe("runner - lifecycle hooks", () => {
 
   beforeEach(() => {
     clearLastJudgeResult();
+    clearLastJudgeOptions();
     vi.clearAllMocks();
     mockEnvInstance.execute.mockReturnValue({ stdout: "", stderr: "", exitCode: 0 });
     mockEnvInstance.getDiff.mockReturnValue("mock diff content");
@@ -756,6 +768,7 @@ describe("runner - lifecycle hooks", () => {
       title: "test-config-before-add-task",
       fn: ({ agent }) => {
         agent.instruct("do something");
+        setLastJudgeOptions({ criteria: "Build task from config beforeEach passes" });
       },
     };
 

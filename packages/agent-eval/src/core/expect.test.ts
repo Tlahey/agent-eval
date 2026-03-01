@@ -6,7 +6,12 @@ import {
   setGlobalThresholds,
   getGlobalThresholds,
 } from "./expect.js";
-import { clearLastJudgeResult, getLastJudgeResult } from "./runner.js";
+import {
+  clearLastJudgeOptions,
+  clearLastJudgeResult,
+  getLastJudgeOptions,
+  getLastJudgeResult,
+} from "./runner.js";
 import type { TestContext, JudgeConfig } from "./types.js";
 import { DEFAULT_THRESHOLDS } from "./types.js";
 
@@ -40,6 +45,7 @@ describe("expect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearLastJudgeResult();
+    clearLastJudgeOptions();
     clearJudgeConfig();
   });
 
@@ -138,6 +144,23 @@ describe("expect", () => {
       reason: "perfect",
       improvement: "No improvement needed.",
     });
+  });
+
+  it("defers judge evaluation when diff is not available yet", async () => {
+    setJudgeConfig(judgeConfig);
+    const ctx = createMockContext({ diff: null });
+
+    const result = await agentExpect(ctx).toPassJudge({
+      criteria: "declarative criteria",
+      expectedFiles: ["src/Banner.tsx"],
+    });
+
+    vitestExpect(mockJudge).not.toHaveBeenCalled();
+    vitestExpect(getLastJudgeOptions()).toEqual({
+      criteria: "declarative criteria",
+      expectedFiles: ["src/Banner.tsx"],
+    });
+    vitestExpect(result.reason).toContain("Deferred judge evaluation registered");
   });
 
   it("throws JudgeFailure when judge returns pass=false", async () => {

@@ -233,6 +233,7 @@ async function judgeCli(
  * Incorporates the agent instruction, task results with weighted criteria, and context.
  */
 export function buildDeclarativeJudgePrompt(
+  criteria: string,
   instruction: string,
   taskResults: Array<{ task: TaskDefinition; result: CommandResult }>,
   ctx: TestContext,
@@ -257,6 +258,9 @@ ${tr.result.stdout.slice(0, 2000)}${tr.result.stderr ? `\nSTDERR:\n${tr.result.s
   const totalWeight = taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
 
   return `You are an expert code reviewer acting as a Judge for an AI coding agent evaluation.
+
+## Evaluation Criteria
+${criteria}
 
 ## Agent Instruction
 The agent was asked to: "${instruction}"

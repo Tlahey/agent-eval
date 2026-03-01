@@ -2,8 +2,10 @@
 
 Create a fluent assertion chain for LLM-as-a-Judge evaluation.
 
-::: danger Mandatory in imperative mode
-Every imperative test (using `agent.run()`) **must** call `expect(ctx).toPassJudge()`. If a test completes without a judge evaluation, AgentEval throws an error. In declarative mode, the judge is called automatically by the runner.
+::: danger Mandatory in all test modes
+Every test (imperative or declarative) **must** call `expect(ctx).toPassJudge()`.  
+`agent.run()` / `agent.instruct()` define the implementation request; `toPassJudge()` defines scoring criteria and file scope for the judge.  
+If a test completes without `toPassJudge()`, AgentEval throws an error.
 :::
 
 ## Signature
@@ -66,6 +68,9 @@ test("Example", async ({ agent, ctx }) => {
   // result.score, result.status, result.reason, result.improvement
 });
 ```
+
+In **declarative** tests, call `expect(ctx).toPassJudge(...)` after `agent.instruct(...)`.  
+The runner uses these options later (after agent execution) to run the final judge step, optionally enriched by `ctx.addTask()` results.
 
 ## Behavior
 

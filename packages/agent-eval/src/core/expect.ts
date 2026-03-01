@@ -1,5 +1,5 @@
 import { judge as runJudge } from "../judge/judge.js";
-import { setLastJudgeResult } from "./runner.js";
+import { setLastJudgeOptions, setLastJudgeResult } from "./runner.js";
 import type {
   ExpectChain,
   JudgeConfig,
@@ -47,6 +47,23 @@ export function expect(ctx: TestContext): ExpectChain {
         throw new Error(
           "Judge config not set. Make sure you are running inside an agenteval test.",
         );
+      }
+
+      // Always record the requested judge options so the runner can enforce
+      // and apply criteria/model/thresholds consistently across modes.
+      setLastJudgeOptions(options);
+
+      // Declarative mode: before agent execution, diff is not captured yet.
+      // Defer evaluation to the runner after instruction + tasks have executed.
+      if (ctx.diff === null) {
+        return {
+          pass: true,
+          status: "PASS",
+          score: 1,
+          reason:
+            "Deferred judge evaluation registered. The runner will execute the judge after agent.instruct() and tasks complete.",
+          improvement: "No improvement needed.",
+        };
       }
 
       const result = await runJudge(

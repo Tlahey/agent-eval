@@ -86,9 +86,20 @@ pnpm add -D agent-eval
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "agent-eval";
+import {
+  defineConfig,
+  OpenAILLM,
+  LocalEnvironment,
+  DockerEnvironment,
+  SqliteLedger,
+  JsonLedger,
+} from "agent-eval";
+
+const useDocker = process.env.AGENTEVAL_ENV === "docker";
+const useJsonLedger = process.env.AGENTEVAL_LEDGER === "json";
 
 export default defineConfig({
+  // Agent runners (CLI or API)
   runners: [
     {
       name: "copilot",
@@ -96,13 +107,27 @@ export default defineConfig({
       command: 'gh copilot suggest "{{prompt}}"',
     },
   ],
+
+  // Judge used to score every test
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    provider: "openai",
+    model: "gpt-5-mini",
   },
 
-  // Config-level beforeEach — runs before every test.
-  // Register common verification tasks here.
+  // LLM plugin (used by API runners for model calls)
+  llm: new OpenAILLM({
+    defaultModel: "gpt-5-mini",
+  }),
+
+  // Execution environment plugin: local git workspace OR docker sandbox
+  environment: useDocker ? new DockerEnvironment({ image: "node:22" }) : new LocalEnvironment(),
+
+  // Ledger plugin: sqlite (default) OR json fallback
+  ledger: useJsonLedger
+    ? new JsonLedger({ outputDir: ".agenteval" })
+    : new SqliteLedger({ outputDir: ".agenteval" }),
+
+  // Config-level beforeEach — register shared verification tasks
   beforeEach: ({ ctx }) => {
     ctx.addTask({
       name: "Tests",
@@ -120,45 +145,38 @@ export default defineConfig({
 });
 ```
 
-### Write a test (Declarative — recommended)
-
-```ts
-// evals/banner.eval.ts
-import { test } from "agent-eval";
-
-test("Add a Close button to the Banner", ({ agent, ctx }) => {
-  // Declare what the agent should do
-  agent.instruct("Add a Close button to the Banner component");
-
-  // Add test-specific verification task
-  ctx.addTask({
-    name: "Close button",
-    action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
-    criteria: "A close button with aria-label='Close' is rendered",
-    weight: 2,
-  });
-  // Runner auto-executes: agent → storeDiff → tasks → judge
-});
-```
-
-### Write a test (Imperative — legacy)
+### Write a test
 
 ```ts
 // evals/banner.eval.ts
 import { test, expect } from "agent-eval";
 
 test("Add a Close button to the Banner", async ({ agent, ctx }) => {
-  await agent.run("Add a Close button inside the banner component");
+  // 1) Instruct the agent
+  agent.instruct("Add a Close button to the Banner component");
 
+  // 2) Add a weighted verification task (criteria used by the judge)
+  ctx.addTask({
+    name: "Close button renders and works",
+    action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
+    criteria:
+      'A close button with aria-label="Close" is rendered when onClose is provided and calls onClose when clicked',
+    weight: 3,
+  });
+
+  // 3) Required: define final judge criteria and expected scope
   await expect(ctx).toPassJudge({
     criteria: `
       - Uses a proper close button component
-      - Has aria-label 'Close'
-      - All tests pass
+      - Has aria-label "Close"
+      - Calls onClose when clicked
+      - Existing tests still pass
       - Build succeeds
     `,
-    expectedFiles: ["src/components/Banner.tsx"],
+    expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
   });
+
+  // Runner executes: agent instruction -> storeDiff -> optional tasks -> judge
 });
 ```
 

@@ -1,41 +1,41 @@
 # Declarative Pipeline
 
-The **declarative pipeline** is an alternative to the imperative `agent.run()` approach. Instead of manually running the agent and calling `expect().toPassJudge()`, you **declare** what the agent should do and what tasks to verify — the runner handles execution, evaluation, and scoring automatically.
+The **declarative pipeline** is an alternative to the imperative `agent.run()` approach. You declare what the agent should do with `agent.instruct()`, optionally add verification tasks with `ctx.addTask()`, and finish with `expect(ctx).toPassJudge()` to define final judge criteria and scope.
 
 ## Why Declarative?
 
 ```mermaid
 flowchart LR
-  subgraph Imperative["Imperative (legacy)"]
+  subgraph Imperative["Imperative"]
     direction TB
     A1["agent.run(prompt)"] --> A2["ctx.storeDiff()"]
     A2 --> A3["ctx.runCommand(...)"]
     A3 --> A4["expect(ctx).toPassJudge(...)"]
   end
 
-  subgraph Declarative["Declarative (new)"]
+  subgraph Declarative["Declarative"]
     direction TB
     B1["agent.instruct(prompt)"] --> B2["ctx.addTask(...)"]
-    B2 --> B3["Runner auto-executes"]
-    B3 --> B4["Auto judge + scoring"]
+    B2 --> B3["expect(ctx).toPassJudge(...)"]
+    B3 --> B4["Runner executes + judges"]
   end
 
   style Imperative fill:#f59e0b,color:#000
   style Declarative fill:#10b981,color:#fff
 ```
 
-| Feature           | Imperative                      | Declarative                     |
-| ----------------- | ------------------------------- | ------------------------------- |
-| Agent execution   | Manual `agent.run()`            | Auto via `agent.instruct()`     |
-| Diff capture      | Manual `ctx.storeDiff()`        | Automatic                       |
-| Task verification | Manual commands                 | `ctx.addTask()` with criteria   |
-| Judge evaluation  | Manual `expect().toPassJudge()` | Automatic with weighted scoring |
-| Test function     | `async` required                | Sync config builder             |
+| Feature           | Imperative                      | Declarative                                                |
+| ----------------- | ------------------------------- | ---------------------------------------------------------- |
+| Agent execution   | Manual `agent.run()`            | Auto via `agent.instruct()`                                |
+| Diff capture      | Manual `ctx.storeDiff()`        | Automatic                                                  |
+| Task verification | Manual commands                 | `ctx.addTask()` with criteria                              |
+| Judge evaluation  | Manual `expect().toPassJudge()` | Required `expect().toPassJudge()` + optional task evidence |
+| Test function     | `async` required                | Sync config builder                                        |
 
 ## Basic Example
 
 ```ts
-import { test, beforeEach } from "agent-eval";
+import { test, beforeEach, expect } from "agent-eval";
 
 // Common verification tasks for all tests
 beforeEach(({ ctx }) => {
@@ -54,7 +54,7 @@ beforeEach(({ ctx }) => {
   });
 });
 
-test("add close button to Banner", ({ agent, ctx }) => {
+test("add close button to Banner", async ({ agent, ctx }) => {
   // 1. Declare what the agent should do
   agent.instruct("Add a close button to the Banner component");
 
@@ -65,11 +65,22 @@ test("add close button to Banner", ({ agent, ctx }) => {
     criteria: "A close button with aria-label='Close' is rendered",
     weight: 2,
   });
+
+  // 3. Required: define final judge criteria and expected scope
+  await expect(ctx).toPassJudge({
+    criteria: `
+      - Close button is implemented correctly
+      - onClose is called when clicked
+      - Existing tests and build still pass
+    `,
+    expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
+  });
 });
 ```
 
-::: tip No `async` needed
-Declarative test functions are **synchronous** — they just declare the plan. The runner handles all async execution.
+::: tip Why still call `toPassJudge()`?
+`agent.instruct()` defines the implementation request. `toPassJudge()` defines how the judge scores that implementation.  
+`ctx.addTask()` is optional and acts as extra evidence injected into the judge prompt.
 :::
 
 ## Single-Instruct Policy
@@ -157,7 +168,7 @@ sequenceDiagram
     R->>T: Execute task action
     T-->>R: CommandResult
   end
-  R->>J: Auto-judge (instruction + diff + task results)
+  R->>J: Judge (toPassJudge criteria + diff + optional task results)
   J-->>R: { pass, score, reason }
   R->>H: afterEach hooks
   R->>E: env.teardown(cwd)
@@ -168,7 +179,7 @@ sequenceDiagram
 Use `beforeEach()` and `afterEach()` for shared setup/teardown. This is the recommended pattern for registering **common verification tasks** (build, test, lint) that apply to all tests:
 
 ```ts
-import { test, beforeEach, afterEach } from "agent-eval";
+import { test, beforeEach, afterEach, expect } from "agent-eval";
 
 // Register common verification tasks for ALL tests
 beforeEach(({ ctx }) => {
@@ -192,7 +203,7 @@ afterEach(async ({ ctx }) => {
   await ctx.exec("pnpm clean");
 });
 
-test("Add close button to Banner", ({ agent, ctx }) => {
+test("Add close button to Banner", async ({ agent, ctx }) => {
   agent.instruct("Add a close button to the Banner component");
 
   // Test-specific task (in addition to the common ones from beforeEach)
@@ -201,6 +212,11 @@ test("Add close button to Banner", ({ agent, ctx }) => {
     action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
     criteria: "A close button with aria-label='Close' is rendered when onClose is provided",
     weight: 2,
+  });
+
+  await expect(ctx).toPassJudge({
+    criteria: "Close button works correctly and all quality checks remain green",
+    expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
   });
 });
 ```

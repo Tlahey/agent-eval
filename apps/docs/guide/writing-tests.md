@@ -15,7 +15,7 @@ flowchart TD
     D1 --> D2["📸 Auto storeDiff()"]
     D2 --> D3["⚙️ afterEach commands"]
     D3 --> D4["✅ Execute tasks"]
-    D4 --> D5["⚖️ Auto judge"]
+    D4 --> D5["⚖️ Judge (toPassJudge criteria + optional tasks)"]
     C -- Imperative --> E1["🤖 agent.run(prompt)"]
     E1 --> E2["📸 Auto storeDiff()"]
     E2 --> E3["⚙️ afterEach commands"]
@@ -241,7 +241,7 @@ The `test()` function receives an object with:
 The `agent` object exposes:
 
 - `agent.run(prompt)` — trigger the agent with a prompt (imperative mode — **must** be followed by `toPassJudge()`)
-- `agent.instruct(prompt)` — declare what the agent should do (declarative mode — judge is automatic) — see [Declarative Pipeline](./declarative-pipeline.md)
+- `agent.instruct(prompt)` — declare what the agent should do (declarative mode — **must** also call `toPassJudge()` to define judge criteria) — see [Declarative Pipeline](./declarative-pipeline.md)
 - `agent.name` — the runner's name (e.g., `"copilot"`)
 - `agent.model` — the runner's model (e.g., `"claude-sonnet-4-20250514"`)
 
@@ -269,21 +269,32 @@ test("task", async ({ agent, ctx }) => {
 ```
 
 ::: warning Judge is mandatory
-Every imperative test **must** call `expect(ctx).toPassJudge()`. If a test completes without a judge evaluation, AgentEval will throw an explicit error. The `criteria` field defines what the judge should evaluate — be specific.
+Every test style (imperative and declarative) **must** call `expect(ctx).toPassJudge()`.  
+`agent.instruct()` defines what the agent should implement; `toPassJudge()` defines how the judge evaluates and scores that implementation.  
+If a test completes without `toPassJudge()`, AgentEval throws an explicit error.
 :::
 
 ### Declarative — you declare, the runner executes
 
-You call `agent.instruct()` to declare what the agent should do, and `ctx.addTask()` to register verification tasks. The runner handles execution and judging automatically:
+You call `agent.instruct()` to declare what the agent should do, optionally add `ctx.addTask()` verification tasks, and **must** finish with `expect(ctx).toPassJudge()` to define final scoring criteria/scope:
 
 ```ts
-test("task", ({ agent, ctx }) => {
+test("task", async ({ agent, ctx }) => {
   agent.instruct("Add close button");
   ctx.addTask({
     name: "Build",
     action: () => ctx.exec("pnpm build"),
     criteria: "build succeeds",
     weight: 2,
+  });
+
+  await expect(ctx).toPassJudge({
+    criteria: `
+      - Feature works as requested
+      - Build and tests pass
+      - No unnecessary refactors
+    `,
+    expectedFiles: ["src/components/Banner.tsx"],
   });
 });
 ```

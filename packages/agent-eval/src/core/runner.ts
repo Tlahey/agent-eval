@@ -14,6 +14,7 @@ import type {
   AgentHandle,
   AgentRunnerConfig,
   CommandResult,
+  JudgeOptions,
   JudgeResult,
   LedgerEntry,
   TaskDefinition,
@@ -410,6 +411,9 @@ export async function runTest(
   const results: RunResult[] = [];
 
   for (const runner of runners) {
+    clearLastJudgeResult();
+    clearLastJudgeOptions();
+
     const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
     rep.onTestStart(event);
 
@@ -457,6 +461,12 @@ export async function runTest(
       } else {
         // ─── IMPERATIVE PIPELINE (agent.run() was called) ───
         if (!getLastJudgeResult()) {
+          if (getLastJudgeOptions()) {
+            throw new Error(
+              `Test "${testDef.title}" called expect(ctx).toPassJudge() before agent output was ready.\n` +
+                `In imperative mode, call toPassJudge() after await agent.run(...).`,
+            );
+          }
           throw new Error(
             `Test "${testDef.title}" completed without a judge evaluation.\n` +
               `Every test MUST call expect(ctx).toPassJudge({ criteria: "..." }) to be evaluated.\n` +
@@ -548,7 +558,7 @@ export async function runTest(
  * 2. Auto storeDiff
  * 3. Run config afterEach commands
  * 4. Execute registered tasks
- * 5. Auto judge evaluation from task criteria
+ * 5. Judge evaluation using required expect(ctx).toPassJudge() criteria
  */
 async function executeDeclarativePipeline(
   instruction: string,
@@ -563,6 +573,15 @@ async function executeDeclarativePipeline(
   thresholds: import("./types.js").Thresholds,
 ): Promise<LedgerEntry> {
   const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
+  const judgeOptions = getLastJudgeOptions();
+
+  if (!judgeOptions) {
+    throw new Error(
+      `Test "${testDef.title}" completed without judge criteria.\n` +
+        `Declarative tests MUST end with expect(ctx).toPassJudge({ criteria: "..." }).\n` +
+        `Use ctx.addTask() for supplemental verification tasks (optional), then define final judge criteria with toPassJudge().`,
+    );
+  }
 
   // 1. Execute the agent instruction
   reporter.onPipelineStep(event, "agent", "running");
@@ -592,80 +611,47 @@ async function executeDeclarativePipeline(
     reporter.onPipelineStep(event, "task", "done", task.name);
   }
 
-  // 5. Auto judge evaluation
+  // 5. Judge evaluation (criteria from expect().toPassJudge + optional task evidence)
   const durationMs = Date.now() - start;
+  reporter.onPipelineStep(event, "judge", "running");
+  const prompt = buildDeclarativeJudgePrompt(
+    judgeOptions.criteria,
+    instruction,
+    taskResults,
+    ctx,
+    judgeOptions.expectedFiles,
+  );
+  const judgeResult = await runJudge(
+    ctx,
+    prompt,
+    config.judge,
+    judgeOptions.model,
+    judgeOptions.expectedFiles,
+  );
+  reporter.onPipelineStep(event, "judge", "done");
 
-  if (taskResults.length > 0) {
-    // Build a weighted judge prompt from task criteria
-    reporter.onPipelineStep(event, "judge", "running");
-    const prompt = buildDeclarativeJudgePrompt(instruction, taskResults, ctx);
-    const judgeResult = await runJudge(ctx, prompt, config.judge);
-    reporter.onPipelineStep(event, "judge", "done");
+  const effectiveThresholds = judgeOptions.thresholds ?? thresholds;
+  const status = computeStatus(judgeResult.score, effectiveThresholds);
+  clearLastJudgeOptions();
+  clearLastJudgeResult();
 
-    const status = computeStatus(judgeResult.score, thresholds);
-    return {
-      testId: testDef.title,
-      suitePath: testDef.suitePath ?? [],
-      timestamp: new Date().toISOString(),
-      agentRunner: runner.name,
-      judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
-      score: judgeResult.score,
-      pass: status !== "FAIL",
-      status,
-      reason: judgeResult.reason,
-      improvement: judgeResult.improvement,
-      context: {
-        diff: ctx.diff,
-        commands: ctx.commands,
-      },
-      durationMs,
-      thresholds,
-    };
-  }
-
-  // No tasks registered — check if expect().toPassJudge() was used
-  const judgeResult = getLastJudgeResult();
-  if (judgeResult) {
-    const status = judgeResult.status ?? computeStatus(judgeResult.score, thresholds);
-    clearLastJudgeResult();
-    return {
-      testId: testDef.title,
-      suitePath: testDef.suitePath ?? [],
-      timestamp: new Date().toISOString(),
-      agentRunner: runner.name,
-      judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
-      score: judgeResult.score,
-      pass: judgeResult.pass,
-      status,
-      reason: judgeResult.reason,
-      improvement: judgeResult.improvement,
-      context: {
-        diff: ctx.diff,
-        commands: ctx.commands,
-      },
-      durationMs,
-      thresholds,
-    };
-  }
-
-  // Declarative with no tasks and no judge — record as incomplete
   return {
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
     agentRunner: runner.name,
     judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
-    score: 0,
-    pass: false,
-    status: "FAIL",
-    reason: "Declarative test completed without tasks or judge evaluation",
-    improvement: "Add ctx.addTask() calls to define evaluation criteria",
+    score: judgeResult.score,
+    pass: status !== "FAIL",
+    status,
+    reason: judgeResult.reason,
+    improvement: judgeResult.improvement,
     context: {
       diff: ctx.diff,
       commands: ctx.commands,
     },
     durationMs,
-    thresholds,
+    thresholds: effectiveThresholds,
   };
 }
 
@@ -683,7 +669,10 @@ function buildImperativeEntry(
 ): LedgerEntry {
   const durationMs = Date.now() - start;
   const judgeResult = getLastJudgeResult()!;
+  const judgeOptions = getLastJudgeOptions();
+  const effectiveThresholds = judgeOptions?.thresholds ?? thresholds;
   clearLastJudgeResult();
+  clearLastJudgeOptions();
 
   return {
     testId: testDef.title,
@@ -693,7 +682,7 @@ function buildImperativeEntry(
     judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
     score: judgeResult.score,
     pass: judgeResult.pass,
-    status: judgeResult.status ?? computeStatus(judgeResult.score, thresholds),
+    status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
     reason: judgeResult.reason,
     improvement: judgeResult.improvement,
     context: {
@@ -701,13 +690,14 @@ function buildImperativeEntry(
       commands: ctx.commands,
     },
     durationMs,
-    thresholds,
+    thresholds: effectiveThresholds,
   };
 }
 
-// ─── Global judge result store (set by expect().toPassJudge) ───
+// ─── Global judge store (set by expect().toPassJudge) ───
 
 let _lastJudgeResult: JudgeResult | null = null;
+let _lastJudgeOptions: JudgeOptions | null = null;
 
 export function setLastJudgeResult(result: JudgeResult): void {
   _lastJudgeResult = result;
@@ -719,4 +709,16 @@ export function getLastJudgeResult(): JudgeResult | null {
 
 export function clearLastJudgeResult(): void {
   _lastJudgeResult = null;
+}
+
+export function setLastJudgeOptions(options: JudgeOptions): void {
+  _lastJudgeOptions = options;
+}
+
+export function getLastJudgeOptions(): JudgeOptions | null {
+  return _lastJudgeOptions;
+}
+
+export function clearLastJudgeOptions(): void {
+  _lastJudgeOptions = null;
 }
