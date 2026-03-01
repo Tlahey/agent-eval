@@ -237,6 +237,8 @@ export { validateRunnerNames } from "./core/config.js";
 export type {
   IModelPlugin,
   ICliModel,
+  CliOutputMetrics,
+  CliOutputParser,
   RunnerContext,
   RunnerExecResult,
   ILedgerPlugin,

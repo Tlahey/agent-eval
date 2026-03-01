@@ -4,6 +4,7 @@ import type {
   IJudgePlugin,
   IModelPlugin,
   ICliModel,
+  CliOutputMetrics,
   RunnerStats,
   TestTreeNode,
 } from "./interfaces.js";
@@ -154,6 +155,65 @@ describe("Plugin Interfaces", () => {
       expect(cliModel.type).toBe("cli");
       expect(cliModel.name).toBe("aider");
       expect(cliModel.command).toContain("{{prompt}}");
+    });
+
+    it("allows optional parseOutput for token extraction", () => {
+      const cliModel: ICliModel = {
+        type: "cli",
+        name: "claude-code",
+        command: 'claude -p "{{prompt}}" --output-format json',
+        parseOutput: ({ stdout }) => {
+          const json = JSON.parse(stdout);
+          return {
+            tokenUsage: {
+              inputTokens: json.usage.input_tokens,
+              outputTokens: json.usage.output_tokens,
+              totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+            },
+            agentOutput: json.result,
+          };
+        },
+      };
+      expect(cliModel.parseOutput).toBeDefined();
+
+      const metrics = cliModel.parseOutput!({
+        stdout: JSON.stringify({
+          result: "Done",
+          usage: { input_tokens: 1000, output_tokens: 500 },
+        }),
+        stderr: "",
+      });
+      expect(metrics.tokenUsage).toEqual({
+        inputTokens: 1000,
+        outputTokens: 500,
+        totalTokens: 1500,
+      });
+      expect(metrics.agentOutput).toBe("Done");
+    });
+
+    it("works without parseOutput (e.g., Copilot CLI)", () => {
+      const cliModel: ICliModel = {
+        type: "cli",
+        name: "copilot",
+        command: 'gh copilot suggest "{{prompt}}"',
+      };
+      expect(cliModel.parseOutput).toBeUndefined();
+    });
+  });
+
+  describe("CliOutputMetrics type", () => {
+    it("allows empty metrics (no token data)", () => {
+      const metrics: CliOutputMetrics = {};
+      expect(metrics.tokenUsage).toBeUndefined();
+      expect(metrics.agentOutput).toBeUndefined();
+    });
+
+    it("allows partial metrics (tokens only)", () => {
+      const metrics: CliOutputMetrics = {
+        tokenUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+      };
+      expect(metrics.tokenUsage?.totalTokens).toBe(150);
+      expect(metrics.agentOutput).toBeUndefined();
     });
   });
 

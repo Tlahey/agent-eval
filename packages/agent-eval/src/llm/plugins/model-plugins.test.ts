@@ -136,4 +136,54 @@ describe("CliModel", () => {
     const model = new CliModel({ command: "echo {{prompt}}" });
     expect(model.name).toBe("cli");
   });
+
+  it("has no parseOutput by default", () => {
+    const model = new CliModel({ command: "echo {{prompt}}" });
+    expect(model.parseOutput).toBeUndefined();
+  });
+
+  it("accepts a parseOutput function for token extraction", () => {
+    const model = new CliModel({
+      command: 'claude -p "{{prompt}}" --output-format json',
+      name: "claude-code",
+      parseOutput: ({ stdout }) => {
+        const json = JSON.parse(stdout);
+        return {
+          tokenUsage: {
+            inputTokens: json.usage.input_tokens,
+            outputTokens: json.usage.output_tokens,
+            totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+          },
+          agentOutput: json.result,
+        };
+      },
+    });
+
+    expect(model.parseOutput).toBeDefined();
+    const metrics = model.parseOutput!({
+      stdout: JSON.stringify({
+        result: "Files updated",
+        usage: { input_tokens: 2000, output_tokens: 800 },
+      }),
+      stderr: "",
+    });
+    expect(metrics.tokenUsage).toEqual({
+      inputTokens: 2000,
+      outputTokens: 800,
+      totalTokens: 2800,
+    });
+    expect(metrics.agentOutput).toBe("Files updated");
+  });
+
+  it("parseOutput can return empty metrics for CLIs without token data", () => {
+    const model = new CliModel({
+      command: 'gh copilot suggest "{{prompt}}"',
+      name: "copilot",
+      parseOutput: () => ({}),
+    });
+
+    const metrics = model.parseOutput!({ stdout: "some output", stderr: "" });
+    expect(metrics.tokenUsage).toBeUndefined();
+    expect(metrics.agentOutput).toBeUndefined();
+  });
 });
