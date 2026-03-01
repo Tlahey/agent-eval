@@ -321,7 +321,7 @@ export interface ScoreOverride {
 // ─── Test Definition ───
 
 export interface AgentHandle {
-  /** Execute the agent with a prompt instruction (imperative mode — legacy) */
+  /** Execute the agent with a prompt instruction (imperative mode) */
   run(prompt: string): Promise<void>;
   /**
    * Register a prompt for declarative execution (Single-Instruct Policy).

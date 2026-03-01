@@ -2,6 +2,10 @@
 
 Create a fluent assertion chain for LLM-as-a-Judge evaluation.
 
+::: danger Mandatory in imperative mode
+Every imperative test (using `agent.run()`) **must** call `expect(ctx).toPassJudge()`. If a test completes without a judge evaluation, AgentEval throws an error. In declarative mode, the judge is called automatically by the runner.
+:::
+
 ## Signature
 
 ```ts
@@ -37,12 +41,12 @@ interface JudgeResult {
 
 ## Options
 
-| Option          | Type                             | Required | Description                                          |
-| --------------- | -------------------------------- | -------- | ---------------------------------------------------- |
-| `criteria`      | `string`                         | ✅       | Markdown criteria for evaluation                     |
-| `model`         | `string`                         | —        | Override judge model for this call                   |
-| `expectedFiles` | `string[]`                       | —        | Files that should have been changed (scope analysis) |
-| `thresholds`    | `{ warn: number; fail: number }` | —        | Per-test scoring thresholds (overrides global)       |
+| Option          | Type                             | Required | Description                                                                                                          |
+| --------------- | -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `criteria`      | `string`                         | ✅       | Markdown criteria for evaluation — defines what the judge should evaluate and how to score                           |
+| `model`         | `string`                         | —        | Override judge model for this call                                                                                   |
+| `expectedFiles` | `string[]`                       | —        | Minimum files that should be changed. Extra changes are evaluated by the judge for relevance (scope creep detection) |
+| `thresholds`    | `{ warn: number; fail: number }` | —        | Per-test scoring thresholds (overrides global)                                                                       |
 
 ## Usage
 

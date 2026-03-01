@@ -180,15 +180,16 @@ describe("runner - runTest", () => {
     expect(results[0].runner).toBe("runner-b");
   });
 
-  it("records entry with no judge when test completes silently", async () => {
+  it("fails with explicit error when test completes without judge evaluation", async () => {
     const testDef: TestDefinition = {
       title: "test-no-judge",
       fn: vi.fn().mockResolvedValue(undefined),
     };
 
     const results = await runTest(testDef, baseConfig);
-    expect(results[0].entries[0].pass).toBe(false);
-    expect(results[0].entries[0].reason).toBe("Test completed without judge evaluation");
+    expect(results[0].passed).toBe(false);
+    expect(results[0].entries[0].reason).toContain("completed without a judge evaluation");
+    expect(results[0].entries[0].reason).toContain("toPassJudge");
   });
 });
 
@@ -485,7 +486,7 @@ describe("runner - auto storeDiff and afterEach", () => {
     };
 
     const results = await runTest(testDef, config);
-    expect(results[0].passed).toBe(false); // no judge = fail
+    expect(results[0].passed).toBe(false); // no judge = error
   });
 
   it("still allows manual storeDiff and runCommand alongside auto", async () => {

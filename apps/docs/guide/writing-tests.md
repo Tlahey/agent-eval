@@ -64,9 +64,14 @@ test("Test title", async ({ agent, ctx }) => {
   // 1. Run the agent (storeDiff is called automatically after this)
   await agent.run("Your instruction to the agent");
 
-  // 2. Judge the output
+  // 2. Judge the output (MANDATORY — every test must have a judge)
   await expect(ctx).toPassJudge({
-    criteria: "Your evaluation criteria in Markdown",
+    criteria: `
+      - Describe what the agent should have done
+      - Be specific about expected behavior
+      - List files that should be modified
+    `,
+    expectedFiles: ["src/target-file.ts"], // optional but recommended
   });
 });
 ```
@@ -235,25 +240,41 @@ The `test()` function receives an object with:
 
 The `agent` object exposes:
 
-- `agent.run(prompt)` — trigger the agent with a prompt (imperative mode)
-- `agent.instruct(prompt)` — declare what the agent should do (declarative mode) — see [Declarative Pipeline](./declarative-pipeline.md)
+- `agent.run(prompt)` — trigger the agent with a prompt (imperative mode — **must** be followed by `toPassJudge()`)
+- `agent.instruct(prompt)` — declare what the agent should do (declarative mode — judge is automatic) — see [Declarative Pipeline](./declarative-pipeline.md)
 - `agent.name` — the runner's name (e.g., `"copilot"`)
 - `agent.model` — the runner's model (e.g., `"claude-sonnet-4-20250514"`)
 
 ## Declarative vs Imperative
 
-AgentEval supports two test styles:
+AgentEval supports two test styles — both are first-class citizens:
 
-**Imperative** (original) — you control execution:
+### Imperative — you control execution
+
+You call `agent.run()` to execute the agent, then call `expect(ctx).toPassJudge()` to evaluate the result. This gives you full control over the execution flow:
 
 ```ts
 test("task", async ({ agent, ctx }) => {
   await agent.run("Add close button");
-  await expect(ctx).toPassJudge({ criteria: "works" });
+
+  await expect(ctx).toPassJudge({
+    criteria: `
+      - Close button renders with aria-label="Close"
+      - Click handler calls onClose prop
+      - No TypeScript errors
+    `,
+    expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
+  });
 });
 ```
 
-**Declarative** (new) — you declare, the runner executes:
+::: warning Judge is mandatory
+Every imperative test **must** call `expect(ctx).toPassJudge()`. If a test completes without a judge evaluation, AgentEval will throw an explicit error. The `criteria` field defines what the judge should evaluate — be specific.
+:::
+
+### Declarative — you declare, the runner executes
+
+You call `agent.instruct()` to declare what the agent should do, and `ctx.addTask()` to register verification tasks. The runner handles execution and judging automatically:
 
 ```ts
 test("task", ({ agent, ctx }) => {
@@ -312,7 +333,7 @@ await expect(ctx).toPassJudge({
 
 ## Expected Files
 
-Use `expectedFiles` to tell the judge which files **should** have been modified. The judge will flag scope creep if the agent touches unexpected files:
+Use `expectedFiles` to tell the judge which files **should** have been modified. This defines the minimum scope of the change:
 
 ```ts
 await expect(ctx).toPassJudge({
@@ -321,7 +342,11 @@ await expect(ctx).toPassJudge({
 });
 ```
 
-The judge prompt includes a **file scope analysis** section that compares the expected files against what was actually changed in the diff. This helps detect agents that modify too many files.
+The judge prompt includes a **file scope analysis** section that compares the expected files against what was actually changed in the diff:
+
+- **Missing expected files** → the judge penalizes the score significantly
+- **Extra files modified** → the judge evaluates whether they are necessary for the task. Relevant changes (updating imports, adding new dependencies) are acceptable. Unrelated changes are flagged as **scope creep** and reduce the score
+- The judge reports its file scope analysis in the `reason` field of the result
 
 ## Judge Result
 

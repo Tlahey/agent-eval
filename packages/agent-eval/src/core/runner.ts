@@ -455,7 +455,14 @@ export async function runTest(
           thresholds,
         );
       } else {
-        // ─── IMPERATIVE PIPELINE (legacy: agent.run() was called) ───
+        // ─── IMPERATIVE PIPELINE (agent.run() was called) ───
+        if (!getLastJudgeResult()) {
+          throw new Error(
+            `Test "${testDef.title}" completed without a judge evaluation.\n` +
+              `Every test MUST call expect(ctx).toPassJudge({ criteria: "..." }) to be evaluated.\n` +
+              `Add a toPassJudge() call after agent.run() with your evaluation criteria.`,
+          );
+        }
         entry = buildImperativeEntry(testDef, runner, ctx, config, start, thresholds);
       }
 
@@ -663,7 +670,8 @@ async function executeDeclarativePipeline(
 }
 
 /**
- * Build a ledger entry for the imperative pipeline (agent.run + optional expect).
+ * Build a ledger entry for the imperative pipeline (agent.run + expect().toPassJudge).
+ * The caller guarantees a judge result exists (validated before calling this function).
  */
 function buildImperativeEntry(
   testDef: TestDefinition,
@@ -674,17 +682,20 @@ function buildImperativeEntry(
   thresholds: import("./types.js").Thresholds,
 ): LedgerEntry {
   const durationMs = Date.now() - start;
-  const entry: LedgerEntry = {
+  const judgeResult = getLastJudgeResult()!;
+  clearLastJudgeResult();
+
+  return {
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
     agentRunner: runner.name,
     judgeModel: config.judge.model ?? config.judge.command ?? "unknown",
-    score: 0,
-    pass: false,
-    status: "FAIL",
-    reason: "Test completed without judge evaluation",
-    improvement: "",
+    score: judgeResult.score,
+    pass: judgeResult.pass,
+    status: judgeResult.status ?? computeStatus(judgeResult.score, thresholds),
+    reason: judgeResult.reason,
+    improvement: judgeResult.improvement,
     context: {
       diff: ctx.diff,
       commands: ctx.commands,
@@ -692,19 +703,6 @@ function buildImperativeEntry(
     durationMs,
     thresholds,
   };
-
-  const judgeResult = getLastJudgeResult();
-  if (judgeResult) {
-    entry.score = judgeResult.score;
-    entry.pass = judgeResult.pass;
-    entry.status = judgeResult.status ?? computeStatus(judgeResult.score, thresholds);
-    entry.reason = judgeResult.reason;
-    entry.improvement = judgeResult.improvement;
-    clearLastJudgeResult();
-  } else {
-    entry.status = computeStatus(entry.score, thresholds);
-    entry.pass = entry.status !== "FAIL";
-  }
 
   return entry;
 }

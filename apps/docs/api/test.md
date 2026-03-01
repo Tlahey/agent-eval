@@ -209,10 +209,10 @@ describe("UI", () => {
 
 The `agent` parameter exposes two mutually exclusive execution modes:
 
-| Method                   | Mode        | Description                                                        |
-| ------------------------ | ----------- | ------------------------------------------------------------------ |
-| `agent.run(prompt)`      | Imperative  | Execute agent and return. Use with manual `expect().toPassJudge()` |
-| `agent.instruct(prompt)` | Declarative | Declare instruction. Runner auto-executes and judges               |
+| Method                   | Mode        | Description                                                                |
+| ------------------------ | ----------- | -------------------------------------------------------------------------- |
+| `agent.run(prompt)`      | Imperative  | Execute agent and return. **Must** be followed by `expect().toPassJudge()` |
+| `agent.instruct(prompt)` | Declarative | Declare instruction. Runner auto-executes and judges                       |
 
 ### Single-Instruct Policy
 
