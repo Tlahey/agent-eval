@@ -160,7 +160,12 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: false, score: 0.3, reason: "missing close button", improvement: "add a close button" },
+      result: {
+        pass: false,
+        score: 0.3,
+        reason: "missing close button",
+        improvement: "add a close button",
+      },
     });
 
     await vitestExpect(
@@ -194,7 +199,12 @@ describe("expect", () => {
     const ctx = createMockContext();
 
     vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.65, reason: "partially correct", improvement: "needs more work" },
+      result: {
+        pass: true,
+        score: 0.65,
+        reason: "partially correct",
+        improvement: "needs more work",
+      },
     });
 
     const result = await agentExpect(ctx).toPassJudge({ criteria: "test" });

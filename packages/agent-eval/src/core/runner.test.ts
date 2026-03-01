@@ -48,7 +48,9 @@ vi.mock("../environment/plugins/local.js", () => ({
 }));
 
 vi.mock("../judge/judge.js", () => ({
-  judge: vi.fn(() => ({ result: { pass: true, score: 0.85, reason: "good", improvement: "none" } })),
+  judge: vi.fn(() => ({
+    result: { pass: true, score: 0.85, reason: "good", improvement: "none" },
+  })),
   buildJudgePrompt: vi.fn(() => "mock judge prompt"),
   extractChangedFiles: vi.fn(() => []),
 }));

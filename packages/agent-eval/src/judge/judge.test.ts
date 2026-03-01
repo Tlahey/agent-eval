@@ -86,7 +86,10 @@ describe("judge", () => {
 
     const config: JudgeConfig = { llm: createMockModel("claude-sonnet-4-20250514") };
     const ctx = createMockContext();
-    const prompt = buildJudgePrompt({ criteria: "has close button", execution: createMockExecution() });
+    const prompt = buildJudgePrompt({
+      criteria: "has close button",
+      execution: createMockExecution(),
+    });
 
     const { result } = await judge(ctx, prompt, config);
 
@@ -119,7 +122,10 @@ describe("judge", () => {
 
     const ctx = createMockContext({ logs: "", diff: null, commands: [] });
     const config: JudgeConfig = { llm: createMockModel() };
-    const prompt = buildJudgePrompt({ criteria: "criteria", execution: createMockExecution({ logs: "", diff: null, changedFiles: [], commands: [] }) });
+    const prompt = buildJudgePrompt({
+      criteria: "criteria",
+      execution: createMockExecution({ logs: "", diff: null, changedFiles: [], commands: [] }),
+    });
 
     const { result } = await judge(ctx, prompt, config);
     expect(result.pass).toBe(false);
@@ -221,7 +227,8 @@ describe("buildJudgePrompt - expectedFiles", () => {
   });
 
   it("flags unexpected file changes", () => {
-    const diff = "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep";
+    const diff =
+      "diff --git a/src/Banner.tsx b/src/Banner.tsx\n+code\ndiff --git a/package.json b/package.json\n+dep";
     const prompt = buildJudgePrompt({
       criteria: "criteria",
       execution: createMockExecution({
@@ -236,7 +243,8 @@ describe("buildJudgePrompt - expectedFiles", () => {
   });
 
   it("shows no warnings when all expected files match", () => {
-    const diff = "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code";
+    const diff =
+      "diff --git a/src/A.tsx b/src/A.tsx\n+code\ndiff --git a/src/B.tsx b/src/B.tsx\n+code";
     const prompt = buildJudgePrompt({
       criteria: "criteria",
       execution: createMockExecution({

@@ -24,17 +24,33 @@ flowchart LR
 
 ```ts
 interface TestContext {
+  // Capture methods
   storeDiff(): void;
   storeDiffAsync(): Promise<void>;
   runCommand(name: string, command: string): Promise<CommandResult>;
   addTask(task: TaskDefinition): void;
   exec(command: string): Promise<CommandResult>;
+
+  // Runner enrichment (called automatically by the runner)
+  setInstruction(instruction: string): void;
+  setRunnerInfo(info: { name: string; model: string }): void;
+  setAgentOutput(output: string): void;
+  setAgentTokenUsage(usage: TokenUsage): void;
+
+  // Build execution summary
+  buildExecutionData(taskResults: TaskResult[], timing: TimingData): ExecutionData;
+
+  // Read-only properties
   readonly diff: string | null;
   readonly commands: CommandResult[];
   readonly tasks: readonly TaskDefinition[];
   readonly logs: string;
 }
 ```
+
+::: tip Runner enrichment
+The `set*` methods and `buildExecutionData()` are called **automatically by the runner** during test execution. You don't need to call them in your test code — they exist to populate the `ExecutionData` that the judge uses for evaluation.
+:::
 
 ## Methods
 
@@ -72,11 +88,24 @@ Registers a verification task for the [declarative pipeline](/guide/declarative-
 ```ts
 interface TaskDefinition {
   name: string; // Task identifier
-  action: () => Promise<CommandResult>; // Task execution function
+  action: () => TaskActionResult | Promise<TaskActionResult>; // Task execution
   criteria: string; // Judge evaluation criteria
   weight?: number; // Scoring weight (default: 1)
 }
+
+interface TaskActionResult {
+  stdout: string; // Command output (required)
+  exitCode: number; // Exit code (required)
+  stderr?: string; // Error output (optional)
+  name?: string; // Auto-filled by runner
+  command?: string; // Auto-filled by runner
+  durationMs?: number; // Auto-filled by runner
+}
 ```
+
+::: tip Lenient return type
+Task actions only need to return `{ stdout, exitCode }`. The runner automatically enriches the result with `name` (from `task.name`), `command`, `stderr`, and `durationMs`.
+:::
 
 **Validation rules:**
 

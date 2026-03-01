@@ -145,10 +145,10 @@ judge: {
 }
 ```
 
-| Option       | Type     | Default | Description                                              |
-| ------------ | -------- | ------- | -------------------------------------------------------- |
-| `llm`        | `IModelPlugin` | —  | LLM plugin for judge evaluation                          |
-| `maxRetries` | `number` | `2`     | Number of retry attempts on failure (0 = no retries)     |
+| Option       | Type           | Default | Description                                          |
+| ------------ | -------------- | ------- | ---------------------------------------------------- |
+| `llm`        | `IModelPlugin` | —       | LLM plugin for judge evaluation                      |
+| `maxRetries` | `number`       | `2`     | Number of retry attempts on failure (0 = no retries) |
 
 After all attempts are exhausted, the judge throws an error with the last failure message.
 

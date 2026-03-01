@@ -46,6 +46,7 @@ export default withMermaid(
             { text: "expect()", link: "/api/expect" },
             { text: "Context", link: "/api/context" },
             { text: "defineConfig()", link: "/api/define-config" },
+            { text: "Types", link: "/api/types" },
             { text: "Ledger", link: "/api/ledger" },
           ],
         },

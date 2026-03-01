@@ -148,10 +148,7 @@ export class EvalContext implements TestContext {
    * Build the unified ExecutionData from all collected context.
    * Called by the runner to pass to the judge and store in the ledger.
    */
-  buildExecutionData(
-    taskResults: TaskResult[],
-    timing: TimingData,
-  ): ExecutionData {
+  buildExecutionData(taskResults: TaskResult[], timing: TimingData): ExecutionData {
     return {
       instruction: this._instruction,
       runner: { ...this._runnerInfo },
