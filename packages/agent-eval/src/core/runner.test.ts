@@ -9,6 +9,7 @@ import {
   dryRunTest,
 } from "./runner.js";
 import type { AgentEvalConfig, TestDefinition, JudgeResult } from "./types.js";
+import type { IRunnerPlugin, RunnerContext, RunnerExecResult } from "./interfaces.js";
 
 // Mock external deps
 vi.mock("../git/git.js", () => ({
@@ -46,24 +47,6 @@ vi.mock("../environment/plugins/local.js", () => ({
   LocalEnvironment: vi.fn(() => mockEnvInstance),
 }));
 
-vi.mock("node:fs", () => ({
-  writeFileSync: vi.fn(),
-  mkdirSync: vi.fn(),
-}));
-
-vi.mock("ai", () => ({
-  generateObject: vi.fn(),
-}));
-
-vi.mock("@ai-sdk/anthropic", () => ({
-  createAnthropic: vi.fn(() => (model: string) => ({ modelId: model, provider: "anthropic" })),
-}));
-
-vi.mock("@ai-sdk/openai", () => ({
-  createOpenAI: vi.fn(() => (model: string) => ({ modelId: model, provider: "openai" })),
-}));
-
-// Mock the judge module for declarative pipeline tests
 vi.mock("../judge/judge.js", () => ({
   judge: vi.fn(() => ({ pass: true, score: 0.85, reason: "good", improvement: "none" })),
   buildJudgePrompt: vi.fn(() => "mock judge prompt"),
@@ -80,11 +63,25 @@ vi.mock("../index.js", async (importOriginal) => {
   };
 });
 
-import { writeFileSync, mkdirSync } from "node:fs";
-import { generateObject } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import { judge as runJudge } from "../judge/judge.js";
 import { getMatchingHooks } from "../index.js";
+
+/** Create a mock IRunnerPlugin for testing */
+function createMockRunner(name: string, overrides?: Partial<IRunnerPlugin>): IRunnerPlugin {
+  return {
+    name,
+    model: overrides?.model ?? `mock-model-${name}`,
+    execute:
+      overrides?.execute ??
+      vi.fn(async (_prompt: string, context: RunnerContext): Promise<RunnerExecResult> => {
+        // Delegate to env.execute like CLIRunner does
+        const result = await context.env.execute(`echo ${_prompt}`, context.cwd, {
+          timeout: context.timeout ?? 600_000,
+        });
+        return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+      }),
+  };
+}
 
 describe("runner - judge result store", () => {
   beforeEach(() => {
@@ -113,8 +110,8 @@ describe("runner - runTest", () => {
   const baseConfig: AgentEvalConfig = {
     rootDir: "/tmp/test",
     outputDir: "/tmp/test/.agenteval",
-    runners: [{ name: "mock-cli", type: "cli", command: "echo {{prompt}}" }],
-    judge: { provider: "openai", model: "gpt-4o" },
+    runners: [createMockRunner("mock-cli")],
+    judge: {},
     timeout: 5000,
   };
 
@@ -167,10 +164,7 @@ describe("runner - runTest", () => {
   it("filters runners when matrix is configured", async () => {
     const config: AgentEvalConfig = {
       ...baseConfig,
-      runners: [
-        { name: "runner-a", type: "cli", command: "echo a" },
-        { name: "runner-b", type: "cli", command: "echo b" },
-      ],
+      runners: [createMockRunner("runner-a"), createMockRunner("runner-b")],
       matrix: { runners: ["runner-b"] },
     };
 
@@ -210,8 +204,8 @@ describe("runner - createAgent via runTest", () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "cli-runner", type: "cli", command: "echo {{prompt}}" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [createMockRunner("cli-runner")],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
@@ -224,22 +218,27 @@ describe("runner - createAgent via runTest", () => {
     await runTest(testDef, config);
 
     expect(mockEnvInstance.execute).toHaveBeenCalledWith(
-      "echo hello world",
+      expect.stringContaining("hello world"),
       "/tmp/test",
       expect.objectContaining({ timeout: 600_000 }),
     );
   });
 
-  it("CLI runner throws error when command is missing", async () => {
+  it("captures runner plugin execution errors gracefully", async () => {
+    const failingRunner = createMockRunner("fail-runner", {
+      execute: vi.fn(async () => {
+        throw new Error("runner crashed");
+      }),
+    });
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "no-cmd", type: "cli" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [failingRunner],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
-      title: "test-no-cmd",
+      title: "test-runner-error",
       fn: vi.fn().mockImplementation(async ({ agent }) => {
         await agent.run("prompt");
       }),
@@ -247,27 +246,24 @@ describe("runner - createAgent via runTest", () => {
 
     const results = await runTest(testDef, config);
     expect(results[0].passed).toBe(false);
-    expect(results[0].entries[0].reason).toContain("no command defined");
+    expect(results[0].entries[0].reason).toContain("runner crashed");
   });
 
-  it("API runner calls generateObject and writes files", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: {
-        files: [{ path: "src/test.ts", content: "const x = 1;" }],
-      },
-    } as never);
+  it("runner with filesWritten reports written files", async () => {
+    const apiRunner = createMockRunner("api-runner", {
+      model: "claude-sonnet-4-20250514",
+      execute: vi.fn(
+        async (): Promise<RunnerExecResult> => ({
+          filesWritten: ["src/test.ts"],
+        }),
+      ),
+    });
 
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [
-        {
-          name: "api-runner",
-          type: "api",
-          api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-        },
-      ],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [apiRunner],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
@@ -278,143 +274,93 @@ describe("runner - createAgent via runTest", () => {
     };
 
     await runTest(testDef, config);
+    expect(apiRunner.execute).toHaveBeenCalledOnce();
+  });
 
-    expect(generateObject).toHaveBeenCalledOnce();
-    expect(mkdirSync).toHaveBeenCalled();
-    expect(writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining("src/test.ts"),
-      "const x = 1;",
-      "utf-8",
+  it("runner plugin execute is called with the right prompt", async () => {
+    const executeFn = vi.fn(
+      async (_prompt: string, context: RunnerContext): Promise<RunnerExecResult> => {
+        const result = await context.env.execute(`echo ${_prompt}`, context.cwd, {
+          timeout: context.timeout,
+        });
+        return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+      },
     );
-  });
-
-  it("API runner throws when api config is missing", async () => {
+    const runner = createMockRunner("prompt-check", { execute: executeFn });
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "no-api", type: "api" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [runner],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
-      title: "test-no-api",
+      title: "test-prompt-pass",
       fn: vi.fn().mockImplementation(async ({ agent }) => {
-        await agent.run("prompt");
-      }),
-    };
-
-    const results = await runTest(testDef, config);
-    expect(results[0].passed).toBe(false);
-    expect(results[0].entries[0].reason).toContain("no api config defined");
-  });
-
-  it("resolves openai provider for API runner", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: { files: [] },
-    } as never);
-
-    const config: AgentEvalConfig = {
-      rootDir: "/tmp/test",
-      outputDir: "/tmp/test/.agenteval",
-      runners: [
-        {
-          name: "openai-runner",
-          type: "api",
-          api: { provider: "openai", model: "gpt-4o" },
-        },
-      ],
-      judge: { provider: "openai", model: "gpt-4o" },
-    };
-
-    const testDef: TestDefinition = {
-      title: "test-openai",
-      fn: vi.fn().mockImplementation(async ({ agent }) => {
-        await agent.run("task");
+        await agent.run("my specific prompt");
       }),
     };
 
     await runTest(testDef, config);
-    expect(createOpenAI).toHaveBeenCalled();
-  });
-
-  it("resolves ollama provider for API runner", async () => {
-    vi.mocked(generateObject).mockResolvedValue({
-      object: { files: [] },
-    } as never);
-
-    const config: AgentEvalConfig = {
-      rootDir: "/tmp/test",
-      outputDir: "/tmp/test/.agenteval",
-      runners: [
-        {
-          name: "ollama-runner",
-          type: "api",
-          api: { provider: "ollama", model: "llama3" },
-        },
-      ],
-      judge: { provider: "openai", model: "gpt-4o" },
-    };
-
-    const testDef: TestDefinition = {
-      title: "test-ollama",
-      fn: vi.fn().mockImplementation(async ({ agent }) => {
-        await agent.run("task");
-      }),
-    };
-
-    await runTest(testDef, config);
-    expect(createOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: "http://localhost:11434/v1",
-        apiKey: "ollama",
-      }),
+    expect(executeFn).toHaveBeenCalledWith(
+      "my specific prompt",
+      expect.objectContaining({ cwd: "/tmp/test" }),
     );
   });
 
-  it("throws for unknown runner type", async () => {
+  it("runner with stderr reports error to reporter", async () => {
+    const runner = createMockRunner("stderr-runner", {
+      execute: vi.fn(
+        async (): Promise<RunnerExecResult> => ({
+          stdout: "",
+          stderr: "some error output",
+          exitCode: 1,
+        }),
+      ),
+    });
+
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "bad", type: "unknown" as never }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [runner],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
-      title: "test-unknown-type",
+      title: "test-stderr",
       fn: vi.fn().mockImplementation(async ({ agent }) => {
         await agent.run("task");
       }),
     };
 
+    // Should not crash; error is reported gracefully
     const results = await runTest(testDef, config);
-    expect(results[0].passed).toBe(false);
-    expect(results[0].entries[0].reason).toContain("Unknown runner type");
+    expect(results).toHaveLength(1);
   });
 
-  it("throws for unsupported API provider", async () => {
+  it("multiple runners execute sequentially", async () => {
+    const runner1 = createMockRunner("runner-1");
+    const runner2 = createMockRunner("runner-2");
+
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [
-        {
-          name: "bad-provider",
-          type: "api",
-          api: { provider: "unsupported" as never, model: "test" },
-        },
-      ],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [runner1, runner2],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
-      title: "test-bad-provider",
+      title: "test-multi-runner",
       fn: vi.fn().mockImplementation(async ({ agent }) => {
         await agent.run("task");
       }),
     };
 
     const results = await runTest(testDef, config);
-    expect(results[0].passed).toBe(false);
-    expect(results[0].entries[0].reason).toContain("Unsupported API runner provider");
+    // No judge = fail for each, but both should execute
+    expect(results).toHaveLength(2);
+    expect(results[0].runner).toBe("runner-1");
+    expect(results[1].runner).toBe("runner-2");
   });
 });
 
@@ -431,8 +377,8 @@ describe("runner - auto storeDiff and afterEach", () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [createMockRunner("cli")],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
@@ -453,8 +399,8 @@ describe("runner - auto storeDiff and afterEach", () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [createMockRunner("cli")],
+      judge: {},
       afterEach: [
         { name: "test", command: "pnpm test" },
         { name: "build", command: "pnpm build" },
@@ -479,8 +425,8 @@ describe("runner - auto storeDiff and afterEach", () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [createMockRunner("cli")],
+      judge: {},
     };
 
     const testDef: TestDefinition = {
@@ -499,8 +445,8 @@ describe("runner - auto storeDiff and afterEach", () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
-      runners: [{ name: "cli", type: "cli", command: "echo {{prompt}}" }],
-      judge: { provider: "openai", model: "gpt-4o" },
+      runners: [createMockRunner("cli")],
+      judge: {},
       afterEach: [{ name: "build", command: "pnpm build" }],
     };
 
@@ -525,8 +471,8 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
   const baseConfig: AgentEvalConfig = {
     rootDir: "/tmp/test",
     outputDir: "/tmp/test/.agenteval",
-    runners: [{ name: "mock-cli", type: "cli", command: "echo {{prompt}}" }],
-    judge: { provider: "openai", model: "gpt-4o" },
+    runners: [createMockRunner("mock-cli")],
+    judge: {},
   };
 
   beforeEach(() => {
@@ -697,8 +643,8 @@ describe("runner - lifecycle hooks", () => {
   const baseConfig: AgentEvalConfig = {
     rootDir: "/tmp/test",
     outputDir: "/tmp/test/.agenteval",
-    runners: [{ name: "mock-cli", type: "cli", command: "echo {{prompt}}" }],
-    judge: { provider: "openai", model: "gpt-4o" },
+    runners: [createMockRunner("mock-cli")],
+    judge: {},
   };
 
   beforeEach(() => {
@@ -783,14 +729,10 @@ describe("runner - dryRunTest", () => {
   const baseConfig: AgentEvalConfig = {
     rootDir: "/tmp/test",
     runners: [
-      { name: "copilot", type: "cli", command: "echo {{prompt}}" },
-      {
-        name: "claude",
-        type: "api",
-        api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-      },
+      createMockRunner("copilot"),
+      createMockRunner("claude", { model: "claude-sonnet-4-20250514" }),
     ],
-    judge: { provider: "openai", model: "gpt-4o" },
+    judge: {},
     afterEach: [{ name: "test", command: "pnpm test" }],
   };
 

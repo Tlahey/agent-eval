@@ -3,6 +3,8 @@ import {
   validateLedgerPlugin,
   validateJudgePlugin,
   validateEnvironmentPlugin,
+  validateModelPlugin,
+  validateRunnerPlugin,
   validatePlugins,
   formatPluginErrors,
 } from "./plugin-validator.js";
@@ -166,6 +168,98 @@ describe("validatePlugins", () => {
   it("accumulates errors from multiple plugins", () => {
     const errors = validatePlugins({ ledger: "bad" as unknown, environment: null as unknown });
     expect(errors.length).toBe(2);
+  });
+});
+
+describe("validateModelPlugin", () => {
+  it("returns empty array for valid plugin", () => {
+    const model = { name: "openai", modelId: "gpt-4o", createModel: () => ({}) };
+    expect(validateModelPlugin(model)).toEqual([]);
+  });
+
+  it("detects missing name property", () => {
+    const errors = validateModelPlugin({ modelId: "gpt-4o", createModel: () => ({}) });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("name");
+  });
+
+  it("detects missing modelId property", () => {
+    const errors = validateModelPlugin({ name: "openai", createModel: () => ({}) });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("modelId");
+  });
+
+  it("detects missing createModel method", () => {
+    const errors = validateModelPlugin({ name: "openai", modelId: "gpt-4o" });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("createModel");
+    expect(errors[0].expected).toBe("method");
+  });
+
+  it("detects null plugin", () => {
+    const errors = validateModelPlugin(null);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("non-null object");
+  });
+});
+
+describe("validateRunnerPlugin", () => {
+  it("returns empty array for valid plugin", () => {
+    const runner = { name: "cli", model: "echo", execute: async () => ({}) };
+    expect(validateRunnerPlugin(runner)).toEqual([]);
+  });
+
+  it("detects missing name property", () => {
+    const errors = validateRunnerPlugin({ model: "echo", execute: async () => ({}) });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("name");
+  });
+
+  it("detects missing model property", () => {
+    const errors = validateRunnerPlugin({ name: "cli", execute: async () => ({}) });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("model");
+  });
+
+  it("detects missing execute method", () => {
+    const errors = validateRunnerPlugin({ name: "cli", model: "echo" });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].member).toBe("execute");
+    expect(errors[0].expected).toBe("method");
+  });
+
+  it("detects non-object plugin", () => {
+    const errors = validateRunnerPlugin("string");
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("non-null object");
+  });
+});
+
+describe("validatePlugins - runners and judge.llm", () => {
+  it("validates runner plugins in runners array", () => {
+    const errors = validatePlugins({
+      runners: [{ name: "ok", model: "test", execute: async () => ({}) }, { name: "bad" }],
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].plugin).toContain("RunnerPlugin[1]");
+  });
+
+  it("validates judge.llm when present", () => {
+    const errors = validatePlugins({
+      judge: { llm: { name: "openai" } },
+    });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].plugin).toBe("ModelPlugin");
+  });
+
+  it("passes for valid runners array", () => {
+    const errors = validatePlugins({
+      runners: [
+        { name: "a", model: "x", execute: async () => ({}) },
+        { name: "b", model: "y", execute: async () => ({}) },
+      ],
+    });
+    expect(errors).toEqual([]);
   });
 });
 

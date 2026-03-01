@@ -2,15 +2,124 @@
  * Plugin interfaces for the AgentEval SOLID architecture.
  *
  * These interfaces define the contracts for:
+ * - IModelPlugin: LLM provider (Anthropic, OpenAI, Ollama, custom)
  * - ILedgerPlugin: Storage backend (SQLite, JSON, custom)
- * - IEnvironmentPlugin: Execution environment (Local, Docker)
- * - IJudgePlugin: Evaluation judge (API, CLI)
+ * - IEnvironmentPlugin: Execution environment (Local, Docker, custom)
+ * - IJudgePlugin: Evaluation judge (API, CLI, custom)
  *
- * Both follow the Dependency Inversion Principle (DIP):
+ * All follow the Dependency Inversion Principle (DIP):
  * high-level modules (Runner, CLI) depend on abstractions, not concrete implementations.
  */
 
 import type { LedgerEntry, ScoreOverride, TestContext, JudgeResult, JudgeConfig } from "./types.js";
+
+// ─── Model Plugin ───
+
+/**
+ * Contract for LLM model providers.
+ *
+ * Wraps a Vercel AI SDK model instance. The framework calls `createModel()`
+ * to get a model that can be passed to `generateObject()` / `generateText()`.
+ *
+ * Built-in: AnthropicModel, OpenAIModel, OllamaModel.
+ * Third parties can implement this to add any provider (Mistral, Gemini, etc.).
+ *
+ * @example
+ * ```ts
+ * import type { IModelPlugin } from "agent-eval";
+ * import { createMistral } from "@ai-sdk/mistral";
+ *
+ * class MistralModel implements IModelPlugin {
+ *   readonly name = "mistral";
+ *   constructor(private opts: { model: string; apiKey?: string }) {}
+ *   createModel() {
+ *     const provider = createMistral({ apiKey: this.opts.apiKey });
+ *     return provider(this.opts.model);
+ *   }
+ * }
+ * ```
+ */
+export interface IModelPlugin {
+  /** Human-readable name of the model provider (e.g., "anthropic", "openai") */
+  readonly name: string;
+
+  /** Model identifier (e.g., "claude-3-5-sonnet-latest", "gpt-4o") */
+  readonly modelId: string;
+
+  /**
+   * Create and return a Vercel AI SDK LanguageModel instance.
+   * May be async for providers that use dynamic imports.
+   */
+  createModel(): unknown | Promise<unknown>;
+}
+
+// ─── Runner Plugin ───
+
+/** Context provided to runner plugins during execution */
+export interface RunnerContext {
+  /** Working directory of the project */
+  cwd: string;
+  /** Environment plugin for command execution (used by CLI runners) */
+  env: IEnvironmentPlugin;
+  /** Timeout in ms */
+  timeout?: number;
+}
+
+/** Result returned by a runner plugin after execution */
+export interface RunnerExecResult {
+  /** stdout from execution (CLI runners) */
+  stdout?: string;
+  /** stderr from execution (CLI runners) */
+  stderr?: string;
+  /** Exit code (CLI runners, 0 = success) */
+  exitCode?: number;
+  /** Files written to disk (API runners) */
+  filesWritten?: string[];
+}
+
+/**
+ * Contract for agent runner plugins.
+ *
+ * A runner encapsulates the full execution logic for an agent:
+ * - CLI runners: build the command, execute via environment plugin
+ * - API runners: call LLM API, parse response, write files to disk
+ *
+ * The core runner orchestrates lifecycle (setup → hooks → execute → diff → judge)
+ * and delegates execution to this plugin.
+ *
+ * Built-in: CLIRunner, APIRunner.
+ * Third parties can implement custom runners (e.g., SSH, browser-based agents).
+ *
+ * @example
+ * ```ts
+ * import type { IRunnerPlugin, RunnerContext, RunnerExecResult } from "agent-eval";
+ *
+ * class BrowserAgentRunner implements IRunnerPlugin {
+ *   readonly name = "browser-agent";
+ *   readonly model = "playwright-agent";
+ *   async execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult> {
+ *     // Launch browser, run agent, return result
+ *     return { stdout: "done", exitCode: 0 };
+ *   }
+ * }
+ * ```
+ */
+export interface IRunnerPlugin {
+  /** Human-readable name of the runner (e.g., "copilot", "claude") */
+  readonly name: string;
+  /** Display name of the model or command (for logs and ledger) */
+  readonly model: string;
+
+  /**
+   * Execute the agent with the given prompt.
+   * All execution logic (command building, API calls, file writing) lives here.
+   *
+   * @param prompt - The instruction/prompt for the agent
+   * @param context - Execution context (cwd, environment, timeout)
+   * @returns Execution result with optional stdout/stderr/files
+   */
+  execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult>;
+}
 
 // ─── Ledger Plugin ───
 

@@ -1,38 +1,42 @@
-import type { AgentRunnerConfig, JudgeConfig } from "../../core/types.js";
+import type { IModelPlugin } from "../../core/interfaces.js";
 
-export interface OpenAIProviderOptions {
-  name?: string;
+export interface OpenAIModelOptions {
+  /** Model identifier (default: "gpt-4o") */
   model?: string;
-  baseURL?: string;
+  /** API key (falls back to OPENAI_API_KEY env var) */
   apiKey?: string;
+  /** Custom base URL */
+  baseURL?: string;
 }
 
-export class OpenAIProvider implements AgentRunnerConfig, JudgeConfig {
-  public readonly name: string;
-  public readonly type = "api" as const;
-  public readonly provider = "openai" as const;
-  public readonly model: string;
-  public readonly baseURL?: string;
-  public readonly apiKey?: string;
+/**
+ * OpenAI LLM model plugin.
+ * Uses @ai-sdk/openai under the hood (dynamic import — install as peer dep).
+ *
+ * @example
+ * ```ts
+ * import { OpenAIModel } from "agent-eval";
+ * const model = new OpenAIModel({ model: "gpt-4o" });
+ * ```
+ */
+export class OpenAIModel implements IModelPlugin {
+  readonly name = "openai";
+  readonly modelId: string;
+  private apiKey?: string;
+  private baseURL?: string;
 
-  public readonly api: {
-    provider: "openai";
-    model: string;
-    baseURL?: string;
-    apiKey?: string;
-  };
-
-  constructor(options: OpenAIProviderOptions = {}) {
-    this.name = options.name ?? "openai";
-    this.model = options.model ?? "gpt-4o";
-    this.baseURL = options.baseURL;
+  constructor(options: OpenAIModelOptions = {}) {
+    this.modelId = options.model ?? "gpt-4o";
     this.apiKey = options.apiKey;
+    this.baseURL = options.baseURL;
+  }
 
-    this.api = {
-      provider: this.provider,
-      model: this.model,
-      baseURL: this.baseURL,
-      apiKey: this.apiKey,
-    };
+  async createModel() {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const provider = createOpenAI({
+      apiKey: this.apiKey ?? process.env.OPENAI_API_KEY,
+      ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+    });
+    return provider(this.modelId);
   }
 }

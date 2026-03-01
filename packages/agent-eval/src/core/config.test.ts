@@ -23,13 +23,14 @@ describe("config", () => {
 
   describe("defineConfig", () => {
     it("returns the config object as-is (identity helper)", () => {
+      const mockRunner = { name: "test", model: "test-model", execute: async () => ({}) };
       const config = defineConfig({
-        runners: [{ name: "test", type: "cli", command: "echo hi" }],
-        judge: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+        runners: [mockRunner],
+        judge: {},
       });
 
       expect(config.runners).toHaveLength(1);
-      expect(config.judge.provider).toBe("anthropic");
+      expect(config.runners[0].name).toBe("test");
     });
   });
 

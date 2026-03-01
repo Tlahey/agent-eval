@@ -35,6 +35,12 @@ const JUDGE_REQUIRED_METHODS = ["judge"] as const;
 const ENV_REQUIRED_PROPERTIES = ["name"] as const;
 const ENV_REQUIRED_METHODS = ["setup", "execute", "getDiff"] as const;
 
+const MODEL_REQUIRED_PROPERTIES = ["name", "modelId"] as const;
+const MODEL_REQUIRED_METHODS = ["createModel"] as const;
+
+const RUNNER_REQUIRED_PROPERTIES = ["name", "model"] as const;
+const RUNNER_REQUIRED_METHODS = ["execute"] as const;
+
 // ─── Validators ───
 
 function checkMembers(
@@ -97,6 +103,16 @@ export function validateEnvironmentPlugin(plugin: unknown): PluginValidationErro
   return checkMembers(plugin, "EnvironmentPlugin", ENV_REQUIRED_PROPERTIES, ENV_REQUIRED_METHODS);
 }
 
+/** Validate that an object satisfies the IModelPlugin contract */
+export function validateModelPlugin(plugin: unknown): PluginValidationError[] {
+  return checkMembers(plugin, "ModelPlugin", MODEL_REQUIRED_PROPERTIES, MODEL_REQUIRED_METHODS);
+}
+
+/** Validate that an object satisfies the IRunnerPlugin contract */
+export function validateRunnerPlugin(plugin: unknown): PluginValidationError[] {
+  return checkMembers(plugin, "RunnerPlugin", RUNNER_REQUIRED_PROPERTIES, RUNNER_REQUIRED_METHODS);
+}
+
 /**
  * Validate all plugins in a config object.
  * Returns an array of errors (empty = valid).
@@ -105,6 +121,7 @@ export function validatePlugins(config: {
   ledger?: unknown;
   judge?: unknown;
   environment?: unknown;
+  runners?: unknown[];
 }): PluginValidationError[] {
   const errors: PluginValidationError[] = [];
 
@@ -113,7 +130,7 @@ export function validatePlugins(config: {
   }
 
   // Only validate judge if it looks like a plugin (has 'judge' method),
-  // not a plain JudgeConfig object (which has 'provider' + 'model')
+  // not a plain JudgeConfig object
   if (
     config.judge !== undefined &&
     typeof config.judge === "object" &&
@@ -124,8 +141,32 @@ export function validatePlugins(config: {
     errors.push(...validateJudgePlugin(config.judge));
   }
 
+  // Validate judge.llm if it's an IModelPlugin
+  if (
+    config.judge !== undefined &&
+    typeof config.judge === "object" &&
+    config.judge !== null &&
+    "llm" in config.judge &&
+    (config.judge as Record<string, unknown>).llm !== undefined
+  ) {
+    errors.push(...validateModelPlugin((config.judge as Record<string, unknown>).llm));
+  }
+
   if (config.environment !== undefined) {
     errors.push(...validateEnvironmentPlugin(config.environment));
+  }
+
+  // Validate each runner plugin
+  if (config.runners) {
+    for (let i = 0; i < config.runners.length; i++) {
+      const runner = config.runners[i];
+      const runnerErrors = validateRunnerPlugin(runner);
+      // Prefix errors with runner index for clarity
+      for (const err of runnerErrors) {
+        err.plugin = `RunnerPlugin[${i}]`;
+      }
+      errors.push(...runnerErrors);
+    }
   }
 
   return errors;

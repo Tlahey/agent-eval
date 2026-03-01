@@ -1,33 +1,38 @@
-import type { AgentRunnerConfig, JudgeConfig } from "../../core/types.js";
+import type { IModelPlugin } from "../../core/interfaces.js";
 
-export interface OllamaProviderOptions {
-  name?: string;
+export interface OllamaModelOptions {
+  /** Model identifier (default: "llama3") */
   model?: string;
+  /** Custom base URL (default: "http://localhost:11434/v1") */
   baseURL?: string;
 }
 
-export class OllamaProvider implements AgentRunnerConfig, JudgeConfig {
-  public readonly name: string;
-  public readonly type = "api" as const;
-  public readonly provider = "ollama" as const;
-  public readonly model: string;
-  public readonly baseURL?: string;
+/**
+ * Ollama LLM model plugin.
+ * Uses @ai-sdk/openai with Ollama's OpenAI-compatible endpoint.
+ *
+ * @example
+ * ```ts
+ * import { OllamaModel } from "agent-eval";
+ * const model = new OllamaModel({ model: "llama3" });
+ * ```
+ */
+export class OllamaModel implements IModelPlugin {
+  readonly name = "ollama";
+  readonly modelId: string;
+  private baseURL: string;
 
-  public readonly api: {
-    provider: "ollama";
-    model: string;
-    baseURL?: string;
-  };
+  constructor(options: OllamaModelOptions = {}) {
+    this.modelId = options.model ?? "llama3";
+    this.baseURL = options.baseURL ?? "http://localhost:11434/v1";
+  }
 
-  constructor(options: OllamaProviderOptions = {}) {
-    this.name = options.name ?? "ollama";
-    this.model = options.model ?? "llama3";
-    this.baseURL = options.baseURL;
-
-    this.api = {
-      provider: this.provider,
-      model: this.model,
+  async createModel() {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const provider = createOpenAI({
       baseURL: this.baseURL,
-    };
+      apiKey: "ollama",
+    });
+    return provider(this.modelId);
   }
 }
