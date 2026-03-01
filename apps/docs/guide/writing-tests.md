@@ -12,13 +12,15 @@ flowchart TD
     D --> E["📸 Auto storeDiff()"]
     E --> F["⚙️ afterEach commands"]
     F --> G["⚖️ expect(ctx).toPassJudge()"]
-    G --> H{"score ≥ 0.7?"}
-    H -- Yes --> I["✅ PASS → Ledger"]
-    H -- No --> J["❌ FAIL → Ledger"]
+    G --> H{"score ≥ warn\nthreshold?"}
+    H -- "≥ 0.8" --> I["✅ PASS → Ledger"]
+    H -- "≥ 0.5" --> I2["⚠️ WARN → Ledger"]
+    H -- "< 0.5" --> J["❌ FAIL → Ledger"]
 
     style D fill:#f59e0b,color:#000
     style G fill:#10b981,color:#fff
     style I fill:#10b981,color:#fff
+    style I2 fill:#f59e0b,color:#000
     style J fill:#ef4444,color:#fff
 ```
 
@@ -173,18 +175,27 @@ The judge prompt includes a **file scope analysis** section that compares the ex
 
 ## Judge Result
 
-The judge returns a structured result with four fields:
+The judge returns a structured result:
 
 ```ts
 interface JudgeResult {
-  pass: boolean; // true if score >= 0.7
+  pass: boolean; // true if status is PASS or WARN
+  status?: TestStatus; // "PASS" | "WARN" | "FAIL"
   score: number; // 0.0 to 1.0
   reason: string; // Why the agent got this score
   improvement: string; // Suggestions to improve the score
 }
 ```
 
-The `improvement` field is stored in the ledger alongside the score and reason, providing actionable feedback for improving agent performance.
+The `status` is computed from the score and [thresholds](/guide/configuration#scoring-thresholds):
+
+| Status | Condition                         | Default             |
+| ------ | --------------------------------- | ------------------- |
+| PASS   | `score ≥ warn`                    | `score ≥ 0.8`       |
+| WARN   | `score ≥ fail` and `score < warn` | `0.5 ≤ score < 0.8` |
+| FAIL   | `score < fail`                    | `score < 0.5`       |
+
+Only **FAIL** throws a `JudgeFailure` error. **WARN** is flagged but still passes.
 
 ## Tagged Tests
 
@@ -227,17 +238,21 @@ test("Complex feature", async ({ agent, ctx }) => {
 
 ## Error Handling
 
-If a judge call fails (score < 0.7), it throws a `JudgeFailure` error. The runner catches this error per-test and records the failure in the ledger — **a single test failure never crashes the entire run**.
+If a judge call fails (score < fail threshold, default 0.5), it throws a `JudgeFailure` error. The runner catches this error per-test and records the failure in the ledger — **a single test failure never crashes the entire run**.
 
 ```mermaid
 flowchart LR
-    A["toPassJudge()"] --> B{"score ≥ 0.7?"}
-    B -- Yes --> C["Return JudgeResult"]
-    B -- No --> D["Throw JudgeFailure"]
-    D --> E["Runner catches error"]
-    E --> F["Record FAIL in ledger"]
-    F --> G["Continue to next test"]
+    A["toPassJudge()"] --> B{"Resolve\nthresholds"}
+    B --> C{"score ≥ warn?"}
+    C -- Yes --> D["✅ PASS — return"]
+    C -- No --> E{"score ≥ fail?"}
+    E -- Yes --> F["⚠️ WARN — return"]
+    E -- No --> G["❌ FAIL — throw"]
+    G --> H["Runner catches"]
+    H --> I["Record in ledger"]
+    I --> J["Continue next test"]
 
-    style C fill:#10b981,color:#fff
-    style D fill:#ef4444,color:#fff
+    style D fill:#10b981,color:#fff
+    style F fill:#f59e0b,color:#000
+    style G fill:#ef4444,color:#fff
 ```

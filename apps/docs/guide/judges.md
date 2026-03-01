@@ -32,10 +32,12 @@ flowchart TD
     G -- Yes --> J["Zod validation"]
 
     E --> J
-    J --> K{"score ≥ 0.7?"}
-    K -- Yes --> L["✅ PASS"]
-    K -- No --> M["❌ FAIL"]
-    L --> N["Return { pass, score, reason, improvement }"]
+    J --> K{"Compute status\nvia thresholds"}
+    K -- "score ≥ 0.8" --> L["✅ PASS"]
+    K -- "score ≥ 0.5" --> L2["⚠️ WARN"]
+    K -- "score < 0.5" --> M["❌ FAIL"]
+    L --> N["Return { pass, status, score, reason, improvement }"]
+    L2 --> N
     M --> N
     N --> O["📝 Append to ledger"]
 
@@ -54,7 +56,10 @@ flowchart TD
    ```json
    { "pass": true, "score": 0.85, "reason": "...", "improvement": "..." }
    ```
-3. Score ≥ 0.7 = pass, < 0.7 = fail
+3. The score is evaluated against [thresholds](/guide/configuration#scoring-thresholds):
+   - Score ≥ warn (0.8) = **PASS**
+   - Score ≥ fail (0.5) = **WARN** (passes, but flagged)
+   - Score < fail (0.5) = **FAIL** (throws error)
 
 ## Supported Providers
 
@@ -214,16 +219,37 @@ This is powerful for ensuring agents make **surgical changes** rather than modif
 
 The judge is instructed to be "strict but fair" and award partial credit.
 
+### Scoring Thresholds
+
+The raw score is mapped to a three-level status using configurable thresholds:
+
+| Condition                                 | Status  | `pass`  |
+| ----------------------------------------- | ------- | ------- |
+| score ≥ warn threshold (default: **0.8**) | ✅ PASS | `true`  |
+| score ≥ fail threshold (default: **0.5**) | ⚠️ WARN | `true`  |
+| score < fail threshold                    | ❌ FAIL | `false` |
+
+Configure thresholds in your config:
+
+```ts
+export default defineConfig({
+  options: {
+    thresholds: { warn: 0.8, fail: 0.5 },
+  },
+});
+```
+
 ## Judge Result Structure
 
-Every judge evaluation returns four fields, all stored in the ledger:
+Every judge evaluation returns these fields, all stored in the ledger:
 
-| Field         | Type    | Description                                             |
-| ------------- | ------- | ------------------------------------------------------- |
-| `pass`        | boolean | `true` if `score >= 0.7`                                |
-| `score`       | number  | Score between 0.0 and 1.0                               |
-| `reason`      | string  | Detailed explanation of the score                       |
-| `improvement` | string  | Actionable suggestions for improving the agent's output |
+| Field         | Type        | Description                                                             |
+| ------------- | ----------- | ----------------------------------------------------------------------- |
+| `pass`        | boolean     | `true` if status is PASS or WARN                                        |
+| `status`      | TestStatus? | `"PASS"`, `"WARN"`, or `"FAIL"` — computed by the runner via thresholds |
+| `score`       | number      | Score between 0.0 and 1.0                                               |
+| `reason`      | string      | Detailed explanation of the score                                       |
+| `improvement` | string      | Actionable suggestions for improving the agent's output                 |
 
 The `improvement` field is the judge's **opinion on how the agent could do better**. This is visible in the dashboard's "Improve" tab for each run.
 

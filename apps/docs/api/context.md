@@ -25,6 +25,7 @@ flowchart LR
 ```ts
 interface TestContext {
   storeDiff(): void;
+  storeDiffAsync(): Promise<void>;
   runCommand(name: string, command: string): Promise<CommandResult>;
   readonly diff: string | null;
   readonly commands: CommandResult[];
@@ -36,11 +37,15 @@ interface TestContext {
 
 ### `storeDiff()`
 
-Captures the current git diff (staged + unstaged) into the context. **Called automatically** after `agent.run()`.
+Captures the current git diff (staged + unstaged) into the context. **Called automatically** after `agent.run()`. Works synchronously with `LocalEnvironment`.
+
+### `storeDiffAsync()`
+
+Async version of `storeDiff()`. Used internally by the runner for environments that return promises (e.g., `DockerEnvironment`, SSH-based environments). You generally don't need to call this directly.
 
 ### `runCommand(name, command)`
 
-Runs a shell command and stores the result. Each command has a **120-second timeout**.
+Runs a shell command via the configured [environment plugin](/guide/environments) and stores the result. Each command has a **120-second timeout**.
 
 ```ts
 interface CommandResult {

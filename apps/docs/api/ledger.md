@@ -22,10 +22,10 @@ Each ledger entry contains:
   "suitePath": ["UI Components", "Banner"],
   "timestamp": "2025-03-15T10:30:00.000Z",
   "agentRunner": "copilot",
-  "agentModel": "claude-sonnet-4-20250514",
   "judgeModel": "claude-sonnet-4-20250514",
   "score": 0.85,
   "pass": true,
+  "status": "PASS",
   "reason": "The agent correctly added a close button with proper aria-label...",
   "improvement": "Consider adding keyboard event handling for Escape key",
   "context": {
@@ -35,7 +35,8 @@ Each ledger entry contains:
       { "name": "typecheck", "stdout": "...", "exitCode": 0, "durationMs": 1500 }
     ]
   },
-  "durationMs": 45000
+  "durationMs": 45000,
+  "thresholds": { "warn": 0.8, "fail": 0.5 }
 }
 ```
 
@@ -105,38 +106,43 @@ erDiagram
         text judge_model "model or CLI"
         real score "0.0 – 1.0"
         int pass "0 or 1"
+        text status "PASS, WARN, or FAIL"
         text reason "judge explanation"
         text improvement "judge suggestions"
         text diff "raw git diff"
         text commands "JSON array"
         int duration_ms "agent run time"
+        text thresholds "JSON: {warn, fail}"
     }
     SCORE_OVERRIDES {
         int id PK "auto-increment"
         int run_id FK "references runs.id"
         real score "0.0 – 1.0"
         int pass "0 or 1"
+        text status "PASS, WARN, or FAIL"
         text reason "human explanation"
         text timestamp "ISO 8601"
     }
     RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
 ```
 
-| Column         | Type      | Description                                   |
-| -------------- | --------- | --------------------------------------------- |
-| `id`           | `INTEGER` | Auto-increment primary key                    |
-| `test_id`      | `TEXT`    | Test title (indexed)                          |
-| `suite_path`   | `TEXT`    | JSON array of suite names (from `describe()`) |
-| `timestamp`    | `TEXT`    | ISO 8601 timestamp (indexed)                  |
-| `agent_runner` | `TEXT`    | Runner name                                   |
-| `judge_model`  | `TEXT`    | Judge model used                              |
-| `score`        | `REAL`    | 0.0 to 1.0                                    |
-| `pass`         | `INTEGER` | 1 = passed, 0 = failed                        |
-| `reason`       | `TEXT`    | Judge's markdown explanation                  |
-| `improvement`  | `TEXT`    | Judge's improvement suggestions               |
-| `diff`         | `TEXT`    | Raw git diff                                  |
-| `commands`     | `TEXT`    | JSON-encoded CommandResult[]                  |
-| `duration_ms`  | `INTEGER` | Total duration in ms                          |
+| Column         | Type      | Description                                       |
+| -------------- | --------- | ------------------------------------------------- |
+| `id`           | `INTEGER` | Auto-increment primary key                        |
+| `test_id`      | `TEXT`    | Test title (indexed)                              |
+| `suite_path`   | `TEXT`    | JSON array of suite names (from `describe()`)     |
+| `timestamp`    | `TEXT`    | ISO 8601 timestamp (indexed)                      |
+| `agent_runner` | `TEXT`    | Runner name                                       |
+| `judge_model`  | `TEXT`    | Judge model used                                  |
+| `score`        | `REAL`    | 0.0 to 1.0                                        |
+| `pass`         | `INTEGER` | 1 = passed, 0 = failed                            |
+| `status`       | `TEXT`    | `PASS`, `WARN`, or `FAIL`                         |
+| `reason`       | `TEXT`    | Judge's markdown explanation                      |
+| `improvement`  | `TEXT`    | Judge's improvement suggestions                   |
+| `diff`         | `TEXT`    | Raw git diff                                      |
+| `commands`     | `TEXT`    | JSON-encoded CommandResult[]                      |
+| `duration_ms`  | `INTEGER` | Total duration in ms                              |
+| `thresholds`   | `TEXT`    | JSON-encoded thresholds `{ warn, fail }` snapshot |
 
 Indexes on `test_id` and `timestamp` for fast queries.
 
@@ -147,7 +153,8 @@ Indexes on `test_id` and `timestamp` for fast queries.
 | `id`        | `INTEGER` | Auto-increment primary key         |
 | `run_id`    | `INTEGER` | Foreign key → `runs.id` (indexed)  |
 | `score`     | `REAL`    | Manually assigned score (0.0–1.0)  |
-| `pass`      | `INTEGER` | 1 = pass, 0 = fail (score ≥ 0.5)   |
+| `pass`      | `INTEGER` | 1 = pass, 0 = fail                 |
+| `status`    | `TEXT`    | `PASS`, `WARN`, or `FAIL`          |
 | `reason`    | `TEXT`    | Human-provided justification       |
 | `timestamp` | `TEXT`    | ISO 8601 timestamp of the override |
 

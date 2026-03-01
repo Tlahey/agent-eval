@@ -542,3 +542,4 @@ This file tracks the implementation progress of the AgentEval framework. It is u
 - [ ] Parallel evaluation — Safe concurrent execution with workspace isolation
 - [ ] Notification hooks — Webhooks/Slack alerts on score regressions
 - [ ] Multi-repo support — Evaluate agents across multiple project repositories
+- [ ] Add more informations based on the context token etc ... input tokens and output tokens, latency, cost, etc ...

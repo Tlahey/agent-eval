@@ -28,7 +28,7 @@ type TestStatus = "PASS" | "WARN" | "FAIL";
 
 interface JudgeResult {
   pass: boolean; // true if status is PASS or WARN
-  status: TestStatus; // PASS, WARN, or FAIL
+  status?: TestStatus; // PASS, WARN, or FAIL (set by runner)
   score: number; // 0.0 to 1.0
   reason: string; // Markdown explanation
   improvement: string; // Suggestions for improvement
