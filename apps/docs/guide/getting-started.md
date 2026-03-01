@@ -28,18 +28,18 @@ flowchart LR
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
   runners: [
-    {
+    new CLIRunner({
       name: "copilot",
-      type: "cli",
       command: 'gh copilot suggest "{{prompt}}"',
-    },
+    }),
   ],
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
   // Automatically run after each agent execution
   afterEach: [

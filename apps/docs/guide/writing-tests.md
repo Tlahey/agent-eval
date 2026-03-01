@@ -157,10 +157,12 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
-  runners: [{ name: "copilot", type: "cli", command: 'gh copilot "{{prompt}}"' }],
-  judge: { provider: "openai", model: "gpt-4o" },
+  runners: [new CLIRunner({ name: "copilot", command: 'gh copilot "{{prompt}}"' })],
+  judge: { llm: new OpenAIModel({ model: "gpt-4o" }) },
 
   beforeEach: ({ ctx }) => {
     ctx.addTask({
@@ -414,10 +416,9 @@ test("Complex feature", async ({ agent, ctx }) => {
     criteria: "Search input renders correctly",
   });
 
-  // Second judge call — check the logic (with a stronger model)
+  // Second judge call — check the logic
   await expect(ctx).toPassJudge({
     criteria: "Debounce is implemented with 300ms delay",
-    model: "claude-opus-4-20250514",
   });
 });
 ```

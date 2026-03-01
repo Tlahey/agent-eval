@@ -1,49 +1,16 @@
-// ─── Agent Configuration ───
-
-/**
- * @deprecated Use IRunnerPlugin instances directly in `runners[]`.
- * Kept temporarily for backward compatibility during migration.
- */
-export interface AgentRunnerConfig {
-  /** Unique name for the agent (e.g., "copilot", "cursor") */
-  name: string;
-  /** Type of runner: CLI command or API call */
-  type: "cli" | "api";
-  /** CLI command template. Use {{prompt}} as placeholder for the instruction. */
-  command?: string;
-  /** API configuration for direct model calls */
-  api?: {
-    provider: "anthropic" | "openai" | "ollama";
-    model: string;
-    baseURL?: string;
-    apiKey?: string;
-  };
-}
-
 // ─── Judge Configuration ───
 
 export interface JudgeConfig {
   /**
    * LLM plugin for API-based judging.
-   * When provided, `type`, `provider`, `model`, `apiKey`, `baseURL` are ignored.
    *
    * @example
    * ```ts
-   * import { OpenAIModel } from "agent-eval";
+   * import { OpenAIModel } from "agent-eval/providers/openai";
    * judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }
    * ```
    */
   llm?: import("./interfaces.js").IModelPlugin;
-  /** @deprecated Use `llm` with an IModelPlugin instead. Type of judge: API call (default) or CLI command */
-  type?: "api" | "cli";
-  /** @deprecated Use `llm` with an IModelPlugin instead. */
-  provider?: "anthropic" | "openai" | "ollama";
-  /** @deprecated Use `llm` with an IModelPlugin instead. */
-  model?: string;
-  /** @deprecated Use `llm` with an IModelPlugin instead. */
-  baseURL?: string;
-  /** @deprecated Use `llm` with an IModelPlugin instead. */
-  apiKey?: string;
   /**
    * CLI command template for CLI judges.
    * Use {{prompt}} as placeholder for the judge prompt,
@@ -99,7 +66,9 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { CLIRunner, APIRunner, AnthropicModel } from "agent-eval";
+   * import { CLIRunner } from "agent-eval/runner/cli";
+   * import { APIRunner } from "agent-eval/runner/api";
+   * import { AnthropicModel } from "agent-eval/providers/anthropic";
    * runners: [
    *   new CLIRunner({ name: "copilot", command: "gh copilot suggest {{prompt}}" }),
    *   new APIRunner({ name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) }),
@@ -155,7 +124,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { SqliteLedger } from "agent-eval";
+   * import { SqliteLedger } from "agent-eval/ledger/sqlite";
    * export default defineConfig({
    *   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
    *   // ...
@@ -170,7 +139,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { DockerEnvironment } from "agent-eval";
+   * import { DockerEnvironment } from "agent-eval/environment/docker";
    * export default defineConfig({
    *   environment: new DockerEnvironment({ image: "node:22" }),
    *   // ...
@@ -266,8 +235,6 @@ export interface JudgeResult {
 export interface JudgeOptions {
   /** Evaluation criteria (Markdown) */
   criteria: string;
-  /** Optional model override for this specific judgment */
-  model?: string;
   /**
    * Expected files that should be modified by the agent.
    * The judge will verify these files were changed and flag

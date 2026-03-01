@@ -46,22 +46,21 @@ describe("config", () => {
       writeFileSync(
         join(tmpDir, "agenteval.config.js"),
         `module.exports = {
-          runners: [{ name: "test-runner", type: "cli", command: "echo test" }],
-          judge: { provider: "openai", model: "gpt-4o" },
+          runners: [],
+          judge: { command: "judge-cli evaluate" },
         };`,
       );
 
       const config = await loadConfig(tmpDir);
-      expect(config.runners[0].name).toBe("test-runner");
-      expect(config.judge.model).toBe("gpt-4o");
+      expect(config.judge.command).toBe("judge-cli evaluate");
     });
 
     it("applies defaults for missing optional fields", async () => {
       writeFileSync(
         join(tmpDir, "agenteval.config.js"),
         `module.exports = {
-          runners: [{ name: "r", type: "cli", command: "echo" }],
-          judge: { provider: "anthropic", model: "m" },
+          runners: [],
+          judge: {},
         };`,
       );
 

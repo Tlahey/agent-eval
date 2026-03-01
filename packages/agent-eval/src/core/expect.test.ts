@@ -38,8 +38,11 @@ function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
 }
 
 const judgeConfig: JudgeConfig = {
-  provider: "openai",
-  model: "gpt-4o",
+  llm: {
+    name: "mock",
+    modelId: "gpt-4o",
+    createModel: async () => ({ modelId: "gpt-4o", provider: "mock" }),
+  },
 };
 
 describe("expect", () => {
@@ -90,15 +93,9 @@ describe("expect", () => {
 
     await agentExpect(ctx).toPassJudge({
       criteria: "must have close button",
-      model: "gpt-4o-mini",
     });
 
-    vitestExpect(mockJudge).toHaveBeenCalledWith(
-      ctx,
-      "mock judge prompt",
-      judgeConfig,
-      "gpt-4o-mini",
-    );
+    vitestExpect(mockJudge).toHaveBeenCalledWith(ctx, "mock judge prompt", judgeConfig);
   });
 
   it("passes expectedFiles to buildJudgePrompt", async () => {

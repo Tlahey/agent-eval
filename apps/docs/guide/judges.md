@@ -66,13 +66,14 @@ flowchart TD
 ### Anthropic
 
 ```ts
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+
 judge: {
-  provider: "anthropic",
-  model: "claude-sonnet-4-20250514",
+  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
 }
 ```
 
-Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in config).
+Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in constructor).
 
 | Model                      | Notes                        |
 | -------------------------- | ---------------------------- |
@@ -83,13 +84,14 @@ Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in config).
 ### OpenAI
 
 ```ts
+import { OpenAIModel } from "agent-eval/providers/openai";
+
 judge: {
-  provider: "openai",
-  model: "gpt-4o",
+  llm: new OpenAIModel({ model: "gpt-4o" }),
 }
 ```
 
-Requires `OPENAI_API_KEY` environment variable (or `apiKey` in config).
+Requires `OPENAI_API_KEY` environment variable (or `apiKey` in constructor).
 
 | Model           | Notes           |
 | --------------- | --------------- |
@@ -100,10 +102,10 @@ Requires `OPENAI_API_KEY` environment variable (or `apiKey` in config).
 ### Ollama (Local)
 
 ```ts
+import { OllamaModel } from "agent-eval/providers/ollama";
+
 judge: {
-  provider: "ollama",
-  model: "llama3",
-  baseURL: "http://localhost:11434/v1", // default
+  llm: new OllamaModel({ model: "llama3" }),
 }
 ```
 
@@ -115,18 +117,31 @@ Local models lack the reasoning depth for reliable code evaluation. Use them onl
 
 ### Custom / Enterprise Provider
 
-Any OpenAI-compatible API can be used as a judge via the `openai` provider with a custom `baseURL`:
+Any provider can be used by implementing `IModelPlugin`:
 
 ```ts
+import type { IModelPlugin } from "agent-eval";
+
+class CompanyModel implements IModelPlugin {
+  readonly name = "company";
+  readonly modelId = "judge-v2";
+
+  async createModel() {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    return createOpenAI({
+      baseURL: "https://llm.internal.company.com/v1",
+      apiKey: process.env.INTERNAL_LLM_KEY,
+    })("judge-v2");
+  }
+}
+
+// In config:
 judge: {
-  provider: "openai",
-  model: "company-judge-v2",
-  baseURL: "https://llm.internal.company.com/v1",
-  apiKey: process.env.INTERNAL_LLM_KEY,
+  llm: new CompanyModel();
 }
 ```
 
-This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible chat completions API.
+This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible API.
 
 ### CLI Judge
 
@@ -134,7 +149,6 @@ You can use **any CLI tool** as a judge — including `claude`, `gh copilot`, or
 
 ```ts
 judge: {
-  type: "cli",
   command: 'claude -p "Evaluate this code change: {{prompt}}" --output-format json',
   maxRetries: 3, // Retry on invalid JSON (default: 2)
 }
@@ -145,7 +159,6 @@ Git diffs can be thousands of lines. To avoid shell escaping issues, use `{{prom
 
 ```ts
 judge: {
-  type: "cli",
   command: "cat {{prompt_file}} | claude -p --output-format json",
 }
 ```
@@ -164,19 +177,6 @@ judge: {
 ```
 
 AgentEval extracts the first JSON object containing `pass`, `score`, and `reason` from stdout (preamble text and markdown fences are ignored). Failed attempts are automatically retried up to `maxRetries` times.
-
-## Per-Test Model Override
-
-You can override the judge model for specific evaluations:
-
-```ts
-await expect(ctx).toPassJudge({
-  criteria: "...",
-  model: "claude-opus-4-20250514", // More capable model for complex eval
-});
-```
-
-This is useful when some tests need a stronger model for accurate evaluation while most can use a cheaper default.
 
 ## Expected Files (Scope Analysis)
 

@@ -401,8 +401,7 @@ export async function runTest(
         suitePath: testDef.suitePath ?? [],
         timestamp: new Date().toISOString(),
         agentRunner: runner.name,
-        judgeModel:
-          config.judge.llm?.modelId ?? config.judge.model ?? config.judge.command ?? "unknown",
+        judgeModel: config.judge.llm?.modelId ?? config.judge.command ?? "unknown",
         score: 0,
         pass: false,
         status: "FAIL",
@@ -514,7 +513,7 @@ async function executeDeclarativePipeline(
     taskResults,
     expectedFiles: judgeOptions.expectedFiles,
   });
-  const judgeResult = await runJudge(ctx, prompt, config.judge, judgeOptions.model);
+  const judgeResult = await runJudge(ctx, prompt, config.judge);
   reporter.onPipelineStep(event, "judge", "done");
 
   const effectiveThresholds = judgeOptions.thresholds ?? thresholds;
@@ -527,8 +526,7 @@ async function executeDeclarativePipeline(
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
     agentRunner: runner.name,
-    judgeModel:
-      config.judge.llm?.modelId ?? config.judge.model ?? config.judge.command ?? "unknown",
+    judgeModel: config.judge.llm?.modelId ?? config.judge.command ?? "unknown",
     score: judgeResult.score,
     pass: status !== "FAIL",
     status,
@@ -567,8 +565,7 @@ function buildImperativeEntry(
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
     agentRunner: runner.name,
-    judgeModel:
-      config.judge.llm?.modelId ?? config.judge.model ?? config.judge.command ?? "unknown",
+    judgeModel: config.judge.llm?.modelId ?? config.judge.command ?? "unknown",
     score: judgeResult.score,
     pass: judgeResult.pass,
     status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),

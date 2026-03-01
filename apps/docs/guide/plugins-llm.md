@@ -1,53 +1,45 @@
 # LLM / Model Plugins
 
-LLM plugins abstract AI provider calls for **judge evaluation** and **API-based agent runners**. They implement the `ILLMPlugin` interface.
+Model plugins abstract AI provider calls for **judge evaluation** and **API-based agent runners**. They implement the `IModelPlugin` interface.
 
 ## Interface
 
 ```ts
-interface ILLMPlugin {
+interface IModelPlugin {
+  /** Human-readable name of the model provider (e.g., "anthropic", "openai") */
   readonly name: string;
-  readonly provider: string;
-  readonly defaultModel: string;
-
-  /** Evaluate agent output (used by the judge) */
-  evaluate(options: LLMEvaluationOptions): Promise<JudgeResult>;
-
-  /** Generate structured file output (used by API runners) — optional */
-  generate?(options: LLMGenerationOptions): Promise<AgentFileOutput>;
+  /** Model identifier (e.g., "claude-sonnet-4-20250514", "gpt-4o") */
+  readonly modelId: string;
+  /** Create and return a Vercel AI SDK LanguageModel instance */
+  createModel(): unknown | Promise<unknown>;
 }
 ```
 
+The framework calls `createModel()` whenever it needs a model — for judge evaluation (`generateObject()`) or for API runners (`generateObject()` with file schema).
+
 ## Built-in Plugins
 
-### AnthropicLLM
+### AnthropicModel
 
 Uses Anthropic's Claude models via `@ai-sdk/anthropic`.
 
 ```ts
-import { defineConfig, AnthropicLLM } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
-  llm: new AnthropicLLM({
-    defaultModel: "claude-sonnet-4-20250514",
-    apiKey: process.env.ANTHROPIC_API_KEY, // optional — reads env var by default
-  }),
-
-  runners: [
-    {
-      name: "claude-api",
-      type: "api",
-      api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    },
-  ],
-  judge: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+  runners: [new CLIRunner({ name: "copilot", command: "gh copilot -p '{{prompt}}'" })],
+  judge: {
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  },
 });
 ```
 
-| Option         | Type     | Default             | Description                |
-| -------------- | -------- | ------------------- | -------------------------- |
-| `defaultModel` | `string` | —                   | Default model name         |
-| `apiKey`       | `string` | `ANTHROPIC_API_KEY` | API key (env var fallback) |
+| Option   | Type     | Default             | Description                |
+| -------- | -------- | ------------------- | -------------------------- |
+| `model`  | `string` | —                   | Model identifier           |
+| `apiKey` | `string` | `ANTHROPIC_API_KEY` | API key (env var fallback) |
 
 **Recommended models:**
 
@@ -57,29 +49,28 @@ export default defineConfig({
 | `claude-opus-4-20250514`   | Most capable          |
 | `claude-haiku-3-20250305`  | Fastest, cheapest     |
 
-### OpenAILLM
+### OpenAIModel
 
 Uses OpenAI's GPT models via `@ai-sdk/openai`.
 
 ```ts
-import { defineConfig, OpenAILLM } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { APIRunner } from "agent-eval/runner/api";
+
+const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
-  llm: new OpenAILLM({
-    defaultModel: "gpt-4o",
-    apiKey: process.env.OPENAI_API_KEY,
-  }),
-
-  runners: [{ name: "gpt-4o", type: "api", api: { provider: "openai", model: "gpt-4o" } }],
-  judge: { provider: "openai", model: "gpt-4o" },
+  runners: [new APIRunner({ name: "gpt-4o", model: gpt4o })],
+  judge: { llm: gpt4o },
 });
 ```
 
-| Option         | Type     | Default          | Description                |
-| -------------- | -------- | ---------------- | -------------------------- |
-| `defaultModel` | `string` | —                | Default model name         |
-| `apiKey`       | `string` | `OPENAI_API_KEY` | API key (env var fallback) |
-| `baseURL`      | `string` | —                | Custom API endpoint        |
+| Option    | Type     | Default          | Description                |
+| --------- | -------- | ---------------- | -------------------------- |
+| `model`   | `string` | —                | Model identifier           |
+| `apiKey`  | `string` | `OPENAI_API_KEY` | API key (env var fallback) |
+| `baseURL` | `string` | —                | Custom API endpoint        |
 
 **Recommended models:**
 
@@ -93,8 +84,8 @@ export default defineConfig({
 Use `baseURL` to connect to any OpenAI-compatible API: Azure OpenAI, Together AI, Fireworks, Groq, etc.
 
 ```ts
-new OpenAILLM({
-  defaultModel: "internal-model-v2",
+new OpenAIModel({
+  model: "internal-model-v2",
   baseURL: "https://llm.internal.company.com/v1",
   apiKey: process.env.INTERNAL_LLM_KEY,
 });
@@ -102,28 +93,27 @@ new OpenAILLM({
 
 :::
 
-### OllamaLLM
+### OllamaModel
 
 Run models **locally** with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
-import { defineConfig, OllamaLLM } from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { OllamaModel } from "agent-eval/providers/ollama";
+import { APIRunner } from "agent-eval/runner/api";
+
+const llama = new OllamaModel({ model: "llama3" });
 
 export default defineConfig({
-  llm: new OllamaLLM({
-    defaultModel: "llama3",
-    baseURL: "http://localhost:11434/v1", // default
-  }),
-
-  runners: [{ name: "llama3", type: "api", api: { provider: "ollama", model: "llama3" } }],
-  judge: { provider: "ollama", model: "llama3" },
+  runners: [new APIRunner({ name: "llama3", model: llama })],
+  judge: { llm: llama },
 });
 ```
 
-| Option         | Type     | Default                     | Description         |
-| -------------- | -------- | --------------------------- | ------------------- |
-| `defaultModel` | `string` | —                           | Default model name  |
-| `baseURL`      | `string` | `http://localhost:11434/v1` | Ollama API endpoint |
+| Option    | Type     | Default                     | Description         |
+| --------- | -------- | --------------------------- | ------------------- |
+| `model`   | `string` | —                           | Model identifier    |
+| `baseURL` | `string` | `http://localhost:11434/v1` | Ollama API endpoint |
 
 ::: warning Not recommended as judge
 Local models lack the reasoning depth for reliable code evaluation. Use them only for experimentation, not production evaluations.
@@ -138,75 +128,45 @@ Local models lack the reasoning depth for reliable code evaluation. Use them onl
 | `deepseek-coder` | Strong code generation |
 | `mistral`        | Fast, general-purpose  |
 
-## Creating a Custom LLM Plugin
+## Creating a Custom Model Plugin
 
-### Option 1: Extend BaseLLMPlugin (Vercel AI SDK)
-
-If your provider is compatible with the Vercel AI SDK:
+Implement the `IModelPlugin` interface:
 
 ```ts
-import { BaseLLMPlugin } from "agent-eval";
+import type { IModelPlugin } from "agent-eval";
 
-class AzureLLM extends BaseLLMPlugin {
-  readonly name = "azure-openai";
-  readonly provider = "azure";
+class MistralModel implements IModelPlugin {
+  readonly name = "mistral";
+  readonly modelId: string;
 
-  protected async createModel(modelName: string) {
-    const { createAzure } = await import("@ai-sdk/azure");
-    return createAzure({
-      resourceName: "my-resource",
-      apiKey: process.env.AZURE_API_KEY,
-    })(modelName);
+  constructor(private opts: { model: string; apiKey?: string }) {
+    this.modelId = opts.model;
+  }
+
+  async createModel() {
+    const { createMistral } = await import("@ai-sdk/mistral");
+    return createMistral({ apiKey: this.opts.apiKey })(this.opts.model);
   }
 }
 ```
 
-### Option 2: Implement ILLMPlugin directly
+The returned object must be a Vercel AI SDK `LanguageModel` instance (or any object compatible with `generateObject()` / `generateText()`).
 
-For non-Vercel providers or custom APIs:
-
-```ts
-import type { ILLMPlugin, JudgeResult } from "agent-eval";
-
-class CustomLLM implements ILLMPlugin {
-  readonly name = "custom-api";
-  readonly provider = "custom";
-  readonly defaultModel = "v1";
-
-  async evaluate(options) {
-    const response = await fetch("https://api.example.com/evaluate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: options.prompt, model: options.model }),
-    });
-    return response.json() as Promise<JudgeResult>;
-  }
-
-  async generate(options) {
-    const response = await fetch("https://api.example.com/generate", {
-      method: "POST",
-      body: JSON.stringify({ prompt: options.prompt }),
-    });
-    return response.json();
-  }
-}
-```
-
-## LLM Plugin vs Judge Config
-
-The `llm` plugin and `judge` config option work together:
+## How Model Plugins Are Used
 
 ```mermaid
 flowchart LR
-    JC["judge config<br/>(provider, model)"] --> |"which model"| JP["Judge Prompt"]
-    LP["llm plugin<br/>(ILLMPlugin)"] --> |"how to call"| JP
-    JP --> R["JudgeResult"]
+    MP["IModelPlugin<br/>(createModel())"] --> |"LanguageModel"| J["Judge<br/>generateObject()"]
+    MP --> |"LanguageModel"| AR["APIRunner<br/>generateObject()"]
+    J --> R["JudgeResult<br/>{pass, score, reason}"]
+    AR --> F["Files written<br/>to disk"]
 
-    style JC fill:#6366f1,color:#fff
-    style LP fill:#f59e0b,color:#000
+    style MP fill:#6366f1,color:#fff
+    style J fill:#f59e0b,color:#000
+    style AR fill:#f59e0b,color:#000
     style R fill:#10b981,color:#fff
+    style F fill:#10b981,color:#fff
 ```
 
-- **`judge`** in config defines _which model_ to use and its settings
-- **`llm`** plugin defines _how_ to call the model (API client, SDK, custom logic)
-- When no `llm` plugin is set, the built-in Vercel AI SDK is used based on `judge.provider`
+- The **judge** calls `config.judge.llm.createModel()` to get the model, then uses `generateObject()` with a Zod schema to get structured `{ pass, score, reason }`.
+- The **APIRunner** calls its model plugin's `createModel()` to get the model, then uses `generateObject()` with a file schema to generate code files.

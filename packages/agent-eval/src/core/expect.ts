@@ -72,7 +72,7 @@ export function expect(ctx: TestContext): ExpectChain {
         expectedFiles: options.expectedFiles,
       });
 
-      const result = await runJudge(ctx, prompt, _judgeConfig, options.model);
+      const result = await runJudge(ctx, prompt, _judgeConfig);
 
       // Compute status from thresholds (per-test > global > defaults)
       const thresholds = options.thresholds ?? _globalThresholds;

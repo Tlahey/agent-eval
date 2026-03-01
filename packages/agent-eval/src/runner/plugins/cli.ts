@@ -14,7 +14,7 @@ export interface CLIRunnerOptions {
  *
  * @example
  * ```ts
- * import { CLIRunner } from "agent-eval";
+ * import { CLIRunner } from "agent-eval/runner/cli";
  * const runner = new CLIRunner({
  *   name: "copilot",
  *   command: "gh copilot suggest {{prompt}}",

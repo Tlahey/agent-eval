@@ -27,18 +27,18 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
   runners: [
-    {
+    new CLIRunner({
       name: "claude-code",
-      type: "cli",
       command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-    },
+    }),
   ],
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
 ```
@@ -47,11 +47,13 @@ export default defineConfig({
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { AnthropicProvider } from "agent-eval/providers/anthropic";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { APIRunner } from "agent-eval/runner/api";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { LocalEnvironment } from "agent-eval/environment/local";
 
-const judgeProvider = new AnthropicProvider({ model: "claude-sonnet-4-20250514" });
+const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
   // ── Plugins ────────────────────────────────────
@@ -60,20 +62,15 @@ export default defineConfig({
 
   // ── Runners ────────────────────────────────────
   runners: [
-    {
+    new CLIRunner({
       name: "claude-code",
-      type: "cli",
       command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-    },
-    {
-      name: "gpt-4o-api",
-      type: "api",
-      api: { provider: "openai", model: "gpt-4o" },
-    },
+    }),
+    new APIRunner({ name: "gpt-4o", model: gpt4o }),
   ],
 
   // ── Judge ──────────────────────────────────────
-  judge: judgeProvider,
+  judge: { llm: gpt4o },
 
   // ── Lifecycle hooks ────────────────────────────
   beforeEach: ({ ctx }) => {
@@ -103,7 +100,7 @@ export default defineConfig({
 
 | Option        | Type                             | Default                                  | Description                                           |
 | ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
-| `runners`     | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                             |
+| `runners`     | `IRunnerPlugin[]`                | _required_                               | Agent runner plugins to evaluate                      |
 | `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                               |
 | `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                    |
 | `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                |
@@ -114,37 +111,48 @@ export default defineConfig({
 | `afterEach`   | `AfterEachCommand[]`             | —                                        | Commands to run after each agent execution            |
 | `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                       |
 | `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin — see [Plugins](/guide/plugins)  |
-| `llm`         | `ILLMPlugin`                     | Built-in Vercel AI SDK                   | Custom LLM plugin — see [Plugins](/guide/plugins)     |
 | `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment — see [Plugins](/guide/plugins) |
 
 ## Plugins
 
-AgentEval is extensible via three plugin axes: **LLM** (models), **Ledger** (storage), and **Environment** (execution). When no plugins are configured, sensible defaults are used.
+AgentEval is extensible via four plugin axes: **Models** (`IModelPlugin`), **Runners** (`IRunnerPlugin`), **Ledger** (`ILedgerPlugin`), and **Environment** (`IEnvironmentPlugin`). When no plugins are configured for ledger or environment, sensible defaults are used.
 
 ```ts
 import { defineConfig } from "agent-eval";
-// Ledger plugins
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { APIRunner } from "agent-eval/runner/api";
 import { SqliteLedger } from "agent-eval/ledger/sqlite";
 import { JsonLedger } from "agent-eval/ledger/json";
-// Environment plugins
 import { LocalEnvironment } from "agent-eval/environment/local";
 import { DockerEnvironment } from "agent-eval/environment/docker";
 
+const gpt4o = new OpenAIModel({ model: "gpt-4o" });
+
 export default defineConfig({
+  // Pick runner plugins
+  runners: [
+    new CLIRunner({ name: "copilot", command: "gh copilot -p '{{prompt}}'" }),
+    new APIRunner({ name: "gpt-4o", model: gpt4o }),
+  ],
+
+  // Judge uses a model plugin
+  judge: { llm: gpt4o },
+
   // Pick one ledger plugin — or omit for SqliteLedger
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
 
   // Pick one environment plugin — or omit for LocalEnvironment
   environment: new LocalEnvironment(),
-
-  // ...runners, judge, etc.
 });
 ```
 
-| Plugin Axis     | Built-in Options                        | Default            |
-| --------------- | --------------------------------------- | ------------------ |
-| **Ledger**      | `SqliteLedger`, `JsonLedger`            | `SqliteLedger`     |
-| **Environment** | `LocalEnvironment`, `DockerEnvironment` | `LocalEnvironment` |
+| Plugin Axis     | Built-in Options                               | Default                    |
+| --------------- | ---------------------------------------------- | -------------------------- |
+| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel` | — (required for API judge) |
+| **Runner**      | `CLIRunner`, `APIRunner`                       | — (required)               |
+| **Ledger**      | `SqliteLedger`, `JsonLedger`                   | `SqliteLedger`             |
+| **Environment** | `LocalEnvironment`, `DockerEnvironment`        | `LocalEnvironment`         |
 
 ::: tip Learn more
 See the dedicated [Plugins guide](/guide/plugins) for interfaces, custom plugins, and detailed configuration for each.
@@ -230,36 +238,49 @@ Since `agenteval.config.ts` is a TypeScript file, you can use `process.env` dire
 
 ## Runner Configuration
 
-AgentEval supports two runner types: **CLI** (shell commands) and **API** (direct LLM calls).
+AgentEval supports two built-in runner plugins: **CLIRunner** (shell commands) and **APIRunner** (direct LLM calls).
 
-### CLI Runner
+### CLIRunner
 
 Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction.
 
 ```ts
+import { CLIRunner } from "agent-eval/runner/cli";
+
 runners: [
-  {
+  new CLIRunner({
     name: "claude-code",
-    type: "cli",
     command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-  },
-  { name: "aider", type: "cli", command: 'aider --message "{{prompt}}" --yes --no-auto-commits' },
-  { name: "codex", type: "cli", command: 'codex "{{prompt}}" --approval-mode full-auto' },
+  }),
+  new CLIRunner({
+    name: "aider",
+    command: 'aider --message "{{prompt}}" --yes --no-auto-commits',
+  }),
+  new CLIRunner({
+    name: "codex",
+    command: 'codex "{{prompt}}" --approval-mode full-auto',
+  }),
 ];
 ```
 
-### API Runner
+### APIRunner
 
-Calls an LLM directly. The model returns structured file operations that AgentEval writes to disk.
+Calls an LLM directly via an `IModelPlugin`. The model returns structured file operations that AgentEval writes to disk.
 
 ```ts
+import { APIRunner } from "agent-eval/runner/api";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+
 runners: [
-  {
+  new APIRunner({
     name: "claude-api",
-    type: "api",
-    api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-  },
-  { name: "gpt-4o", type: "api", api: { provider: "openai", model: "gpt-4o" } },
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  }),
+  new APIRunner({
+    name: "gpt-4o",
+    model: new OpenAIModel({ model: "gpt-4o" }),
+  }),
 ];
 ```
 
@@ -270,15 +291,15 @@ See the dedicated [Runners guide](/guide/runners) for all supported agents and d
 The judge evaluates agent output using an LLM. See the [Judges guide](/guide/judges) for full details.
 
 ```ts
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+
 // API judge (default) — recommended
 judge: {
-  provider: "anthropic",
-  model: "claude-sonnet-4-20250514",
+  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
 }
 
 // CLI judge — use any CLI tool
 judge: {
-  type: "cli",
   command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
 }
 ```

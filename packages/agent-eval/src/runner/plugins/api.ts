@@ -21,7 +21,8 @@ export interface APIRunnerOptions {
  *
  * @example
  * ```ts
- * import { APIRunner, AnthropicModel } from "agent-eval";
+ * import { APIRunner } from "agent-eval/runner/api";
+ * import { AnthropicModel } from "agent-eval/providers/anthropic";
  * const runner = new APIRunner({
  *   name: "claude",
  *   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),

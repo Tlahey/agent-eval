@@ -15,7 +15,7 @@ export interface AnthropicModelOptions {
  *
  * @example
  * ```ts
- * import { AnthropicModel } from "agent-eval";
+ * import { AnthropicModel } from "agent-eval/providers/anthropic";
  * const model = new AnthropicModel({ model: "claude-sonnet-4-20250514" });
  * ```
  */
@@ -31,7 +31,7 @@ export class AnthropicModel implements IModelPlugin {
     this.baseURL = options.baseURL;
   }
 
-  async createModel() {
+  async createModel(): Promise<unknown> {
     const { createAnthropic } = await import("@ai-sdk/anthropic");
     const provider = createAnthropic({
       apiKey: this.apiKey ?? process.env.ANTHROPIC_API_KEY,

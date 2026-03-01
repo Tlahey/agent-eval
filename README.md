@@ -86,14 +86,13 @@ pnpm add -D agent-eval
 
 ```ts
 // agenteval.config.ts
-import {
-  defineConfig,
-  OpenAILLM,
-  LocalEnvironment,
-  DockerEnvironment,
-  SqliteLedger,
-  JsonLedger,
-} from "agent-eval";
+import { defineConfig } from "agent-eval";
+import { OpenAIModel } from "agent-eval/providers/openai";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { LocalEnvironment } from "agent-eval/environment/local";
+import { DockerEnvironment } from "agent-eval/environment/docker";
+import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { JsonLedger } from "agent-eval/ledger/json";
 
 const useDocker = process.env.AGENTEVAL_ENV === "docker";
 const useJsonLedger = process.env.AGENTEVAL_LEDGER === "json";
@@ -101,23 +100,16 @@ const useJsonLedger = process.env.AGENTEVAL_LEDGER === "json";
 export default defineConfig({
   // Agent runners (CLI or API)
   runners: [
-    {
+    new CLIRunner({
       name: "copilot",
-      type: "cli",
       command: 'gh copilot suggest "{{prompt}}"',
-    },
+    }),
   ],
 
-  // Judge used to score every test
+  // Judge — LLM model used to score every test
   judge: {
-    provider: "openai",
-    model: "gpt-5-mini",
+    llm: new OpenAIModel({ model: "gpt-4o" }),
   },
-
-  // LLM plugin (used by API runners for model calls)
-  llm: new OpenAILLM({
-    defaultModel: "gpt-5-mini",
-  }),
 
   // Execution environment plugin: local git workspace OR docker sandbox
   environment: useDocker ? new DockerEnvironment({ image: "node:22" }) : new LocalEnvironment(),

@@ -15,7 +15,7 @@ export interface OpenAIModelOptions {
  *
  * @example
  * ```ts
- * import { OpenAIModel } from "agent-eval";
+ * import { OpenAIModel } from "agent-eval/providers/openai";
  * const model = new OpenAIModel({ model: "gpt-4o" });
  * ```
  */
@@ -31,7 +31,7 @@ export class OpenAIModel implements IModelPlugin {
     this.baseURL = options.baseURL;
   }
 
-  async createModel() {
+  async createModel(): Promise<unknown> {
     const { createOpenAI } = await import("@ai-sdk/openai");
     const provider = createOpenAI({
       apiKey: this.apiKey ?? process.env.OPENAI_API_KEY,

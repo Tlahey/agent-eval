@@ -202,7 +202,6 @@ export type {
 } from "./core/reporter.js";
 export type {
   AgentEvalConfig,
-  AgentRunnerConfig,
   AfterEachCommand,
   JudgeConfig,
   JudgeOptions,
@@ -250,18 +249,14 @@ export {
 } from "./core/plugin-validator.js";
 export type { PluginValidationError } from "./core/plugin-validator.js";
 
-// ─── Built-in Runner Plugins ───
-
-export { CLIRunner } from "./runner/plugins/cli.js";
-export type { CLIRunnerOptions } from "./runner/plugins/cli.js";
-export { APIRunner } from "./runner/plugins/api.js";
-export type { APIRunnerOptions } from "./runner/plugins/api.js";
-
-// ─── Built-in Model Plugins ───
-
-export { AnthropicModel } from "./llm/plugins/anthropic.js";
-export type { AnthropicModelOptions } from "./llm/plugins/anthropic.js";
-export { OpenAIModel } from "./llm/plugins/openai.js";
-export type { OpenAIModelOptions } from "./llm/plugins/openai.js";
-export { OllamaModel } from "./llm/plugins/ollama.js";
-export type { OllamaModelOptions } from "./llm/plugins/ollama.js";
+// ─── Built-in plugins are NOT re-exported from the main entry. ───
+// Import them from their sub-paths:
+//   import { CLIRunner } from "agent-eval/runner/cli";
+//   import { APIRunner } from "agent-eval/runner/api";
+//   import { OpenAIModel } from "agent-eval/providers/openai";
+//   import { AnthropicModel } from "agent-eval/providers/anthropic";
+//   import { OllamaModel } from "agent-eval/providers/ollama";
+//   import { LocalEnvironment } from "agent-eval/environment/local";
+//   import { DockerEnvironment } from "agent-eval/environment/docker";
+//   import { SqliteLedger } from "agent-eval/ledger/sqlite";
+//   import { JsonLedger } from "agent-eval/ledger/json";

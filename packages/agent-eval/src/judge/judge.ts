@@ -23,51 +23,16 @@ const JudgeResultSchema = z.object({
 
 /**
  * Resolve the AI SDK model instance from judge config.
- * Prefers the new `llm` plugin, falls back to legacy `provider` + `model` fields.
+ * Requires the `llm` plugin field.
  */
-async function resolveModel(config: JudgeConfig, modelOverride?: string): Promise<LanguageModelV1> {
-  // New plugin-based path
-  if (config.llm) {
-    return (await config.llm.createModel()) as LanguageModelV1;
-  }
-
-  // Legacy path — hardcoded provider resolution (deprecated)
-  if (!config.provider || !config.model) {
+async function resolveModel(config: JudgeConfig): Promise<LanguageModelV1> {
+  if (!config.llm) {
     throw new Error(
-      'Judge requires an "llm" plugin, or legacy "provider" and "model" fields in judge config.',
+      'API judge requires an "llm" plugin in judge config.\n' +
+        'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
     );
   }
-
-  const modelName = modelOverride ?? config.model;
-
-  switch (config.provider) {
-    case "anthropic": {
-      const { createAnthropic } = await import("@ai-sdk/anthropic");
-      const provider = createAnthropic({
-        apiKey: config.apiKey ?? process.env.ANTHROPIC_API_KEY,
-        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
-      });
-      return provider(modelName);
-    }
-    case "openai": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        apiKey: config.apiKey ?? process.env.OPENAI_API_KEY,
-        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
-      });
-      return provider(modelName);
-    }
-    case "ollama": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        baseURL: config.baseURL ?? "http://localhost:11434/v1",
-        apiKey: "ollama",
-      });
-      return provider(modelName);
-    }
-    default:
-      throw new Error(`Unsupported judge provider: ${config.provider}`);
-  }
+  return (await config.llm.createModel()) as LanguageModelV1;
 }
 
 /**
@@ -139,26 +104,7 @@ export interface JudgePromptOptions {
  * - If expectedFiles provided: file scope analysis
  */
 export function buildJudgePrompt(opts: JudgePromptOptions): string;
-/**
- * @deprecated Use the single-object overload instead.
- * Kept for backward compatibility with tests.
- */
-export function buildJudgePrompt(
-  criteria: string,
-  ctx: TestContext,
-  expectedFiles?: string[],
-): string;
-export function buildJudgePrompt(
-  criteriaOrOpts: string | JudgePromptOptions,
-  ctx?: TestContext,
-  expectedFiles?: string[],
-): string {
-  // Normalize to JudgePromptOptions
-  const opts: JudgePromptOptions =
-    typeof criteriaOrOpts === "string"
-      ? { criteria: criteriaOrOpts, ctx: ctx!, expectedFiles }
-      : criteriaOrOpts;
-
+export function buildJudgePrompt(opts: JudgePromptOptions): string {
   const changedFiles = extractChangedFiles(opts.ctx.diff);
   const fileScopeSection = buildFileScopeSection(changedFiles, opts.expectedFiles);
 
@@ -315,21 +261,21 @@ export async function judge(
   ctx: TestContext,
   prompt: string,
   config: JudgeConfig,
-  modelOverride?: string,
 ): Promise<JudgeResult> {
   // CLI judge path
-  if (config.type === "cli") {
+  if (config.command) {
     return judgeCli(prompt, config);
   }
 
   // API judge path (default)
-  if (!config.llm && (!config.provider || !config.model)) {
+  if (!config.llm) {
     throw new Error(
-      'API judge requires an "llm" plugin, or legacy "provider" and "model" fields in judge config.',
+      'API judge requires an "llm" plugin in judge config.\n' +
+        'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
     );
   }
 
-  const model = await resolveModel(config, modelOverride);
+  const model = await resolveModel(config);
 
   const { object } = await generateObject({
     model,

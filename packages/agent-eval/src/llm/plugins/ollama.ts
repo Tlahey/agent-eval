@@ -13,7 +13,7 @@ export interface OllamaModelOptions {
  *
  * @example
  * ```ts
- * import { OllamaModel } from "agent-eval";
+ * import { OllamaModel } from "agent-eval/providers/ollama";
  * const model = new OllamaModel({ model: "llama3" });
  * ```
  */
@@ -27,7 +27,7 @@ export class OllamaModel implements IModelPlugin {
     this.baseURL = options.baseURL ?? "http://localhost:11434/v1";
   }
 
-  async createModel() {
+  async createModel(): Promise<unknown> {
     const { createOpenAI } = await import("@ai-sdk/openai");
     const provider = createOpenAI({
       baseURL: this.baseURL,

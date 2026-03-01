@@ -13,18 +13,18 @@ function defineConfig(config: AgentEvalConfig): AgentEvalConfig;
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { CLIRunner } from "agent-eval/runner/cli";
 
 export default defineConfig({
   runners: [
-    {
+    new CLIRunner({
       name: "copilot",
-      type: "cli",
       command: 'gh copilot suggest "{{prompt}}"',
-    },
+    }),
   ],
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
   afterEach: [
     { name: "test", command: "pnpm test" },
@@ -39,43 +39,35 @@ export default defineConfig({
 interface AgentEvalConfig {
   rootDir?: string; // Project root (default: cwd)
   testFiles?: string | string[]; // Glob patterns for test discovery
-  runners: AgentRunnerConfig[]; // Agent runners to evaluate
+  runners: IRunnerPlugin[]; // Agent runner plugins to evaluate
   judge: JudgeConfig; // LLM judge configuration
   beforeEach?: HookFn; // Config-level hook before each test
   afterEach?: AfterEachCommand[]; // Auto commands after each agent run
   matrix?: { runners?: string[] }; // Filter which runners to execute
   outputDir?: string; // Ledger output dir (default: .agenteval)
   timeout?: number; // Agent run timeout ms (default: 300000)
+  thresholds?: Thresholds; // Scoring thresholds { warn, fail }
   ledger?: ILedgerPlugin; // Custom storage plugin
-  llm?: ILLMPlugin; // Custom LLM plugin
   environment?: IEnvironmentPlugin; // Execution environment plugin
 }
 
-interface AgentRunnerConfig {
-  name: string;
-  type: "cli" | "api";
-  command?: string; // CLI runners: shell command with {{prompt}}
-  api?: {
-    provider: "anthropic" | "openai" | "ollama";
-    model: string;
-    apiKey?: string;
-    baseURL?: string;
-  };
-}
-
-type JudgeConfig = JudgeApiConfig | JudgeCliConfig;
-
-interface JudgeApiConfig {
-  provider: "anthropic" | "openai" | "ollama";
-  model: string;
-  apiKey?: string;
-  baseURL?: string;
-}
-
-interface JudgeCliConfig {
-  type: "cli";
-  command: string; // CLI command with {{prompt}} or {{prompt_file}}
+interface JudgeConfig {
+  llm?: IModelPlugin; // LLM plugin for API-based judging
+  command?: string; // CLI command with {{prompt}} or {{prompt_file}}
   maxRetries?: number; // Retry on invalid JSON (default: 2)
+}
+
+// Plugin interfaces
+interface IModelPlugin {
+  readonly name: string;
+  readonly modelId: string;
+  createModel(): unknown | Promise<unknown>;
+}
+
+interface IRunnerPlugin {
+  readonly name: string;
+  readonly model: string;
+  execute(prompt: string, context: RunnerContext): Promise<RunnerExecResult>;
 }
 
 interface AfterEachCommand {
@@ -90,12 +82,13 @@ interface AfterEachCommand {
 | ------------- | ------------------------ | ---------------------------------------- | ----------------------------------------------------------- |
 | `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                      |
 | `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
-| `runners`     | `AgentRunnerConfig[]`    | _required_                               | Agent runners to evaluate                                   |
+| `runners`     | `IRunnerPlugin[]`        | _required_                               | Agent runner plugins to evaluate                            |
 | `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                     |
+| `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                          |
 | `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)     |
 | `matrix`      | `{ runners?: string[] }` | —                                        | Filter which runners to execute                             |
 | `outputDir`   | `string`                 | `.agenteval`                             | Ledger output directory                                     |
 | `timeout`     | `number`                 | `300000`                                 | Agent run timeout (ms)                                      |
+| `thresholds`  | `Thresholds`             | `{ warn: 0.8, fail: 0.5 }`               | Scoring thresholds                                          |
 | `ledger`      | `ILedgerPlugin`          | Built-in SQLite                          | Custom storage plugin ([docs](/guide/plugins-ledger))       |
-| `llm`         | `ILLMPlugin`             | Built-in Vercel AI SDK                   | Custom LLM plugin ([docs](/guide/plugins-llm))              |
 | `environment` | `IEnvironmentPlugin`     | `LocalEnvironment`                       | Execution environment ([docs](/guide/plugins-environments)) |
