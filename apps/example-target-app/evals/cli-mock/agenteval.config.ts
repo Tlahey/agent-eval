@@ -1,4 +1,6 @@
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
  * CLI Runner Example — Mock Agent
@@ -14,16 +16,14 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new CLIRunner({
       name: "mock-agent",
-      type: "cli",
       command: 'node scripts/mock-agent.mjs "{{prompt}}"',
-    },
+    }),
   ],
 
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.

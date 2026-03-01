@@ -68,18 +68,18 @@ flowchart TB
 
 Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each plugin has its own sub-path to keep your bundle lean (unused providers are never loaded).
 
-| Import                              | What you get                         |
-| ----------------------------------- | ------------------------------------ |
-| `agent-eval`                        | Core: `test`, `expect`, `describe`, `defineConfig`, types, interfaces |
-| `agent-eval/providers/openai`       | `OpenAIModel`                        |
-| `agent-eval/providers/anthropic`    | `AnthropicModel`                     |
-| `agent-eval/providers/ollama`       | `OllamaModel`                        |
-| `agent-eval/runner/cli`             | `CLIRunner`                          |
-| `agent-eval/runner/api`             | `APIRunner`                          |
-| `agent-eval/ledger/sqlite`          | `SqliteLedger`                       |
-| `agent-eval/ledger/json`            | `JsonLedger`                         |
-| `agent-eval/environment/local`      | `LocalEnvironment`                   |
-| `agent-eval/environment/docker`     | `DockerEnvironment`                  |
+| Import                           | What you get                                                          |
+| -------------------------------- | --------------------------------------------------------------------- |
+| `agent-eval`                     | Core: `test`, `expect`, `describe`, `defineConfig`, types, interfaces |
+| `agent-eval/providers/openai`    | `OpenAIModel`                                                         |
+| `agent-eval/providers/anthropic` | `AnthropicModel`                                                      |
+| `agent-eval/providers/ollama`    | `OllamaModel`                                                         |
+| `agent-eval/runner/cli`          | `CLIRunner`                                                           |
+| `agent-eval/runner/api`          | `APIRunner`                                                           |
+| `agent-eval/ledger/sqlite`       | `SqliteLedger`                                                        |
+| `agent-eval/ledger/json`         | `JsonLedger`                                                          |
+| `agent-eval/environment/local`   | `LocalEnvironment`                                                    |
+| `agent-eval/environment/docker`  | `DockerEnvironment`                                                   |
 
 ::: tip Why sub-path imports?
 Each provider plugin dynamically imports its AI SDK package (`@ai-sdk/openai`, `@ai-sdk/anthropic`, etc.). By isolating them in separate entry points, **only the providers you actually use are loaded** — no unnecessary dependencies.

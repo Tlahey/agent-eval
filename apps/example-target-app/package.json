@@ -9,6 +9,7 @@
     "eval": "agenteval run",
     "eval:mock": "agenteval run --config evals/cli-mock/agenteval.config.ts",
     "eval:copilot": "agenteval run --config evals/cli-copilot/agenteval.config.ts",
+    "eval:copilot-gpt5": "agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts",
     "eval:claude": "agenteval run --config evals/cli-claude/agenteval.config.ts",
     "eval:aider": "agenteval run --config evals/cli-aider/agenteval.config.ts",
     "eval:cli-judge": "agenteval run --config evals/cli-judge/agenteval.config.ts",

@@ -1,4 +1,5 @@
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
 
 /**
  * CLI Judge Example
@@ -22,18 +23,16 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new CLIRunner({
       name: "copilot",
-      type: "cli",
       command: 'gh copilot suggest -t shell "{{prompt}}"',
-    },
+    }),
   ],
 
   // CLI judge — uses Claude CLI instead of an API provider.
   // The command receives the full evaluation prompt via {{prompt_file}}.
   // It must output valid JSON with { pass, score, reason }.
   judge: {
-    type: "cli",
     command:
       'claude -p "Analyze the following code evaluation and respond ONLY with JSON {pass: boolean, score: number, reason: string}. $(cat {{prompt_file}})" --output-format json',
   },

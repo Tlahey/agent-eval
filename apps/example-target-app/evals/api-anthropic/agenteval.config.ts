@@ -1,4 +1,7 @@
 import { defineConfig } from "agent-eval";
+import { APIRunner } from "agent-eval/runner/api";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { OpenAIModel } from "agent-eval/providers/openai";
 
 /**
  * API Runner — Anthropic Claude Sonnet
@@ -18,20 +21,15 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new APIRunner({
       name: "claude-sonnet",
-      type: "api",
-      api: {
-        provider: "anthropic",
-        model: "claude-sonnet-4-20250514",
-      },
-    },
+      model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    }),
   ],
 
   // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
   judge: {
-    provider: "openai",
-    model: "gpt-4o",
+    llm: new OpenAIModel({ model: "gpt-4o" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.

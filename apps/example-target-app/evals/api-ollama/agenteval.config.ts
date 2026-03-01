@@ -1,4 +1,7 @@
 import { defineConfig } from "agent-eval";
+import { APIRunner } from "agent-eval/runner/api";
+import { OllamaModel } from "agent-eval/providers/ollama";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
  * API Runner — Ollama (Local)
@@ -20,22 +23,16 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new APIRunner({
       name: "ollama-llama3",
-      type: "api",
-      api: {
-        provider: "ollama",
-        model: "llama3",
-        // baseURL: "http://localhost:11434/v1",  // default
-      },
-    },
+      model: new OllamaModel({ model: "llama3" }),
+    }),
   ],
 
   // ⚠️ Always use a strong cloud model as judge, even with local runners.
   // Local models lack the reasoning depth to reliably evaluate code quality.
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.

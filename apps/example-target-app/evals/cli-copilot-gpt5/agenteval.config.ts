@@ -3,27 +3,29 @@ import { CLIRunner } from "agent-eval/runner/cli";
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
- * CLI Runner — GitHub Copilot
+ * CLI Runner — GitHub Copilot with GPT-5
  *
- * Uses `gh copilot` CLI to generate code changes.
- * The judge uses Claude Sonnet (recommended for code evaluation).
+ * Uses `copilot` CLI with a specific model flag. The agent output
+ * is captured from stdout — AgentEval records whatever the CLI
+ * prints to the terminal, which the judge then evaluates.
+ *
+ * This is the simplest integration pattern: any CLI tool that
+ * accepts a prompt and writes to stdout can be used as a runner.
  *
  * Prerequisites:
- *   - GitHub CLI: https://cli.github.com/
- *   - Copilot extension: `gh extension install github/gh-copilot`
- *   - Authenticated: `gh auth login`
+ *   - GitHub Copilot CLI installed
  *   - ANTHROPIC_API_KEY for the judge
  *
  * Usage:
- *   agenteval run --config evals/cli-copilot/agenteval.config.ts
+ *   agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts
  */
 export default defineConfig({
   rootDir: "../..",
 
   runners: [
     new CLIRunner({
-      name: "copilot",
-      command: 'gh copilot suggest -t shell "{{prompt}}"',
+      name: "copilot-gpt5",
+      command: "copilot --model=gpt-5 --prompt={{prompt}}",
     }),
   ],
 
@@ -50,7 +52,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/cli-copilot/**/*.eval.ts",
+  testFiles: "evals/cli-copilot-gpt5/**/*.eval.ts",
   outputDir: ".agenteval",
   timeout: 120_000,
 });

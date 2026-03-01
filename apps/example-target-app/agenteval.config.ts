@@ -1,4 +1,6 @@
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 /**
  * Default config — runs the mock agent against ALL eval scenarios.
@@ -8,6 +10,7 @@ import { defineConfig } from "agent-eval";
  *   # CLI agents
  *   agenteval run --config evals/cli-mock/agenteval.config.ts
  *   agenteval run --config evals/cli-copilot/agenteval.config.ts
+ *   agenteval run --config evals/cli-copilot-gpt5/agenteval.config.ts
  *   agenteval run --config evals/cli-claude/agenteval.config.ts
  *   agenteval run --config evals/cli-aider/agenteval.config.ts
  *
@@ -20,18 +23,16 @@ export default defineConfig({
   rootDir: ".",
 
   runners: [
-    {
+    new CLIRunner({
       name: "mock-agent",
-      type: "cli",
       command: 'node scripts/mock-agent.mjs "{{prompt}}"',
-    },
+    }),
   ],
 
   // ⚠️ The judge must be a strong model capable of understanding code diffs,
   // test output, and making nuanced pass/fail decisions.
   judge: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   testFiles: "evals/**/*.eval.ts",

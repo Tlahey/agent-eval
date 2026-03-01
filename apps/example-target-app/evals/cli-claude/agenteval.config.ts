@@ -1,4 +1,6 @@
 import { defineConfig } from "agent-eval";
+import { CLIRunner } from "agent-eval/runner/cli";
+import { OpenAIModel } from "agent-eval/providers/openai";
 
 /**
  * CLI Runner — Claude Code (Anthropic)
@@ -19,17 +21,15 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    {
+    new CLIRunner({
       name: "claude-code",
-      type: "cli",
       command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-    },
+    }),
   ],
 
   // ⚠️ Use a different provider than the runner to avoid self-evaluation bias.
   judge: {
-    provider: "openai",
-    model: "gpt-4o",
+    llm: new OpenAIModel({ model: "gpt-4o" }),
   },
 
   // Config-level beforeEach: these tasks apply to ALL tests using this config.
