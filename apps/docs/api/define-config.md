@@ -67,6 +67,7 @@ interface APIRunnerConfig {
 
 interface JudgeConfig {
   llm?: IModelPlugin; // LLM plugin for judging
+  maxRetries?: number; // Retry attempts on failure (default: 2)
 }
 
 // Plugin interfaces

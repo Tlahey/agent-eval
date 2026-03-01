@@ -292,6 +292,7 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
 
 judge: {
   llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  maxRetries: 2, // retry on invalid responses (default: 2)
 }
 ```
 

@@ -134,6 +134,24 @@ judge: {
 
 This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible API.
 
+## Retry Configuration
+
+The judge **must** return valid structured data (`{ pass, score, reason, improvement }`). If the LLM returns an unparseable or invalid response, the judge automatically retries.
+
+```ts
+judge: {
+  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  maxRetries: 3, // default: 2
+}
+```
+
+| Option       | Type     | Default | Description                                              |
+| ------------ | -------- | ------- | -------------------------------------------------------- |
+| `llm`        | `IModelPlugin` | —  | LLM plugin for judge evaluation                          |
+| `maxRetries` | `number` | `2`     | Number of retry attempts on failure (0 = no retries)     |
+
+After all attempts are exhausted, the judge throws an error with the last failure message.
+
 ## Expected Files (Scope Analysis)
 
 Tell the judge which files should have been modified to detect scope creep:

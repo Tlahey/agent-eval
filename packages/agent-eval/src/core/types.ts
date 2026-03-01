@@ -11,6 +11,12 @@ export interface JudgeConfig {
    * ```
    */
   llm?: import("./interfaces.js").IModelPlugin;
+  /**
+   * Maximum retry attempts if the judge LLM returns an invalid or unparseable response.
+   * The judge **must** return valid structured data — retries ensure reliability.
+   * Defaults to 2.
+   */
+  maxRetries?: number;
 }
 
 // ─── Status & Thresholds ───

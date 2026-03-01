@@ -158,9 +158,11 @@ ${taskScoringInstructions}
 - Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string, "improvement": string }`;
 }
 
+const DEFAULT_MAX_RETRIES = 2;
+
 /**
- * Execute LLM-as-a-Judge evaluation.
- * Uses the configured IModelPlugin to call generateObject with structured output.
+ * Execute LLM-as-a-Judge evaluation with retry logic.
+ * Retries on invalid/unparseable responses to guarantee valid structured output.
  */
 export async function judge(
   _ctx: TestContext,
@@ -168,12 +170,31 @@ export async function judge(
   config: JudgeConfig,
 ): Promise<JudgeResult> {
   const model = await resolveModel(config);
+  const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
 
-  const { object } = await generateObject({
-    model,
-    schema: JudgeResultSchema,
-    prompt,
-  });
+  let lastError: Error | null = null;
 
-  return object;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const { object } = await generateObject({
+        model,
+        schema: JudgeResultSchema,
+        prompt,
+      });
+
+      return object;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (attempt < maxRetries) {
+        console.warn(
+          `⚠️ Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying... (${lastError.message.slice(0, 100)})`,
+        );
+      }
+    }
+  }
+
+  throw new Error(
+    `Judge failed after ${maxRetries + 1} attempts. Last error: ${lastError!.message}`,
+  );
 }

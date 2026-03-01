@@ -112,6 +112,43 @@ describe("judge", () => {
       'Judge requires an "llm" plugin',
     );
   });
+
+  it("retries on generateObject failure and succeeds", async () => {
+    const mockResult = { pass: true, score: 0.8, reason: "ok", improvement: "none" };
+    vi.mocked(generateObject)
+      .mockRejectedValueOnce(new Error("Invalid response format"))
+      .mockResolvedValueOnce({ object: mockResult } as never);
+
+    const config: JudgeConfig = { llm: createMockModel(), maxRetries: 2 };
+    const result = await judge(createMockContext(), "criteria", config);
+
+    expect(result).toEqual(mockResult);
+    expect(generateObject).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws after exhausting all retries", async () => {
+    vi.mocked(generateObject).mockRejectedValue(new Error("Schema validation failed"));
+
+    const config: JudgeConfig = { llm: createMockModel(), maxRetries: 1 };
+
+    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
+      "Judge failed after 2 attempts",
+    );
+    // 1 initial + 1 retry = 2 calls
+    expect(generateObject).toHaveBeenCalledTimes(2);
+  });
+
+  it("defaults to 2 retries when maxRetries is not set", async () => {
+    vi.mocked(generateObject).mockRejectedValue(new Error("bad response"));
+
+    const config: JudgeConfig = { llm: createMockModel() };
+
+    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
+      "Judge failed after 3 attempts",
+    );
+    // 1 initial + 2 default retries = 3 calls
+    expect(generateObject).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("extractChangedFiles", () => {
