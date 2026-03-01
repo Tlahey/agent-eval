@@ -131,13 +131,16 @@ flowchart LR
 
 ### API Endpoints
 
-| Endpoint                 | Description                             |
-| ------------------------ | --------------------------------------- |
-| `GET /api/runs`          | All runs                                |
-| `GET /api/runs?testId=X` | Runs filtered by evaluation             |
-| `GET /api/tests`         | List of unique test IDs                 |
-| `GET /api/tree`          | Hierarchical test tree (suites + tests) |
-| `GET /api/stats`         | Aggregate stats per runner per test     |
+| Endpoint                       | Description                             |
+| ------------------------------ | --------------------------------------- |
+| `GET /api/runs`                | All runs                                |
+| `GET /api/runs?testId=X`       | Runs filtered by evaluation             |
+| `GET /api/tests`               | List of unique test IDs                 |
+| `GET /api/tree`                | Hierarchical test tree (suites + tests) |
+| `GET /api/stats`               | Aggregate stats per runner per test     |
+| `GET /api/health`              | Health check                            |
+| `PATCH /api/runs/:id/override` | Override a run score (HITL)             |
+| `GET /api/runs/:id/overrides`  | Audit trail for score overrides         |
 
 ### Tech Stack
 

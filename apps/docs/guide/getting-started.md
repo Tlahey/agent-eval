@@ -106,7 +106,7 @@ npx agenteval view
 sequenceDiagram
     participant You as You (CLI)
     participant AE as AgentEval
-    participant Git as Git
+    participant Env as Environment Plugin
     participant Agent as AI Agent
     participant Judge as LLM Judge
     participant DB as SQLite Ledger
@@ -115,15 +115,15 @@ sequenceDiagram
     AE->>AE: Load config + discover test files
 
     loop For each test × runner
-        AE->>Git: git reset --hard && git clean -fd
-        Git-->>AE: Clean working directory
+        AE->>Env: env.setup(cwd)
+        Env-->>AE: Clean working directory
         AE->>Agent: agent.run(prompt)
         Agent-->>AE: Files modified on disk
-        AE->>Git: git diff (auto storeDiff)
-        Git-->>AE: Diff captured
+        AE->>Env: env.getDiff(cwd) (auto storeDiff)
+        Env-->>AE: Diff captured
         AE->>AE: Run afterEach commands
         AE->>Judge: Evaluate (criteria + diff + outputs)
-        Judge-->>AE: { score, pass, reason, improvement }
+        Judge-->>AE: { score, pass, status, reason, improvement }
         AE->>DB: Append result
     end
 
@@ -132,10 +132,10 @@ sequenceDiagram
 
 1. **Config loaded** — AgentEval reads your `agenteval.config.ts`
 2. **Test files discovered** — Files matching `*.eval.ts` and `*.agent-eval.ts` are found
-3. **Git reset** — Working directory is reset to HEAD before each run
+3. **Environment setup** — The environment plugin resets the workspace (local git, Docker, etc.)
 4. **Agent executes** — Your configured agent runs the prompt
-5. **Context captured** — Git diff is stored automatically, afterEach commands execute
-6. **Judge evaluates** — An LLM scores the agent's output (0.0–1.0) and suggests improvements
+5. **Context captured** — Diff is captured via the environment plugin, afterEach commands execute
+6. **Judge evaluates** — An LLM scores the agent's output (0.0–1.0) with three-level status (PASS/WARN/FAIL)
 7. **Ledger updated** — Results are stored in `.agenteval/ledger.sqlite` (SQLite)
 
 ## Environment Variables

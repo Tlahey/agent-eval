@@ -133,7 +133,7 @@ flowchart TB
     C --> D["Import files\n(registers tests via test())"]
     D --> E{"For each\ntest × runner"}
 
-    E --> F["🔄 Git Reset\ngit reset --hard\ngit clean -fd"]
+    E --> F["🔄 Environment Setup\nenv.setup(cwd)"]
     F --> G["🤖 Agent Execution\nagent.run(prompt)"]
     G --> H["📸 Auto storeDiff()\ncaptures git diff"]
     H --> I["⚙️ afterEach Commands\npnpm test, tsc, lint..."]
@@ -158,7 +158,7 @@ This is the detailed flow of a **single test iteration** for one runner:
 sequenceDiagram
     participant CLI as CLI (agenteval run)
     participant Runner as Runner Engine
-    participant Git as Git Module
+    participant Git as Environment Plugin
     participant Agent as Agent (CLI/API)
     participant Ctx as TestContext
     participant Judge as Judge (LLM/CLI)
@@ -167,8 +167,8 @@ sequenceDiagram
     CLI->>Runner: runTest(testDef, config)
 
     rect rgb(240, 240, 255)
-        Note over Runner,Git: 1. Git Isolation
-        Runner->>Git: gitResetHard(cwd)
+        Note over Runner,Git: 1. Environment Setup
+        Runner->>Git: env.setup(cwd)
         Git-->>Runner: clean working directory
     end
 
@@ -176,8 +176,8 @@ sequenceDiagram
         Note over Runner,Ctx: 2. Agent Execution + Context Capture
         Runner->>Agent: agent.run(prompt)
         Agent-->>Runner: files modified on disk
-        Runner->>Ctx: storeDiff() [automatic]
-        Ctx->>Git: gitDiff(cwd)
+        Runner->>Ctx: storeDiffAsync() [automatic]
+        Ctx->>Git: env.getDiff(cwd)
         Git-->>Ctx: diff string stored
 
         loop afterEach commands

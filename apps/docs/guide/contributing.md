@@ -17,7 +17,7 @@ Every commit is guarded by **four automated checks** via a Husky pre-commit hook
 flowchart TD
     A["git commit"] --> B["Husky pre-commit hook"]
     B --> C["lint-staged\nESLint + Prettier"]
-    C --> D["pnpm test\n196 tests (agent-eval + eval-ui)"]
+    C --> D["pnpm test\n351 tests (agent-eval + eval-ui)"]
     D --> E["pnpm build\ntsup (ESM + CJS + DTS)"]
     E --> F{"All passed?"}
     F -- Yes --> G["✅ Commit created"]
@@ -43,7 +43,7 @@ pnpm format     # Prettier auto-format
 ### 2. Test
 
 ```bash
-pnpm test       # Runs both agent-eval (94 tests) and eval-ui (102 tests)
+pnpm test       # Runs both agent-eval (223 tests) and eval-ui (128 tests)
 ```
 
 ### 3. Build
@@ -94,7 +94,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - Use `describe` / `it` with clear descriptions
 - Mock external dependencies — no real API calls in unit tests
 - The E2E integration tests in `src/e2e/` validate the full pipeline using temp git repos
-- **94 tests** covering types, config, context, runner, expect, git, ledger
+- **223 tests** covering types, config, context, runner, expect, git, ledger, plugins, environment
 
 ### Dashboard (`apps/eval-ui`)
 
@@ -105,7 +105,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - Use `renderPage()` from `src/test/render.tsx` for page components (provides `useOutletContext`)
 - Mock `fetch` via `vi.fn()` — never make real API calls
 - Mock `ResponsiveContainer` from Recharts (jsdom can't measure SVG)
-- **102 tests** covering all components, pages, and API functions
+- **128 tests** covering all components, pages, and API functions
 
 ::: tip CSS text-transform gotcha
 CSS `text-transform: uppercase` changes visual appearance but **not** DOM `textContent`. Test against the original source text (e.g., "Navigation" not "NAVIGATION").

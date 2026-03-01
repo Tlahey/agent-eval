@@ -260,7 +260,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     subgraph CLI["CLI Runner"]
-        A["execSync(command)"] --> B["Agent modifies files"]
+        A["env.execute(command)"] --> B["Agent modifies files"]
         B --> C["storeDiff()"]
     end
 
@@ -273,6 +273,10 @@ flowchart LR
     style CLI fill:#f0f4ff
     style API fill:#f0fdf4
 ```
+
+::: tip Environment Plugin
+Both CLI and API runners execute within the configured [environment plugin](/guide/environments). By default, the **LocalEnvironment** is used (git reset + local exec). You can configure Docker or custom environments — see [Environments](/guide/environments).
+:::
 
 | Aspect        | CLI Runner               | API Runner                    |
 | ------------- | ------------------------ | ----------------------------- |
