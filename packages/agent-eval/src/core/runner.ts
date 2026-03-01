@@ -545,7 +545,16 @@ async function executeDeclarativePipeline(
   const taskResults: TaskResult[] = [];
   for (const task of ctx.tasks) {
     reporter.onPipelineStep(event, "task", "running", task.name);
-    const result = await task.action();
+    const actionResult = await task.action();
+    // Enrich partial action result into a full CommandResult
+    const result: CommandResult = {
+      name: actionResult.name ?? task.name,
+      command: actionResult.command ?? "",
+      stdout: actionResult.stdout,
+      stderr: actionResult.stderr ?? "",
+      exitCode: actionResult.exitCode,
+      durationMs: actionResult.durationMs ?? 0,
+    };
     taskResults.push({ task, result });
     reporter.onPipelineStep(event, "task", "done", task.name);
   }

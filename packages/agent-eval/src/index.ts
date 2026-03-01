@@ -217,6 +217,7 @@ export type {
   TestStatus,
   Thresholds,
   TaskDefinition,
+  TaskActionResult,
   HookFn,
   HookContext,
   HookDefinition,

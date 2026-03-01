@@ -319,14 +319,29 @@ export interface CommandResult {
 }
 
 /**
+ * Minimal result from a task action. The runner enriches this into a full CommandResult.
+ */
+export interface TaskActionResult {
+  stdout: string;
+  stderr?: string;
+  exitCode: number;
+  /** Optional: filled automatically by ctx.exec() */
+  name?: string;
+  /** Optional: filled automatically by ctx.exec() */
+  command?: string;
+  /** Optional: filled automatically by ctx.exec() */
+  durationMs?: number;
+}
+
+/**
  * A task registered via `ctx.addTask()` in declarative pipeline mode.
  * Tasks execute after the agent instruction and are evaluated by the judge.
  */
 export interface TaskDefinition {
   /** Human-readable name for the task (used in logs and judge prompt) */
   name: string;
-  /** Action to execute after the agent runs. Returns a CommandResult for the judge. */
-  action: () => CommandResult | Promise<CommandResult>;
+  /** Action to execute after the agent runs. Returns a result for the judge. */
+  action: () => TaskActionResult | Promise<TaskActionResult>;
   /** Evaluation criteria for the judge to assess this task's outcome */
   criteria: string;
   /** Weight for scoring (default: 1). Higher weight = more impact on final score. */
