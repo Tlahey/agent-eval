@@ -7,19 +7,8 @@ vi.mock("ai", () => ({
   generateObject: vi.fn(),
 }));
 
-vi.mock("node:child_process", () => ({
-  execSync: vi.fn(),
-}));
-
-vi.mock("node:fs", () => ({
-  writeFileSync: vi.fn(),
-  mkdtempSync: vi.fn(() => "/tmp/agenteval-judge-mock"),
-  rmSync: vi.fn(),
-}));
-
 import { generateObject } from "ai";
-import { execSync } from "node:child_process";
-import { judge, extractJudgeJson, buildJudgePrompt, extractChangedFiles } from "./judge.js";
+import { judge, buildJudgePrompt, extractChangedFiles } from "./judge.js";
 
 function createMockModel(modelId = "test-model"): IModelPlugin {
   return {
@@ -116,178 +105,12 @@ describe("judge", () => {
     expect(callArgs.prompt).toContain("(no logs captured)");
   });
 
-  it("throws when API judge has no llm plugin", async () => {
+  it("throws when judge has no llm plugin", async () => {
     const config: JudgeConfig = {};
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      'API judge requires an "llm" plugin',
+      'Judge requires an "llm" plugin',
     );
-  });
-});
-
-describe("judge - CLI mode", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("executes CLI command and parses JSON result", async () => {
-    const mockResult = JSON.stringify({
-      pass: true,
-      score: 0.85,
-      reason: "looks good",
-      improvement: "none",
-    });
-    vi.mocked(execSync).mockReturnValue(mockResult);
-
-    const config: JudgeConfig = {
-      command: 'claude -p "{{prompt}}" --output-format json',
-    };
-
-    const result = await judge(createMockContext(), "has unit tests", config);
-
-    expect(result).toEqual({ pass: true, score: 0.85, reason: "looks good", improvement: "none" });
-    expect(execSync).toHaveBeenCalledOnce();
-  });
-
-  it("extracts JSON from mixed CLI output", async () => {
-    const output = `Thinking...\n{"pass": false, "score": 0.3, "reason": "missing tests", "improvement": "add tests"}\nDone.`;
-    vi.mocked(execSync).mockReturnValue(output);
-
-    const config: JudgeConfig = {
-      command: "some-cli evaluate",
-    };
-
-    const result = await judge(createMockContext(), "criteria", config);
-
-    expect(result.pass).toBe(false);
-    expect(result.score).toBe(0.3);
-    expect(result.reason).toBe("missing tests");
-  });
-
-  it("replaces {{prompt_file}} with temp file path", async () => {
-    vi.mocked(execSync).mockReturnValue(
-      JSON.stringify({ pass: true, score: 1, reason: "perfect", improvement: "none" }),
-    );
-
-    const config: JudgeConfig = {
-      command: "judge-cli --input {{prompt_file}}",
-    };
-
-    await judge(createMockContext(), "criteria", config);
-
-    const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
-    expect(calledCmd).toContain("/tmp/agenteval-judge-mock/prompt.txt");
-    expect(calledCmd).not.toContain("{{prompt_file}}");
-  });
-
-  it("throws after all retries when CLI output has no valid JSON", async () => {
-    vi.mocked(execSync).mockReturnValue("I could not evaluate this code.");
-
-    const config: JudgeConfig = {
-      command: "bad-cli evaluate",
-      maxRetries: 1,
-    };
-
-    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "does not contain valid JSON",
-    );
-
-    // 1 initial attempt + 1 retry = 2 calls
-    expect(execSync).toHaveBeenCalledTimes(2);
-  });
-
-  it("retries on invalid JSON then succeeds", async () => {
-    vi.mocked(execSync)
-      .mockReturnValueOnce("Not JSON at all")
-      .mockReturnValueOnce(
-        JSON.stringify({ pass: true, score: 0.9, reason: "ok on retry", improvement: "none" }),
-      );
-
-    const config: JudgeConfig = {
-      command: "flaky-cli evaluate",
-      maxRetries: 2,
-    };
-
-    const result = await judge(createMockContext(), "criteria", config);
-
-    expect(result).toEqual({ pass: true, score: 0.9, reason: "ok on retry", improvement: "none" });
-    expect(execSync).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not retry on command execution failure", async () => {
-    vi.mocked(execSync).mockImplementation(() => {
-      throw new Error("Command not found: bad-cli");
-    });
-
-    const config: JudgeConfig = {
-      command: "bad-cli evaluate",
-      maxRetries: 3,
-    };
-
-    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "Command not found",
-    );
-
-    // No retry — command failure, not JSON validation
-    expect(execSync).toHaveBeenCalledTimes(1);
-  });
-
-  it("defaults to 2 retries when maxRetries is not set", async () => {
-    vi.mocked(execSync).mockReturnValue("garbage output");
-
-    const config: JudgeConfig = {
-      command: "cli evaluate",
-    };
-
-    await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      "does not contain valid JSON",
-    );
-
-    // 1 initial + 2 default retries = 3 calls
-    expect(execSync).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe("extractJudgeJson", () => {
-  it("parses clean JSON", () => {
-    const result = extractJudgeJson(
-      '{"pass": true, "score": 0.9, "reason": "good", "improvement": "none"}',
-    );
-    expect(result).toEqual({ pass: true, score: 0.9, reason: "good", improvement: "none" });
-  });
-
-  it("strips markdown code fences", () => {
-    const output =
-      '```json\n{"pass": false, "score": 0.2, "reason": "bad", "improvement": "fix it"}\n```';
-    const result = extractJudgeJson(output);
-    expect(result).toEqual({ pass: false, score: 0.2, reason: "bad", improvement: "fix it" });
-  });
-
-  it("extracts JSON from preamble text", () => {
-    const output =
-      'Here is my evaluation:\n{"pass": true, "score": 0.8, "reason": "decent", "improvement": "none"}\nEnd.';
-    const result = extractJudgeJson(output);
-    expect(result.score).toBe(0.8);
-  });
-
-  it("throws on missing JSON", () => {
-    expect(() => extractJudgeJson("No JSON here")).toThrow("does not contain valid JSON");
-  });
-
-  it("throws on malformed JSON", () => {
-    expect(() =>
-      extractJudgeJson('{"pass": true, "score": bad, "reason": "x", "improvement": "y"}'),
-    ).toThrow("malformed JSON");
-  });
-
-  it("throws on invalid schema (score out of range)", () => {
-    expect(() =>
-      extractJudgeJson('{"pass": true, "score": 5.0, "reason": "too high", "improvement": "none"}'),
-    ).toThrow();
-  });
-
-  it("throws on missing required field", () => {
-    expect(() => extractJudgeJson('{"pass": true, "score": 0.5}')).toThrow();
   });
 });
 

@@ -48,12 +48,12 @@ describe("config", () => {
         join(tmpDir, "agenteval.config.js"),
         `module.exports = {
           runners: [],
-          judge: { command: "judge-cli evaluate" },
+          judge: { },
         };`,
       );
 
       const config = await loadConfig(tmpDir);
-      expect(config.judge.command).toBe("judge-cli evaluate");
+      expect(config.judge).toEqual({});
     });
 
     it("applies defaults for missing optional fields", async () => {

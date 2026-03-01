@@ -25,7 +25,7 @@
 - **Declarative Pipeline** — `agent.instruct()` + `ctx.addTask()` for zero-boilerplate evaluations
 - **Config-level Hooks** — `beforeEach` at config, file, or describe level for shared verification tasks
 - **Git Isolation** — automatic `git reset --hard` between runs for pristine environments
-- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, Ollama, or any CLI tool
+- **LLM-as-a-Judge** — structured evaluation via Anthropic, OpenAI, Ollama, or any custom `IModelPlugin`
 - **Model Matrix** — compare multiple agents/models on the same test suite
 - **Weighted Scoring** — tasks with weights for nuanced, multi-criteria evaluation
 - **Expected Files** — scope analysis detects agents that modify too many files

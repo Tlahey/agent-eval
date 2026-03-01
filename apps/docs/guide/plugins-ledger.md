@@ -67,7 +67,7 @@ erDiagram
         text suite_path "JSON array"
         text timestamp "indexed, ISO 8601"
         text agent_runner "runner name"
-        text judge_model "model or CLI"
+        text judge_model "LLM model used"
         real score "0.0 – 1.0"
         int pass "0 or 1"
         text status "PASS / WARN / FAIL"

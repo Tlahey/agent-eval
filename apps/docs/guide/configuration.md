@@ -290,14 +290,8 @@ The judge evaluates agent output using an LLM. See the [Judges guide](/guide/jud
 ```ts
 import { AnthropicModel } from "agent-eval/providers/anthropic";
 
-// API judge (default) — recommended
 judge: {
   llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-}
-
-// CLI judge — use any CLI tool
-judge: {
-  command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
 }
 ```
 

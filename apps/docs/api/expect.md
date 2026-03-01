@@ -78,7 +78,7 @@ The runner uses these options later (after agent execution) to run the final jud
 flowchart TD
     A["expect(ctx).toPassJudge(opts)"] --> B["Build judge prompt"]
     B --> C["criteria + diff + commands + expectedFiles"]
-    C --> D["Send to judge (API or CLI)"]
+    C --> D["Send to judge (LLM)"]
     D --> E["Receive { score, reason, improvement }"]
     E --> F["Resolve thresholds<br/>(per-test → global → defaults)"]
     F --> G{"score ≥ warn?"}

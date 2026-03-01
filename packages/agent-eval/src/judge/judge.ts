@@ -1,7 +1,3 @@
-import { execSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { generateObject, type LanguageModelV1 } from "ai";
 import { z } from "zod";
 import type {
@@ -28,7 +24,7 @@ const JudgeResultSchema = z.object({
 async function resolveModel(config: JudgeConfig): Promise<LanguageModelV1> {
   if (!config.llm) {
     throw new Error(
-      'API judge requires an "llm" plugin in judge config.\n' +
+      'Judge requires an "llm" plugin in judge config.\n' +
         'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
     );
   }
@@ -163,118 +159,14 @@ ${taskScoringInstructions}
 }
 
 /**
- * Extract and validate a JudgeResult JSON from raw CLI output.
- * Handles preamble text, markdown code fences, and nested JSON.
- */
-export function extractJudgeJson(stdout: string): JudgeResult {
-  // Strip markdown code fences if present
-  const stripped = stdout.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "");
-
-  // Try to find a JSON object containing our required fields
-  const jsonMatch = stripped.match(
-    /\{[\s\S]*?"pass"\s*:[\s\S]*?"score"\s*:[\s\S]*?"reason"\s*:[\s\S]*?"improvement"\s*:[\s\S]*?\}/,
-  );
-  if (!jsonMatch) {
-    throw new Error(
-      `CLI judge output does not contain valid JSON with { pass, score, reason, improvement }.\nOutput: ${stdout.slice(0, 500)}`,
-    );
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonMatch[0]);
-  } catch {
-    throw new Error(
-      `CLI judge output contains malformed JSON.\nExtracted: ${jsonMatch[0].slice(0, 300)}`,
-    );
-  }
-
-  // Validate with Zod — throws ZodError with detailed field info on failure
-  return JudgeResultSchema.parse(parsed);
-}
-
-const DEFAULT_MAX_RETRIES = 2;
-
-/**
- * Execute a CLI-based judge with retry logic.
- * Writes the prompt to a temp file, passes it to the command,
- * parses the JSON output, and retries on validation failure.
- */
-async function judgeCli(prompt: string, config: JudgeConfig): Promise<JudgeResult> {
-  if (!config.command) {
-    throw new Error('CLI judge requires a "command" field in judge config.');
-  }
-
-  const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
-
-  // Write prompt to a temp file to avoid shell escaping issues
-  const tmpDir = mkdtempSync(join(tmpdir(), "agenteval-judge-"));
-  const promptFile = join(tmpDir, "prompt.txt");
-  writeFileSync(promptFile, prompt, "utf-8");
-
-  try {
-    const cmd = config.command
-      .replace("{{prompt}}", prompt.replace(/"/g, '\\"'))
-      .replace("{{prompt_file}}", promptFile);
-
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const stdout = execSync(cmd, {
-          encoding: "utf-8",
-          timeout: 300_000,
-        });
-
-        return extractJudgeJson(stdout);
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-
-        // Only retry on JSON parsing/validation errors, not on command failures
-        const isValidationError =
-          lastError.message.includes("does not contain valid JSON") ||
-          lastError.message.includes("malformed JSON") ||
-          lastError.name === "ZodError";
-
-        if (!isValidationError || attempt >= maxRetries) {
-          break;
-        }
-
-        // Log retry for visibility
-        console.warn(
-          `⚠️ CLI judge attempt ${attempt + 1}/${maxRetries + 1} failed (invalid JSON), retrying...`,
-        );
-      }
-    }
-
-    throw lastError!;
-  } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
-  }
-}
-
-/**
- * Execute LLM-as-a-Judge evaluation (API or CLI).
- * Accepts a pre-built prompt string (from buildJudgePrompt).
+ * Execute LLM-as-a-Judge evaluation.
+ * Uses the configured IModelPlugin to call generateObject with structured output.
  */
 export async function judge(
-  ctx: TestContext,
+  _ctx: TestContext,
   prompt: string,
   config: JudgeConfig,
 ): Promise<JudgeResult> {
-  // CLI judge path
-  if (config.command) {
-    return judgeCli(prompt, config);
-  }
-
-  // API judge path (default)
-  if (!config.llm) {
-    throw new Error(
-      'API judge requires an "llm" plugin in judge config.\n' +
-        'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
-    );
-  }
-
   const model = await resolveModel(config);
 
   const { object } = await generateObject({

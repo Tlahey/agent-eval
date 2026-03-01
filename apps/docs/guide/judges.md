@@ -21,17 +21,9 @@ flowchart TD
     A["Evaluation triggered"] --> B["Build judge prompt"]
     B --> C["Include: criteria + diff + commands + file scope"]
 
-    C --> D{"Judge type?"}
-    D -- API --> E["generateObject()<br/>Vercel AI SDK + Zod"]
-    D -- CLI --> F["execSync(command)<br/>parse JSON from stdout"]
+    C --> E["generateObject()<br/>Vercel AI SDK + Zod"]
 
-    F --> G{"Valid JSON?"}
-    G -- No --> H{"Retries left?"}
-    H -- Yes --> F
-    H -- No --> I["❌ Throw Error"]
-    G -- Yes --> J["Zod validation"]
-
-    E --> J
+    E --> J["Zod validation"]
     J --> K{"Compute status<br/>via thresholds"}
     K -- "score ≥ 0.8" --> L["✅ PASS"]
     K -- "score ≥ 0.5" --> L2["⚠️ WARN"]
@@ -44,7 +36,6 @@ flowchart TD
     style E fill:#6366f1,color:#fff
     style L fill:#10b981,color:#fff
     style M fill:#ef4444,color:#fff
-    style I fill:#ef4444,color:#fff
 ```
 
 1. AgentEval builds a prompt with:
@@ -143,41 +134,6 @@ judge: {
 
 This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible API.
 
-### CLI Judge
-
-You can use **any CLI tool** as a judge — including `claude`, `gh copilot`, or a custom script. The CLI must output JSON with `{ pass, score, reason }`.
-
-```ts
-judge: {
-  command: 'claude -p "Evaluate this code change: {{prompt}}" --output-format json',
-  maxRetries: 3, // Retry on invalid JSON (default: 2)
-}
-```
-
-::: tip Use `{{prompt_file}}` for long prompts
-Git diffs can be thousands of lines. To avoid shell escaping issues, use `{{prompt_file}}` — AgentEval writes the full prompt to a temp file and replaces the placeholder with the file path:
-
-```ts
-judge: {
-  command: "cat {{prompt_file}} | claude -p --output-format json",
-}
-```
-
-:::
-
-**The CLI must return valid JSON:**
-
-```json
-{
-  "pass": true,
-  "score": 0.85,
-  "reason": "The implementation is correct...",
-  "improvement": "Consider adding tests"
-}
-```
-
-AgentEval extracts the first JSON object containing `pass`, `score`, and `reason` from stdout (preamble text and markdown fences are ignored). Failed attempts are automatically retried up to `maxRetries` times.
-
 ## Expected Files (Scope Analysis)
 
 Tell the judge which files should have been modified to detect scope creep:
@@ -272,4 +228,4 @@ flowchart TD
 
 Sections marked in amber are **conditionally included** — only when the test uses `instruct()` or `addTask()`.
 
-The response is enforced via Zod structured output (`generateObject`) for API judges, guaranteeing `{ pass, score, reason, improvement }` — no prompt injection or malformed JSON. For CLI judges, the JSON is parsed from stdout and validated against the same schema.
+The response is enforced via Zod structured output (`generateObject`), guaranteeing `{ pass, score, reason, improvement }` — no prompt injection or malformed JSON.

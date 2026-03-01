@@ -66,9 +66,7 @@ interface APIRunnerConfig {
 }
 
 interface JudgeConfig {
-  llm?: IModelPlugin; // LLM plugin for API-based judging
-  command?: string; // CLI command with {{prompt}} or {{prompt_file}}
-  maxRetries?: number; // Retry on invalid JSON (default: 2)
+  llm?: IModelPlugin; // LLM plugin for judging
 }
 
 // Plugin interfaces

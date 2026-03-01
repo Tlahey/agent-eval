@@ -170,7 +170,7 @@ sequenceDiagram
     participant Git as Environment Plugin
     participant Agent as Agent (CLI/API)
     participant Ctx as TestContext
-    participant Judge as Judge (LLM/CLI)
+    participant Judge as Judge (LLM)
     participant Ledger as SQLite Ledger
 
     CLI->>Runner: runTest(testDef, config)
@@ -234,15 +234,8 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A["Build Prompt"] --> B{"Judge Type?"}
-    B -- API --> C["generateObject()<br/>Vercel AI SDK<br/>+ Zod schema"]
-    B -- CLI --> D["execSync(command)<br/>parse JSON output"]
-    D --> E{"Valid JSON?"}
-    E -- No --> F{"Retries<br/>left?"}
-    F -- Yes --> D
-    F -- No --> G["❌ Throw Error"]
-    E -- Yes --> H["Zod Validation"]
-    C --> H
+    A["Build Prompt"] --> C["generateObject()<br/>Vercel AI SDK<br/>+ Zod schema"]
+    C --> H["Zod Validation"]
     H --> I{"score ≥ 0.7?"}
     I -- Yes --> J["✅ PASS"]
     I -- No --> K["❌ FAIL"]
@@ -251,7 +244,6 @@ flowchart LR
 
     style J fill:#10b981,color:#fff
     style K fill:#ef4444,color:#fff
-    style G fill:#ef4444,color:#fff
 ```
 
 ### Ledger Data Model
@@ -265,7 +257,7 @@ erDiagram
         text timestamp "ISO 8601"
         text agent_runner "runner name"
         text agent_model "runner model"
-        text judge_model "model or CLI command"
+        text judge_model "LLM model used"
         real score "0.0 – 1.0"
         int pass "0 or 1"
         text reason "judge explanation"
