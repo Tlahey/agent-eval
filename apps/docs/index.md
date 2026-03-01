@@ -14,8 +14,8 @@ hero:
 features:
   - title: 🧪 Vitest-like DX
     details: Familiar test() / expect() API designed specifically for evaluating AI agents.
-  - title: 🔒 Git Isolation
-    details: Automatic git reset between test runs guarantees pristine environments.
+  - title: 🔒 Environment Isolation
+    details: Pluggable environment setup (local git reset, Docker containers, or custom) ensures pristine workspaces between tests.
   - title: ⚖️ LLM-as-a-Judge
     details: Structured evaluation via Anthropic, OpenAI, Ollama, or any CLI tool as judge.
   - title: 📊 SQLite Ledger

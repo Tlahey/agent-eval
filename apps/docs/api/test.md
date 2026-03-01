@@ -29,7 +29,7 @@ The `fn` callback receives:
 flowchart TD
     A["test('title', fn)"] --> B["Registers test\n(does not execute yet)"]
     B --> C["Runner picks up test"]
-    C --> D["For each runner:\n1. Git reset\n2. Execute fn\n3. Record result"]
+    C --> D["For each runner:\n1. env.setup()\n2. beforeEach hooks\n3. Execute fn\n4. Pipeline steps\n5. Record result\n6. afterEach hooks\n7. env.teardown()"]
 
     style A fill:#4f46e5,color:#fff
     style B fill:#f59e0b,color:#000

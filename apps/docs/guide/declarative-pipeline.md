@@ -140,17 +140,18 @@ sequenceDiagram
   participant R as Runner
   participant C as Config
   participant H as Hooks
-  participant A as Agent
   participant E as Environment
+  participant A as Agent
   participant T as Tasks
   participant J as Judge
 
-  R->>C: config.beforeEach (if defined)
-  R->>H: DSL beforeEach hooks
+  R->>E: env.setup(cwd) — workspace reset
+  Note over E: LocalEnvironment: git reset<br/>DockerEnvironment: fresh container
+  R->>C: config.beforeEach (register tasks)
+  R->>H: DSL beforeEach hooks (register tasks)
   R->>R: Parse test fn (sync)
-  R->>E: env.setup() (git reset)
   R->>A: Execute agent instruction
-  R->>E: env.getDiff()
+  R->>E: env.getDiff(cwd) — capture changes
   R->>E: Run afterEach commands
   loop Each task
     R->>T: Execute task action
@@ -159,6 +160,7 @@ sequenceDiagram
   R->>J: Auto-judge (instruction + diff + task results)
   J-->>R: { pass, score, reason }
   R->>H: afterEach hooks
+  R->>E: env.teardown(cwd)
 ```
 
 ## Lifecycle Hooks

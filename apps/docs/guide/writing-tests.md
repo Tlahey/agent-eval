@@ -2,27 +2,47 @@
 
 ## Test Lifecycle
 
-Every eval test follows a precise lifecycle:
+Every eval test follows a precise lifecycle, driven by **environment plugins** and **lifecycle hooks**:
 
 ```mermaid
 flowchart TD
     A["test() registers evaluation"] --> B["Runner picks up test"]
-    B --> C["🔄 Git reset (clean state)"]
-    C --> D["🤖 agent.run(prompt)"]
-    D --> E["📸 Auto storeDiff()"]
-    E --> F["⚙️ afterEach commands"]
-    F --> G["⚖️ expect(ctx).toPassJudge()"]
-    G --> H{"score ≥ warn\nthreshold?"}
-    H -- "≥ 0.8" --> I["✅ PASS → Ledger"]
-    H -- "≥ 0.5" --> I2["⚠️ WARN → Ledger"]
-    H -- "< 0.5" --> J["❌ FAIL → Ledger"]
+    B --> B2["🔧 env.setup(cwd)\n(workspace reset via plugin)"]
+    B2 --> B3["📋 Config beforeEach\n(register common tasks)"]
+    B3 --> B4["📋 DSL beforeEach\n(register scoped tasks)"]
+    B4 --> C{"Mode?"}
+    C -- Declarative --> D1["🤖 agent.instruct(prompt)"]
+    D1 --> D2["📸 Auto storeDiff()"]
+    D2 --> D3["⚙️ afterEach commands"]
+    D3 --> D4["✅ Execute tasks"]
+    D4 --> D5["⚖️ Auto judge"]
+    C -- Imperative --> E1["🤖 agent.run(prompt)"]
+    E1 --> E2["📸 Auto storeDiff()"]
+    E2 --> E3["⚙️ afterEach commands"]
+    E3 --> E4["⚖️ expect(ctx).toPassJudge()"]
+    D5 --> F{"score ≥ threshold?"}
+    E4 --> F
+    F -- "≥ pass" --> G["✅ PASS → Ledger"]
+    F -- "≥ warn" --> G2["⚠️ WARN → Ledger"]
+    F -- "< warn" --> H["❌ FAIL → Ledger"]
+    G --> I["📋 afterEach hooks"]
+    G2 --> I
+    H --> I
+    I --> J["🔧 env.teardown(cwd)"]
 
-    style D fill:#f59e0b,color:#000
+    style B2 fill:#6366f1,color:#fff
+    style D1 fill:#f59e0b,color:#000
+    style E1 fill:#f59e0b,color:#000
+    style D5 fill:#10b981,color:#fff
+    style E4 fill:#10b981,color:#fff
     style G fill:#10b981,color:#fff
-    style I fill:#10b981,color:#fff
-    style I2 fill:#f59e0b,color:#000
-    style J fill:#ef4444,color:#fff
+    style G2 fill:#f59e0b,color:#000
+    style H fill:#ef4444,color:#fff
 ```
+
+::: info Environment Setup
+The **environment plugin** handles workspace preparation. By default, `LocalEnvironment` runs `git reset --hard HEAD && git clean -fd`. With `DockerEnvironment`, it creates a fresh container. You can implement your own `IEnvironmentPlugin` for custom setups. See [Environments](/guide/environments).
+:::
 
 ## File Naming
 

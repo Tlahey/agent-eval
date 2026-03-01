@@ -171,7 +171,6 @@ The default reporter uses a **non-TUI approach**: every line is printed sequenti
 📄 evals/banner.eval.ts
 
   [1/2] Add close button [copilot-cli]
-    ↺ git reset --hard && git clean -fd
     ✓ Environment setup
     ✓ Agent execution
     ✓ Diff capture
