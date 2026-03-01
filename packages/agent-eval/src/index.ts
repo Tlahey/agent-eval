@@ -186,8 +186,20 @@ export function initSession(config: AgentEvalConfig): void {
 
 export { expect } from "./core/expect.js";
 export { defineConfig, assertValidPlugins } from "./core/config.js";
-export { DefaultReporter, SilentReporter, VerboseReporter } from "./core/reporter.js";
-export type { Reporter, TestEvent, TestResultEvent } from "./core/reporter.js";
+export {
+  DefaultReporter,
+  SilentReporter,
+  VerboseReporter,
+  CIReporter,
+  isCI,
+} from "./core/reporter.js";
+export type {
+  Reporter,
+  TestEvent,
+  TestResultEvent,
+  PipelineStep,
+  StepStatus,
+} from "./core/reporter.js";
 export type {
   AgentEvalConfig,
   AgentRunnerConfig,

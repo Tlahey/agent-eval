@@ -79,13 +79,13 @@ agenteval run -v -t ui
 
 ### Reporter Modes
 
-AgentEval uses a **Reporter** system for CLI output. Three built-in reporters are available:
+AgentEval uses a **Reporter** system for CLI output. Four built-in reporters are available, including automatic CI detection:
 
 ```mermaid
 flowchart LR
     subgraph Default["Default (default)"]
-        D1["Spinner per test"]
-        D2["✓/✗ on completion"]
+        D1["Pipeline steps with ✓/✗/●"]
+        D2["Progress counter [N/M]"]
         D3["Summary table"]
     end
 
@@ -95,36 +95,73 @@ flowchart LR
     end
 
     subgraph Verbose["Verbose (--verbose)"]
-        V1["Full test details"]
+        V1["Full pipeline steps"]
         V2["Judge reasoning"]
         V3["Improvement suggestions"]
         V4["Summary table"]
     end
 
+    subgraph CI["CI (auto-detected)"]
+        C1["Plain text, no colors"]
+        C2["Static log lines"]
+        C3["Machine-readable summary"]
+    end
+
     style Default fill:#6366f1,color:#fff
     style Silent fill:#f59e0b,color:#000
     style Verbose fill:#10b981,color:#fff
+    style CI fill:#ef4444,color:#fff
 ```
 
-#### Default Output
+::: tip CI Auto-Detection
+When AgentEval detects a CI environment (via `CI`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, `BUILDKITE`, `TF_BUILD`, `CODEBUILD_BUILD_ID` env vars, or when stdout is not a TTY), it automatically switches to the **CIReporter** — plain text, no colors, no animations.
+:::
+
+#### Default Output (Non-TUI)
+
+The default reporter uses a **non-TUI approach**: every line is printed sequentially and stays in your terminal scrollback. No terminal clearing, no cursor manipulation.
 
 ```
+🧪 AgentEval — 2 test(s) × 2 runner(s)
+
 📄 evals/banner.eval.ts
-✓ Add close button [copilot-cli] PASS 0.85 1.2s
-✗ Add animation [copilot-cli] FAIL 0.35 2.1s
+
+  [1/4] Add close button [copilot]
+    ✓ Environment setup
+    ● Agent execution...
+    ✓ Agent execution
+    ✓ Diff capture
+    ✓ Task verification — lint check
+    ✓ Task verification — build check
+    ✓ Judge evaluation
+  ✓ PASS 0.85 12.3s
+
+  [2/4] Add close button [claude-code]
+    ✓ Environment setup
+    ✓ Agent execution
+    ✓ Diff capture
+    ✗ Task verification — lint check
+    ✓ Judge evaluation
+  ⚠ WARN 0.65 8.1s
 
 ─── Results ───
 
   Test              Runner        Score   Status  Duration
   ──────────────────────────────────────────────────────────
-  Add close button  copilot-cli   0.85    PASS    1.2s
-  Add animation     copilot-cli   0.35    FAIL    2.1s
+  Add close button  copilot       0.85    PASS    12.3s
+  Add close button  claude-code   0.65    WARN    8.1s
 
 ─── Summary ───
   ✓ 1 passed
-  ✗ 1 failed
-  ⏱ 3.3s total
+  ⚠ 1 warnings
+  ⏱ 20.4s total
 ```
+
+**Pipeline step symbols:**
+
+- `✓` — Step completed successfully (green)
+- `●` — Step currently running (cyan)
+- `✗` — Step failed (red)
 
 #### Verbose Output
 
@@ -133,10 +170,37 @@ flowchart LR
 
 📄 evals/banner.eval.ts
 
-▶ Add close button [copilot-cli]
-  ↺ git reset --hard && git clean -fd
-  ✓ Score: 0.85 – PASS 1.2s
+  [1/2] Add close button [copilot-cli]
+    ↺ git reset --hard && git clean -fd
+    ✓ Environment setup
+    ✓ Agent execution
+    ✓ Diff capture
+    ✓ Task verification — lint check
+    ✓ Judge evaluation
+  ✓ PASS 0.85 1.2s
     Reason: Close button implemented correctly with proper event handling
+```
+
+#### CI Output
+
+```
+AgentEval: 2 test(s) x 1 runner(s)
+
+File: evals/banner.eval.ts
+[1/2] Add close button [copilot-cli]
+  [ok] Environment setup
+  [ok] Agent execution
+  [ok] Diff capture
+  [ok] Task verification — lint check
+  [ok] Judge evaluation
+  PASS score=0.85 1.2s
+[2/2] Add animation [copilot-cli]
+  [ok] Environment setup
+  [err] Agent execution
+  FAIL score=0.35 2.1s
+  reason: Animation not implemented
+
+Summary: 1 passed, 0 warnings, 1 failed (3.3s)
 ```
 
 ### Execution Flow
@@ -268,3 +332,83 @@ export default defineConfig({
 | "API key missing"       | Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` env var |
 | "Port already in use"   | Use `-p <port>` to pick a different port for the UI |
 | "Ledger not found"      | Run `agenteval run` first to create the database    |
+
+## Custom Reporters
+
+You can create your own reporter by implementing the `Reporter` interface:
+
+```typescript
+import type { Reporter, TestEvent, TestResultEvent, PipelineStep, StepStatus } from "agent-eval";
+
+class MyReporter implements Reporter {
+  onRunStart(totalTests: number, totalRunners: number): void {
+    /* ... */
+  }
+  onFileStart(filePath: string): void {
+    /* ... */
+  }
+  onTestStart(event: TestEvent): void {
+    /* ... */
+  }
+  onGitReset(event: TestEvent): void {
+    /* ... */
+  }
+  onFileWrite(event: TestEvent, filePath: string): void {
+    /* ... */
+  }
+  onPipelineStep(event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void {
+    // step: 'setup' | 'agent' | 'diff' | 'afterEach' | 'task' | 'judge'
+    // status: 'running' | 'done' | 'error'
+  }
+  onTestPass(event: TestResultEvent): void {
+    /* ... */
+  }
+  onTestWarn(event: TestResultEvent): void {
+    /* ... */
+  }
+  onTestFail(event: TestResultEvent): void {
+    /* ... */
+  }
+  onTestError(event: TestEvent, error: string): void {
+    /* ... */
+  }
+  onRunEnd(results: TestResultEvent[], durationMs: number): void {
+    /* ... */
+  }
+}
+```
+
+### Built-in Reporters
+
+| Reporter          | Import                       | Description                            |
+| ----------------- | ---------------------------- | -------------------------------------- |
+| `DefaultReporter` | `import { DefaultReporter }` | Non-TUI with pipeline steps & progress |
+| `VerboseReporter` | `import { VerboseReporter }` | Detailed output with judge reasoning   |
+| `SilentReporter`  | `import { SilentReporter }`  | No output (programmatic use)           |
+| `CIReporter`      | `import { CIReporter }`      | Plain text for CI environments         |
+
+### `isCI()` Helper
+
+The `isCI()` function detects CI environments:
+
+```typescript
+import { isCI } from "agent-eval";
+
+if (isCI()) {
+  // Running in CI — disable interactive features
+}
+```
+
+Detected environments: GitHub Actions, GitLab CI, Jenkins, CircleCI, Buildkite, Azure Pipelines, AWS CodeBuild, and any non-TTY terminal.
+
+## Terminal UX Philosophy
+
+AgentEval uses a **strict non-TUI approach**:
+
+- **No terminal clearing** — all output stays in scrollback history
+- **No cursor manipulation** — every line is printed sequentially
+- **Lightweight styling** — uses `picocolors` (14x faster than chalk, 0 dependencies)
+- **CI-friendly** — auto-detects CI environments and strips ANSI codes
+- **Pipeline visualization** — each test step is shown as a checklist item
+
+This ensures that raw logs and test output remain accessible in CI artifacts, log aggregators, and after terminal session ends.

@@ -4,14 +4,19 @@ import { resolve, join, extname } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { program } from "commander";
-import chalk from "chalk";
-import ora from "ora";
+import pc from "picocolors";
 import { glob } from "glob";
 import { createJiti } from "jiti";
 import { loadConfig, assertValidPlugins } from "../core/config.js";
 import { getRegisteredTests, clearRegisteredTests, initSession } from "../index.js";
 import { runTest, dryRunTest } from "../core/runner.js";
-import { DefaultReporter, SilentReporter, VerboseReporter } from "../core/reporter.js";
+import {
+  DefaultReporter,
+  SilentReporter,
+  VerboseReporter,
+  CIReporter,
+  isCI,
+} from "../core/reporter.js";
 import type { Reporter, TestResultEvent } from "../core/reporter.js";
 import {
   readLedger,
@@ -83,13 +88,13 @@ interface RunOptions {
 function createReporter(opts: RunOptions): Reporter {
   if (opts.silent) return new SilentReporter();
   if (opts.verbose) return new VerboseReporter();
+  if (isCI()) return new CIReporter();
   return new DefaultReporter();
 }
 
 async function executeRun(opts: RunOptions): Promise<void> {
   const cwd = process.cwd();
   const reporter = createReporter(opts);
-  const spinner = opts.silent ? null : ora("Loading config...").start();
 
   try {
     const config = await loadConfig(cwd, opts.config);
@@ -99,7 +104,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
     }
 
     initSession(config);
-    if (spinner) spinner.succeed("Config loaded");
+    if (!opts.silent) console.log(pc.green("✓ Config loaded"));
 
     // Discover test files
     const patterns =
@@ -114,11 +119,11 @@ async function executeRun(opts: RunOptions): Promise<void> {
     });
 
     if (files.length === 0) {
-      if (!opts.silent) console.log(chalk.yellow("No test files found."));
+      if (!opts.silent) console.log(pc.yellow("No test files found."));
       process.exit(0);
     }
 
-    if (!opts.silent) console.log(chalk.dim(`Found ${files.length} test file(s)\n`));
+    if (!opts.silent) console.log(pc.dim(`Found ${files.length} test file(s)\n`));
 
     // Load test files sequentially (each file registers tests via test())
     const jiti = createJiti(cwd, { interopDefault: true });
@@ -146,23 +151,23 @@ async function executeRun(opts: RunOptions): Promise<void> {
 
       // ─── Dry-run mode: output execution plan without running ───
       if (opts.dryRun) {
-        console.log(chalk.bold(`\n📄 ${relPath}`));
+        console.log(pc.bold(`\n📄 ${relPath}`));
         for (const testDef of tests) {
           const plan = await dryRunTest(testDef, config);
           const modeIcon =
             plan.mode === "declarative" ? "🔹" : plan.mode === "imperative" ? "🔸" : "❓";
-          console.log(`\n  ${modeIcon} ${chalk.bold(plan.testId)} ${chalk.dim(`(${plan.mode})`)}`);
+          console.log(`\n  ${modeIcon} ${pc.bold(plan.testId)} ${pc.dim(`(${plan.mode})`)}`);
           if (plan.suitePath && plan.suitePath.length > 0) {
-            console.log(`    Suite: ${chalk.dim(plan.suitePath.join(" > "))}`);
+            console.log(`    Suite: ${pc.dim(plan.suitePath.join(" > "))}`);
           }
           if (plan.instruction) {
-            console.log(`    Instruction: ${chalk.green(`"${plan.instruction}"`)}`);
+            console.log(`    Instruction: ${pc.green(`"${plan.instruction}"`)}`);
           }
           if (plan.tasks.length > 0) {
             console.log(`    Tasks:`);
             for (const task of plan.tasks) {
               console.log(
-                `      - ${task.name} ${chalk.dim(`(weight: ${task.weight})`)} — ${task.criteria}`,
+                `      - ${task.name} ${pc.dim(`(weight: ${task.weight})`)} — ${task.criteria}`,
               );
             }
           }
@@ -203,7 +208,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
     }
 
     if (opts.dryRun) {
-      console.log(chalk.dim("\n✅ Dry run complete. No agents were executed.\n"));
+      console.log(pc.dim("\n✅ Dry run complete. No agents were executed.\n"));
       process.exit(0);
     }
 
@@ -213,8 +218,7 @@ async function executeRun(opts: RunOptions): Promise<void> {
     const totalFailed = allResults.filter((r) => !r.entry.pass).length;
     process.exit(totalFailed > 0 ? 1 : 0);
   } catch (err: unknown) {
-    if (spinner) spinner.fail("Failed");
-    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    console.error(pc.red(err instanceof Error ? err.message : String(err)));
     process.exit(1);
   }
 }
@@ -264,7 +268,7 @@ program
     }[];
 
     if (entries.length === 0) {
-      console.log(chalk.yellow("No ledger entries found."));
+      console.log(pc.yellow("No ledger entries found."));
       return;
     }
 
@@ -274,21 +278,19 @@ program
     }
 
     const testIds = await ledger.getTestIds();
-    console.log(chalk.bold(`Ledger: ${entries.length} entries, ${testIds.length} unique tests\n`));
+    console.log(pc.bold(`Ledger: ${entries.length} entries, ${testIds.length} unique tests\n`));
 
     for (const entry of entries.slice(-20)) {
-      const icon = entry.pass ? chalk.green("✓") : chalk.red("✗");
-      const score = chalk.yellow(entry.score.toFixed(2));
+      const icon = entry.pass ? pc.green("✓") : pc.red("✗");
+      const score = pc.yellow(entry.score.toFixed(2));
       const date = new Date(entry.timestamp).toLocaleString();
       console.log(
-        `${icon} ${score} ${chalk.bold(entry.testId)} [${entry.agentRunner}] ${chalk.dim(date)}`,
+        `${icon} ${score} ${pc.bold(entry.testId)} [${entry.agentRunner}] ${pc.dim(date)}`,
       );
     }
 
     if (entries.length > 20) {
-      console.log(
-        chalk.dim(`\n  ... and ${entries.length - 20} more. Use --json for full output.`),
-      );
+      console.log(pc.dim(`\n  ... and ${entries.length - 20} more. Use --json for full output.`));
     }
   });
 
@@ -322,13 +324,13 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
   const uiDistDir = join(__dirname, "ui");
   const hasUI = existsSync(join(uiDistDir, "index.html"));
 
-  console.log(chalk.bold("🧪 AgentEval Dashboard\n"));
-  console.log(chalk.dim(`  Ledger: ${outputDir}/ledger.sqlite`));
-  console.log(chalk.dim(`  Port:   ${port}`));
+  console.log(pc.bold("🧪 AgentEval Dashboard\n"));
+  console.log(pc.dim(`  Ledger: ${outputDir}/ledger.sqlite`));
+  console.log(pc.dim(`  Port:   ${port}`));
   if (hasUI) {
-    console.log(chalk.dim(`  UI:     bundled (serving static files)`));
+    console.log(pc.dim(`  UI:     bundled (serving static files)`));
   } else {
-    console.log(chalk.dim(`  UI:     not bundled (API-only mode)`));
+    console.log(pc.dim(`  UI:     not bundled (API-only mode)`));
   }
   console.log();
 
@@ -427,18 +429,18 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
   });
 
   server.listen(port, () => {
-    console.log(chalk.green(`  ✓ Dashboard running at http://localhost:${port}`));
-    console.log(chalk.dim(`\n  Endpoints:`));
-    console.log(chalk.dim(`    GET   /api/runs           All runs (or ?testId=...)`));
-    console.log(chalk.dim(`    GET   /api/tests          List of test IDs`));
-    console.log(chalk.dim(`    GET   /api/tree           Hierarchical test tree`));
-    console.log(chalk.dim(`    GET   /api/stats          Aggregate stats per runner`));
-    console.log(chalk.dim(`    PATCH /api/runs/:id/override  Override a run score`));
-    console.log(chalk.dim(`    GET   /api/runs/:id/overrides Override audit trail`));
+    console.log(pc.green(`  ✓ Dashboard running at http://localhost:${port}`));
+    console.log(pc.dim(`\n  Endpoints:`));
+    console.log(pc.dim(`    GET   /api/runs           All runs (or ?testId=...)`));
+    console.log(pc.dim(`    GET   /api/tests          List of test IDs`));
+    console.log(pc.dim(`    GET   /api/tree           Hierarchical test tree`));
+    console.log(pc.dim(`    GET   /api/stats          Aggregate stats per runner`));
+    console.log(pc.dim(`    PATCH /api/runs/:id/override  Override a run score`));
+    console.log(pc.dim(`    GET   /api/runs/:id/overrides Override audit trail`));
     if (hasUI) {
-      console.log(chalk.dim(`    GET   /*                  Static UI (SPA)`));
+      console.log(pc.dim(`    GET   /*                  Static UI (SPA)`));
     }
-    console.log(chalk.dim(`\n  Press Ctrl+C to stop.\n`));
+    console.log(pc.dim(`\n  Press Ctrl+C to stop.\n`));
   });
 }
 

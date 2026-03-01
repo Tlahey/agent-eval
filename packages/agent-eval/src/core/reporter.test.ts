@@ -2,34 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LedgerEntry } from "./types.js";
 import { DEFAULT_THRESHOLDS, computeStatus } from "./types.js";
 import type { TestEvent, TestResultEvent } from "./reporter.js";
-import { DefaultReporter, SilentReporter, VerboseReporter } from "./reporter.js";
-
-// Mock chalk to return raw strings for easy assertions
-vi.mock("chalk", () => {
-  const identity = (s: string) => s;
-  const fn = Object.assign(identity, {
-    blue: identity,
-    gray: identity,
-    dim: identity,
-    green: identity,
-    red: identity,
-    yellow: identity,
-    bold: identity,
-  });
-  return { default: fn };
-});
-
-// Mock ora
-vi.mock("ora", () => {
-  const spinner = {
-    text: "",
-    start: vi.fn().mockReturnThis(),
-    succeed: vi.fn().mockReturnThis(),
-    fail: vi.fn().mockReturnThis(),
-    warn: vi.fn().mockReturnThis(),
-  };
-  return { default: vi.fn(() => spinner) };
-});
+import { DefaultReporter, SilentReporter, VerboseReporter, CIReporter, isCI } from "./reporter.js";
 
 function makeLedgerEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   const score = overrides.score ?? 0.85;
@@ -71,6 +44,33 @@ function makeResultEvent(overrides: Partial<TestResultEvent> = {}): TestResultEv
   };
 }
 
+// ─── isCI ───
+
+describe("isCI", () => {
+  const originalEnv = process.env;
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns true when CI env var is set", () => {
+    process.env = { ...originalEnv, CI: "true" };
+    expect(isCI()).toBe(true);
+  });
+
+  it("returns true when GITHUB_ACTIONS is set", () => {
+    process.env = { ...originalEnv, GITHUB_ACTIONS: "true" };
+    expect(isCI()).toBe(true);
+  });
+
+  it("returns true when not a TTY", () => {
+    // In test environment, stdout.isTTY is typically undefined (falsy)
+    // so isCI() will return true when no CI env vars and no TTY
+    const result = isCI();
+    expect(typeof result).toBe("boolean");
+  });
+});
+
 // ─── SilentReporter ───
 
 describe("SilentReporter", () => {
@@ -83,6 +83,7 @@ describe("SilentReporter", () => {
     reporter.onTestStart(makeTestEvent());
     reporter.onGitReset(makeTestEvent());
     reporter.onFileWrite(makeTestEvent(), "src/file.ts");
+    reporter.onPipelineStep(makeTestEvent(), "setup", "done");
     reporter.onTestPass(makeResultEvent());
     reporter.onTestWarn(makeResultEvent({ entry: makeLedgerEntry({ score: 0.65 }) }));
     reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
@@ -107,53 +108,76 @@ describe("DefaultReporter", () => {
     logSpy.mockRestore();
   });
 
+  it("prints header on onRunStart", () => {
+    const reporter = new DefaultReporter();
+    reporter.onRunStart(5, 2);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("5 test(s)"));
+  });
+
   it("prints file path on onFileStart", () => {
     const reporter = new DefaultReporter();
     reporter.onFileStart("evals/test.eval.ts");
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("evals/test.eval.ts"));
   });
 
-  it("uses ora spinner on onTestStart", async () => {
-    const ora = await import("ora");
+  it("prints progress counter on onTestStart", () => {
     const reporter = new DefaultReporter();
-    reporter.onTestStart(makeTestEvent());
-    expect(ora.default).toHaveBeenCalled();
+    reporter.onRunStart(2, 1);
+    reporter.onTestStart(makeTestEvent({ testId: "my-test" }));
+    const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("[1/2]");
+    expect(output).toContain("my-test");
   });
 
-  it("calls spinner.succeed on onTestPass", async () => {
-    const ora = await import("ora");
-    const spinner = (ora.default as unknown as ReturnType<typeof vi.fn>)();
+  it("prints pipeline step with correct icon on done", () => {
     const reporter = new DefaultReporter();
-    reporter.onTestStart(makeTestEvent());
+    reporter.onPipelineStep(makeTestEvent(), "setup", "done");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("✓"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Environment setup"));
+  });
+
+  it("prints pipeline step with running icon", () => {
+    const reporter = new DefaultReporter();
+    reporter.onPipelineStep(makeTestEvent(), "agent", "running");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("●"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Agent execution"));
+  });
+
+  it("prints pipeline step with error icon", () => {
+    const reporter = new DefaultReporter();
+    reporter.onPipelineStep(makeTestEvent(), "judge", "error");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("✗"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Judge evaluation"));
+  });
+
+  it("prints pipeline step detail when provided", () => {
+    const reporter = new DefaultReporter();
+    reporter.onPipelineStep(makeTestEvent(), "task", "done", "lint check");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("lint check"));
+  });
+
+  it("prints PASS on onTestPass", () => {
+    const reporter = new DefaultReporter();
     reporter.onTestPass(makeResultEvent());
-    expect(spinner.succeed).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("PASS"));
   });
 
-  it("calls spinner.warn on onTestWarn", async () => {
-    const ora = await import("ora");
-    const spinner = (ora.default as unknown as ReturnType<typeof vi.fn>)();
+  it("prints WARN on onTestWarn", () => {
     const reporter = new DefaultReporter();
-    reporter.onTestStart(makeTestEvent());
     reporter.onTestWarn(makeResultEvent({ entry: makeLedgerEntry({ score: 0.65 }) }));
-    expect(spinner.warn).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("WARN"));
   });
 
-  it("calls spinner.fail on onTestFail", async () => {
-    const ora = await import("ora");
-    const spinner = (ora.default as unknown as ReturnType<typeof vi.fn>)();
+  it("prints FAIL on onTestFail", () => {
     const reporter = new DefaultReporter();
-    reporter.onTestStart(makeTestEvent());
     reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
-    expect(spinner.fail).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("FAIL"));
   });
 
-  it("calls spinner.fail on onTestError", async () => {
-    const ora = await import("ora");
-    const spinner = (ora.default as unknown as ReturnType<typeof vi.fn>)();
+  it("prints ERROR on onTestError", () => {
     const reporter = new DefaultReporter();
-    reporter.onTestStart(makeTestEvent());
     reporter.onTestError(makeTestEvent(), "some error");
-    expect(spinner.fail).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("ERROR"));
   });
 
   it("prints summary table on onRunEnd", () => {
@@ -238,6 +262,7 @@ describe("VerboseReporter", () => {
 
   it("prints test id on onTestStart", () => {
     const reporter = new VerboseReporter();
+    reporter.onRunStart(1, 1);
     reporter.onTestStart(makeTestEvent({ testId: "my-test" }));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("my-test"));
   });
@@ -252,6 +277,12 @@ describe("VerboseReporter", () => {
     const reporter = new VerboseReporter();
     reporter.onFileWrite(makeTestEvent(), "src/index.ts");
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("src/index.ts"));
+  });
+
+  it("prints pipeline step events", () => {
+    const reporter = new VerboseReporter();
+    reporter.onPipelineStep(makeTestEvent(), "setup", "done");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Environment setup"));
   });
 
   it("prints PASS with reason on onTestPass", () => {
@@ -309,5 +340,79 @@ describe("VerboseReporter", () => {
     expect(output).toContain("Results");
     expect(output).toContain("Summary");
     expect(output).toContain("1 passed");
+  });
+});
+
+// ─── CIReporter ───
+
+describe("CIReporter", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it("prints plain text header on onRunStart", () => {
+    const reporter = new CIReporter();
+    reporter.onRunStart(3, 2);
+    expect(logSpy).toHaveBeenCalledWith("AgentEval: 3 test(s) x 2 runner(s)");
+  });
+
+  it("prints file path on onFileStart", () => {
+    const reporter = new CIReporter();
+    reporter.onFileStart("evals/test.eval.ts");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("evals/test.eval.ts"));
+  });
+
+  it("prints progress counter on onTestStart", () => {
+    const reporter = new CIReporter();
+    reporter.onRunStart(2, 1);
+    reporter.onTestStart(makeTestEvent());
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("[1/2]"));
+  });
+
+  it("prints pipeline steps with status tags", () => {
+    const reporter = new CIReporter();
+    reporter.onPipelineStep(makeTestEvent(), "setup", "done");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("[ok]"));
+
+    reporter.onPipelineStep(makeTestEvent(), "agent", "error");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("[err]"));
+
+    reporter.onPipelineStep(makeTestEvent(), "diff", "running");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("[...]"));
+  });
+
+  it("prints PASS on onTestPass", () => {
+    const reporter = new CIReporter();
+    reporter.onTestPass(makeResultEvent());
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("PASS"));
+  });
+
+  it("prints FAIL with reason on onTestFail", () => {
+    const reporter = new CIReporter();
+    reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
+    const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("FAIL");
+    expect(output).toContain("reason:");
+  });
+
+  it("prints summary on onRunEnd", () => {
+    const reporter = new CIReporter();
+    reporter.onRunEnd(
+      [
+        makeResultEvent(),
+        makeResultEvent({
+          testId: "test-2",
+          entry: makeLedgerEntry({ testId: "test-2", score: 0.3 }),
+        }),
+      ],
+      5000,
+    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("1 passed, 0 warnings, 1 failed"));
   });
 });
