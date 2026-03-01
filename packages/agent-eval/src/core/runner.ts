@@ -82,7 +82,7 @@ function createRawAgent(
   testId: string,
   config: AgentEvalConfig,
   env: IEnvironmentPlugin,
-): AgentHandle {
+): Omit<AgentHandle, "instruct"> {
   return {
     name: runner.name,
     model: runner.api?.model ?? runner.command ?? "unknown",

@@ -35,31 +35,35 @@ flowchart LR
 ## Basic Example
 
 ```ts
-import { test, describe } from "agent-eval";
+import { test, beforeEach } from "agent-eval";
 
-test("add close button to Banner", ({ agent, ctx }) => {
-  // 1. Declare what the agent should do
-  agent.instruct("Add a close button to the Banner component");
+// Common verification tasks for all tests
+beforeEach(({ ctx }) => {
+  ctx.addTask({
+    name: "Tests",
+    action: () => ctx.exec("pnpm test"),
+    criteria: "All existing and new tests must pass",
+    weight: 3,
+  });
 
-  // 2. Declare verification tasks with criteria
   ctx.addTask({
     name: "Build",
     action: () => ctx.exec("pnpm build"),
     criteria: "TypeScript build must succeed with zero errors",
     weight: 2,
   });
+});
 
-  ctx.addTask({
-    name: "Tests",
-    action: () => ctx.exec("pnpm test"),
-    criteria: "All existing tests must pass",
-    weight: 3,
-  });
+test("add close button to Banner", ({ agent, ctx }) => {
+  // 1. Declare what the agent should do
+  agent.instruct("Add a close button to the Banner component");
 
+  // 2. Add test-specific verification tasks
   ctx.addTask({
-    name: "Lint",
-    action: () => ctx.exec("pnpm lint"),
-    criteria: "No new lint warnings or errors",
+    name: "Close button",
+    action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
+    criteria: "A close button with aria-label='Close' is rendered",
+    weight: 2,
   });
 });
 ```
@@ -157,25 +161,42 @@ sequenceDiagram
 
 ## Lifecycle Hooks
 
-Use `beforeEach()` and `afterEach()` for shared setup/teardown:
+Use `beforeEach()` and `afterEach()` for shared setup/teardown. This is the recommended pattern for registering **common verification tasks** (build, test, lint) that apply to all tests:
 
 ```ts
-import { describe, test, beforeEach, afterEach } from "agent-eval";
+import { test, beforeEach, afterEach } from "agent-eval";
 
-describe("Banner component", () => {
-  beforeEach(async (ctx) => {
-    // Runs before each test in this describe block
-    await ctx.exec("pnpm install");
+// Register common verification tasks for ALL tests
+beforeEach(({ ctx }) => {
+  ctx.addTask({
+    name: "Tests",
+    action: () => ctx.exec("pnpm test"),
+    criteria: "All existing and new tests must pass",
+    weight: 3,
   });
 
-  afterEach(async (ctx) => {
-    // Runs after each test (even on failure)
-    await ctx.exec("pnpm clean");
+  ctx.addTask({
+    name: "Build",
+    action: () => ctx.exec("pnpm build"),
+    criteria: "TypeScript compilation must succeed with zero errors",
+    weight: 2,
   });
+});
 
-  test("add close button", ({ agent, ctx }) => {
-    agent.instruct("Add close button");
-    ctx.addTask({ name: "Build", action: () => ctx.exec("pnpm build"), criteria: "succeeds" });
+afterEach(async ({ ctx }) => {
+  // Runs after each test (even on failure)
+  await ctx.exec("pnpm clean");
+});
+
+test("Add close button to Banner", ({ agent, ctx }) => {
+  agent.instruct("Add a close button to the Banner component");
+
+  // Test-specific task (in addition to the common ones from beforeEach)
+  ctx.addTask({
+    name: "Close button renders",
+    action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
+    criteria: "A close button with aria-label='Close' is rendered when onClose is provided",
+    weight: 2,
   });
 });
 ```

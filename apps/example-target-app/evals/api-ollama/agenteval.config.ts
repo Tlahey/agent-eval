@@ -38,13 +38,6 @@ export default defineConfig({
     model: "claude-sonnet-4-20250514",
   },
 
-  // Commands run automatically after each agent.run() call.
-  // storeDiff() is always called first (built-in).
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
-
   testFiles: "evals/api-ollama/**/*.eval.ts",
   outputDir: ".agenteval",
   timeout: 300_000, // Local models can be slower

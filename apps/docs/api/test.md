@@ -157,7 +157,11 @@ Register lifecycle hooks that run around each test. Follows Vitest-style scoping
 function beforeEach(fn: HookFn): void;
 function afterEach(fn: HookFn): void;
 
-type HookFn = (ctx: HookContext) => void | Promise<void>;
+type HookFn = (args: HookContext) => void | Promise<void>;
+
+interface HookContext {
+  ctx: TestContext;
+}
 ```
 
 ### Hook Scoping
@@ -169,22 +173,34 @@ type HookFn = (ctx: HookContext) => void | Promise<void>;
 ```ts
 import { test, describe, beforeEach, afterEach } from "agent-eval";
 
-beforeEach(async (ctx) => {
-  // Runs before ALL tests
+beforeEach(({ ctx }) => {
+  // Runs before ALL tests — add common verification tasks
+  ctx.addTask({
+    name: "Tests",
+    action: () => ctx.exec("pnpm test"),
+    criteria: "All tests must pass",
+    weight: 3,
+  });
 });
 
 describe("UI", () => {
-  beforeEach(async (ctx) => {
+  beforeEach(({ ctx }) => {
     // Runs before UI tests only
+    ctx.addTask({
+      name: "Lint",
+      action: () => ctx.exec("pnpm lint"),
+      criteria: "No lint errors",
+    });
   });
 
-  afterEach(async (ctx) => {
+  afterEach(async ({ ctx }) => {
     // Runs after UI tests, even on failure
+    await ctx.exec("pnpm clean");
   });
 
   test("task", ({ agent, ctx }) => {
     agent.instruct("do something");
-    ctx.addTask({ name: "t", action: () => ctx.exec("echo ok"), criteria: "pass" });
+    ctx.addTask({ name: "verify", action: () => ctx.exec("echo ok"), criteria: "pass" });
   });
 });
 ```
