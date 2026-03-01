@@ -48,7 +48,7 @@ Async version of `storeDiff()`. Used internally by the runner for environments t
 
 ### `runCommand(name, command)`
 
-Runs a shell command via the configured [environment plugin](/guide/environments) and stores the result. Each command has a **120-second timeout**.
+Runs a shell command via the configured [environment plugin](/guide/plugins-environments) and stores the result. Each command has a **120-second timeout**.
 
 ```ts
 interface CommandResult {

@@ -126,7 +126,7 @@ Before each test iteration, the **environment plugin** prepares a clean workspac
 - **`DockerEnvironment`**: creates a fresh container with the project files
 - **Custom environments**: implement `IEnvironmentPlugin` for your own setup logic (cloud VMs, remote agents, etc.)
 
-After the test completes, `env.teardown()` is called to clean up resources (no-op for local, container removal for Docker). See the [Environments guide](/guide/environments).
+After the test completes, `env.teardown()` is called to clean up resources (no-op for local, container removal for Docker). See the [Environments guide](/guide/plugins-environments).
 
 ## Data Flow
 
@@ -308,6 +308,6 @@ With the plugin architecture, extending AgentEval no longer requires modifying c
 | New CLI command      | Add `program.command()` in `cli/cli.ts`              |
 | New context method   | Add to `TestContext` interface + `EvalContext` class |
 
-See the [Plugin Architecture](/guide/plugin-architecture) guide for full details.
+See the [Plugins guide](/guide/plugins) for full details.
 
 See ADR-007 (`docs/adrs/007-solid-architecture.md`) for the full decision record.

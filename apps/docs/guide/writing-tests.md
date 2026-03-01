@@ -41,7 +41,7 @@ flowchart TD
 ```
 
 ::: info Environment Setup
-The **environment plugin** handles workspace preparation. By default, `LocalEnvironment` runs `git reset --hard HEAD && git clean -fd`. With `DockerEnvironment`, it creates a fresh container. You can implement your own `IEnvironmentPlugin` for custom setups. See [Environments](/guide/environments).
+The **environment plugin** handles workspace preparation. By default, `LocalEnvironment` runs `git reset --hard HEAD && git clean -fd`. With `DockerEnvironment`, it creates a fresh container. You can implement your own `IEnvironmentPlugin` for custom setups. See [Environments](/guide/plugins-environments).
 :::
 
 ## File Naming

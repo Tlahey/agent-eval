@@ -233,9 +233,7 @@ Configure thresholds in your config:
 
 ```ts
 export default defineConfig({
-  options: {
-    thresholds: { warn: 0.8, fail: 0.5 },
-  },
+  thresholds: { warn: 0.8, fail: 0.5 },
 });
 ```
 

@@ -275,7 +275,7 @@ flowchart LR
 ```
 
 ::: tip Environment Plugin
-Both CLI and API runners execute within the configured [environment plugin](/guide/environments). By default, the **LocalEnvironment** is used (git reset + local exec). You can configure Docker or custom environments — see [Environments](/guide/environments).
+Both CLI and API runners execute within the configured [environment plugin](/guide/plugins-environments). By default, the **LocalEnvironment** is used (git reset + local exec). You can configure Docker or custom environments — see [Environments](/guide/plugins-environments).
 :::
 
 | Aspect        | CLI Runner               | API Runner                    |

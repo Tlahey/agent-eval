@@ -1,6 +1,6 @@
 # Configuration
 
-AgentEval is configured via `agenteval.config.ts` at the root of your project.
+AgentEval is configured via `agenteval.config.ts` at the root of your project (or per eval suite).
 
 ## Config Resolution
 
@@ -22,68 +22,59 @@ flowchart TD
     style K fill:#10b981,color:#fff
 ```
 
-## Full Example
+## Minimal Example
 
 ```ts
+// agenteval.config.ts
 import { defineConfig } from "agent-eval";
 
 export default defineConfig({
-  // Where test files are located
-  testFiles: "**/*.{eval,agent-eval}.{ts,js}",
-
-  // Agent runners to evaluate
   runners: [
-    // CLI runner: any tool that accepts a prompt via command line
     {
-      name: "copilot",
+      name: "claude-code",
       type: "cli",
-      command: 'gh copilot suggest -t shell "{{prompt}}"',
+      command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
     },
+  ],
+  judge: {
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
+  },
+});
+```
+
+## Full Example (with plugins)
+
+```ts
+import { defineConfig, AnthropicLLM, SqliteLedger, LocalEnvironment } from "agent-eval";
+
+export default defineConfig({
+  // ── Plugins ────────────────────────────────────
+  llm: new AnthropicLLM({ defaultModel: "claude-sonnet-4-20250514" }),
+  ledger: new SqliteLedger({ outputDir: ".agenteval" }),
+  environment: new LocalEnvironment(),
+
+  // ── Runners ────────────────────────────────────
+  runners: [
     {
       name: "claude-code",
       type: "cli",
       command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
     },
     {
-      name: "aider-sonnet",
-      type: "cli",
-      command:
-        'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
-    },
-    // API runner: calls an LLM directly
-    {
       name: "gpt-4o-api",
       type: "api",
-      api: {
-        provider: "openai",
-        model: "gpt-4o",
-      },
+      api: { provider: "openai", model: "gpt-4o" },
     },
   ],
 
-  // Judge configuration — use a strong, capable model
-  // API judge (default):
+  // ── Judge ──────────────────────────────────────
   judge: {
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
   },
 
-  // Or use a CLI judge:
-  // judge: {
-  //   type: "cli",
-  //   command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
-  //   maxRetries: 3, // Retry on invalid JSON (default: 2)
-  // },
-
-  // Commands to run automatically after each agent execution.
-  // storeDiff() is always called automatically — no need to add it here.
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
-
-  // Config-level beforeEach hook — runs before EVERY test in this config.
-  // Great for registering common verification tasks.
+  // ── Lifecycle hooks ────────────────────────────
   beforeEach: ({ ctx }) => {
     ctx.addTask({
       name: "Tests",
@@ -91,67 +82,114 @@ export default defineConfig({
       criteria: "All existing and new tests must pass",
       weight: 3,
     });
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "Build succeeds with zero errors",
+      weight: 2,
+    });
   },
 
-  // Model matrix (optional): only run specific runners
-  matrix: {
-    runners: ["copilot", "claude-code"],
-  },
-
-  // Output directory for the ledger
+  // ── Options ────────────────────────────────────
+  testFiles: "**/*.eval.ts",
   outputDir: ".agenteval",
-
-  // Timeout per agent run (ms)
   timeout: 300_000,
-
-  // Global scoring thresholds (optional)
-  // score >= warn → PASS, score >= fail → WARN, score < fail → FAIL
-  thresholds: {
-    warn: 0.8, // default
-    fail: 0.5, // default
-  },
+  thresholds: { warn: 0.8, fail: 0.5 },
 });
 ```
 
 ## Options Reference
 
-| Option        | Type                             | Default                                  | Description                                                                  |
-| ------------- | -------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                                       |
-| `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                                           |
-| `runners`     | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                                                    |
-| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                                                      |
-| `beforeEach`  | `HookFn`                         | —                                        | Config-level hook called before each test (can add tasks)                    |
-| `afterEach`   | `AfterEachCommand[]`             | —                                        | Commands to run after each agent (auto storeDiff first)                      |
-| `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                                              |
-| `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                                                      |
-| `timeout`     | `number`                         | `300000`                                 | Agent run timeout (ms)                                                       |
-| `thresholds`  | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL                             |
-| `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin (see [Plugin Architecture](/guide/plugin-architecture)) |
-| `llm`         | `ILLMPlugin`                     | Built-in Vercel AI SDK                   | Custom LLM plugin (see [Plugin Architecture](/guide/plugin-architecture))    |
-| `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment (see [Environments](/guide/environments))              |
+| Option        | Type                             | Default                                  | Description                                           |
+| ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
+| `runners`     | `AgentRunnerConfig[]`            | _required_                               | Agent runners to evaluate                             |
+| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                               |
+| `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                    |
+| `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                |
+| `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                               |
+| `timeout`     | `number`                         | `300000`                                 | Agent run timeout (ms)                                |
+| `thresholds`  | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL      |
+| `beforeEach`  | `HookFn`                         | —                                        | Config-level hook called before each test             |
+| `afterEach`   | `AfterEachCommand[]`             | —                                        | Commands to run after each agent execution            |
+| `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                       |
+| `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin — see [Plugins](/guide/plugins)  |
+| `llm`         | `ILLMPlugin`                     | Built-in Vercel AI SDK                   | Custom LLM plugin — see [Plugins](/guide/plugins)     |
+| `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment — see [Plugins](/guide/plugins) |
 
-## Environment Variables
+## Plugins
 
-AgentEval reads these environment variables automatically:
+AgentEval is extensible via three plugin axes: **LLM** (models), **Ledger** (storage), and **Environment** (execution). When no plugins are configured, sensible defaults are used.
 
-| Variable            | Used by                | Description               |
-| ------------------- | ---------------------- | ------------------------- |
-| `ANTHROPIC_API_KEY` | Anthropic runner/judge | API key for Claude models |
-| `OPENAI_API_KEY`    | OpenAI runner/judge    | API key for GPT models    |
+```ts
+import {
+  defineConfig,
+  // LLM plugins
+  AnthropicLLM,
+  OpenAILLM,
+  OllamaLLM,
+  // Ledger plugins
+  SqliteLedger,
+  JsonLedger,
+  // Environment plugins
+  LocalEnvironment,
+  DockerEnvironment,
+} from "agent-eval";
 
-You can set them in your shell or use a `.env` file:
+export default defineConfig({
+  // Pick one LLM plugin — or omit to use the built-in Vercel AI SDK
+  llm: new AnthropicLLM({ defaultModel: "claude-sonnet-4-20250514" }),
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export OPENAI_API_KEY=sk-...
+  // Pick one ledger plugin — or omit for SqliteLedger
+  ledger: new SqliteLedger({ outputDir: ".agenteval" }),
+
+  // Pick one environment plugin — or omit for LocalEnvironment
+  environment: new LocalEnvironment(),
+
+  // ...runners, judge, etc.
+});
 ```
 
-::: tip
-Since `agenteval.config.ts` is a TypeScript file, you can use `process.env` directly or import `dotenv` for `.env` file support.
+| Plugin Axis     | Built-in Options                         | Default            |
+| --------------- | ---------------------------------------- | ------------------ |
+| **LLM**         | `AnthropicLLM`, `OpenAILLM`, `OllamaLLM` | Vercel AI SDK      |
+| **Ledger**      | `SqliteLedger`, `JsonLedger`             | `SqliteLedger`     |
+| **Environment** | `LocalEnvironment`, `DockerEnvironment`  | `LocalEnvironment` |
+
+::: tip Learn more
+See the dedicated [Plugins guide](/guide/plugins) for interfaces, custom plugins, and detailed configuration for each.
 :::
 
-## Automatic Post-Agent Hooks
+## Lifecycle Hooks
+
+### beforeEach (Config-level)
+
+Register common verification tasks that apply to **all tests** using this config. This is the recommended place for shared tasks like test, build, and lint:
+
+```ts
+export default defineConfig({
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "Build succeeds",
+      weight: 2,
+    });
+  },
+  // ...
+});
+```
+
+`beforeEach` can also be defined at file-level and describe-level in eval files. See [Writing Tests — beforeEach](/guide/writing-tests#beforeeach-3-levels-of-scoping) for the full scoping model.
+
+### afterEach (Auto commands)
+
+Commands run **automatically** after each agent execution, before the judge evaluates. `storeDiff()` always runs first.
 
 ```mermaid
 flowchart LR
@@ -165,135 +203,102 @@ flowchart LR
     style E fill:#10b981,color:#fff
 ```
 
-After each `agent.run()` call, AgentEval automatically:
-
-1. **Captures the git diff** — `storeDiff()` is called automatically, no need to call it manually
-2. **Runs `afterEach` commands** — any commands defined in config are executed sequentially
-
-This means your test files stay clean and focused on the prompt + criteria:
-
 ```ts
-// agenteval.config.ts
 export default defineConfig({
-  runners: [{ name: "claude", type: "cli", command: 'claude -p "{{prompt}}"' }],
-  judge: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
   afterEach: [
     { name: "test", command: "pnpm test" },
     { name: "typecheck", command: "pnpm build" },
   ],
-});
-
-// my-feature.eval.ts — no boilerplate needed
-test("Add close button", async ({ agent, ctx }) => {
-  await agent.run("Add a close button to Banner.tsx");
-  // ✅ storeDiff + pnpm test + pnpm build already ran automatically
-  await expect(ctx).toPassJudge({ criteria: "Close button works..." });
+  // ...
 });
 ```
 
-You can still call `ctx.runCommand()` manually for test-specific commands that aren't in the global config.
+::: tip beforeEach vs afterEach
+
+- **`beforeEach`** is a function that receives `{ ctx }` — use it to register `ctx.addTask()` verification tasks for the declarative pipeline
+- **`afterEach`** is an array of shell commands that run automatically after the agent — their output is available to the judge
+  :::
+
+## Environment Variables
+
+AgentEval reads these environment variables automatically:
+
+| Variable            | Used by                | Description               |
+| ------------------- | ---------------------- | ------------------------- |
+| `ANTHROPIC_API_KEY` | Anthropic runner/judge | API key for Claude models |
+| `OPENAI_API_KEY`    | OpenAI runner/judge    | API key for GPT models    |
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+```
+
+::: tip
+Since `agenteval.config.ts` is a TypeScript file, you can use `process.env` directly or import `dotenv` for `.env` file support.
+:::
 
 ## Runner Configuration
 
-AgentEval supports two runner types. See the dedicated [Runners guide](/guide/runners) for full details and examples.
+AgentEval supports two runner types: **CLI** (shell commands) and **API** (direct LLM calls).
 
 ### CLI Runner
 
-Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction. Most CLI coding agents accept a model flag to choose which LLM to use.
+Spawns a shell command. Use `{{prompt}}` as the placeholder for the test instruction.
 
 ```ts
-// GitHub Copilot
-{
-  name: "copilot",
-  type: "cli",
-  command: 'gh copilot suggest -t shell "{{prompt}}"',
-}
-
-// Claude Code with specific tools
-{
-  name: "claude-code",
-  type: "cli",
-  command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
-}
-
-// Aider with model selection
-{
-  name: "aider-sonnet",
-  type: "cli",
-  command: 'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',
-}
-
-// OpenAI Codex CLI
-{
-  name: "codex",
-  type: "cli",
-  command: 'codex "{{prompt}}" --approval-mode full-auto',
-}
+runners: [
+  {
+    name: "claude-code",
+    type: "cli",
+    command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+  },
+  { name: "aider", type: "cli", command: 'aider --message "{{prompt}}" --yes --no-auto-commits' },
+  { name: "codex", type: "cli", command: 'codex "{{prompt}}" --approval-mode full-auto' },
+];
 ```
 
 ### API Runner
 
-Calls an LLM directly via the Vercel AI SDK. The model returns structured file operations.
+Calls an LLM directly. The model returns structured file operations that AgentEval writes to disk.
 
 ```ts
-{
-  name: "claude-api",
-  type: "api",
-  api: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-    // apiKey: "sk-ant-...",   // or use ANTHROPIC_API_KEY env var
-    // baseURL: "https://...", // optional custom endpoint
+runners: [
+  {
+    name: "claude-api",
+    type: "api",
+    api: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
   },
-}
+  { name: "gpt-4o", type: "api", api: { provider: "openai", model: "gpt-4o" } },
+];
 ```
+
+See the dedicated [Runners guide](/guide/runners) for all supported agents and detailed examples.
 
 ## Judge Configuration
 
-The judge evaluates agent output using an LLM. See the [Judges guide](/guide/judges) for scoring, per-test overrides, and provider details.
-
-::: warning Choose a strong model
-The judge must understand code, parse diffs, and interpret test output. Always use a frontier-class model (`claude-sonnet-4`, `gpt-4o`, `claude-opus-4`). Avoid small or local models — they produce unreliable evaluations.
-:::
-
-### API Judge (default)
+The judge evaluates agent output using an LLM. See the [Judges guide](/guide/judges) for full details.
 
 ```ts
+// API judge (default) — recommended
 judge: {
   provider: "anthropic",
   model: "claude-sonnet-4-20250514",
 }
-```
 
-| Provider    | Package                              | Recommended Model           | Auth                |
-| ----------- | ------------------------------------ | --------------------------- | ------------------- |
-| `anthropic` | `@ai-sdk/anthropic`                  | `claude-sonnet-4-20250514`  | `ANTHROPIC_API_KEY` |
-| `openai`    | `@ai-sdk/openai`                     | `gpt-4o`                    | `OPENAI_API_KEY`    |
-| `ollama`    | `@ai-sdk/openai` (OpenAI-compatible) | ⚠️ Not recommended as judge | None (local)        |
-
-### CLI Judge
-
-Use any CLI tool as a judge. The command must return JSON `{ pass, score, reason }` on stdout.
-
-```ts
-// Claude CLI as judge
+// CLI judge — use any CLI tool
 judge: {
   type: "cli",
   command: 'claude -p "$(cat {{prompt_file}})" --output-format json',
 }
-
-// Custom evaluation script
-judge: {
-  type: "cli",
-  command: "python evaluate.py --prompt-file {{prompt_file}}",
-}
 ```
 
-Use `{{prompt_file}}` to pass the (potentially very long) prompt via a temp file, or `{{prompt}}` for inline replacement.
+::: warning Choose a strong model
+Always use a frontier-class model as judge (`claude-sonnet-4`, `gpt-4o`, `claude-opus-4`). Small or local models produce unreliable evaluations.
+:::
 
 ## Scoring Thresholds
 
-AgentEval uses a three-level scoring system: **PASS**, **WARN**, and **FAIL**. The status is derived from the judge's numeric score and configurable thresholds.
+AgentEval uses a three-level scoring system: **PASS**, **WARN**, and **FAIL**.
 
 ```mermaid
 flowchart LR
@@ -308,8 +313,6 @@ flowchart LR
     style F fill:#ef4444,color:#fff
 ```
 
-### Default Thresholds
-
 | Threshold | Default | Meaning                             |
 | --------- | ------- | ----------------------------------- |
 | `warn`    | `0.8`   | Scores ≥ 0.8 are **PASS**           |
@@ -317,36 +320,8 @@ flowchart LR
 |           |         | Scores < 0.5 are **FAIL**           |
 
 ::: tip WARN doesn't break CI
-Only **FAIL** throws an error and fails the test. **WARN** results are flagged but still count as passing — they won't break your pipeline.
+Only **FAIL** throws an error. **WARN** results are flagged but still count as passing.
 :::
-
-### Global Thresholds
-
-Set thresholds in your config file to apply to all tests:
-
-```ts
-export default defineConfig({
-  // ...
-  thresholds: {
-    warn: 0.85, // Higher bar for PASS
-    fail: 0.6, // Higher bar before FAIL
-  },
-});
-```
-
-### Per-Test Thresholds
-
-Override globally for individual tests via `JudgeOptions.thresholds`:
-
-```ts
-test("critical feature", async ({ agent, ctx }) => {
-  await agent.run("Implement authentication");
-  await expect(ctx).toPassJudge({
-    criteria: "Secure auth implementation",
-    thresholds: { warn: 0.9, fail: 0.7 }, // Stricter for this test
-  });
-});
-```
 
 ### Threshold Precedence
 
@@ -360,4 +335,15 @@ flowchart TD
     style GT fill:#4f46e5,color:#fff
     style DT fill:#374151,color:#fff
     style R fill:#10b981,color:#fff
+```
+
+```ts
+// Global thresholds (in config)
+thresholds: { warn: 0.85, fail: 0.6 }
+
+// Per-test override (in toPassJudge)
+await expect(ctx).toPassJudge({
+  criteria: "...",
+  thresholds: { warn: 0.9, fail: 0.7 }, // overrides global
+});
 ```

@@ -326,17 +326,20 @@ Output:
 The imperative API (`agent.run()` + `expect().toPassJudge()`) continues to work unchanged. You can mix imperative and declarative tests in the same test file — just not in the same test.
 
 ```ts
-// Imperative test (still works)
-test("old style", async ({ agent, ctx }) => {
+// Imperative test
+test("imperative style", async ({ agent, ctx }) => {
   await agent.run("do something");
-  ctx.storeDiff();
-  await ctx.runCommand("build", "pnpm build");
+  // storeDiff + afterEach commands run automatically
   await expect(ctx).toPassJudge({ criteria: "it works" });
 });
 
-// Declarative test (new)
-test("new style", ({ agent, ctx }) => {
+// Declarative test
+test("declarative style", async ({ agent, ctx }) => {
   agent.instruct("do something");
   ctx.addTask({ name: "build", action: () => ctx.exec("pnpm build"), criteria: "it works" });
+  await expect(ctx).toPassJudge({
+    criteria: "Implementation is correct and build passes",
+    expectedFiles: ["src/feature.ts"],
+  });
 });
 ```
