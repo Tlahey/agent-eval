@@ -167,3 +167,69 @@ flowchart LR
 
 - The **judge** calls `config.judge.llm.createModel()` to get the model, then uses `generateObject()` with a Zod schema to get structured `{ pass, score, reason }`.
 - The **API runner** calls its model plugin's `createModel()` to get the model, then uses `generateObject()` with a file schema to generate code files.
+
+## ICliModel
+
+CLI models represent shell-based agents (IDE tools, CLI wrappers, custom scripts). They implement the `ICliModel` interface instead of `IModelPlugin`.
+
+### Interface
+
+```ts
+interface ICliModel {
+  readonly type: "cli";
+  readonly name: string;
+  readonly command: string;
+  parseOutput?: CliOutputParser;
+}
+```
+
+The optional `parseOutput` callback extracts structured metrics from the CLI tool's raw output:
+
+```ts
+interface CliOutputMetrics {
+  tokenUsage?: TokenUsage; // Extracted token counts
+  agentOutput?: string; // Cleaned output (e.g., JSON unwrapped)
+}
+
+type CliOutputParser = (output: { stdout: string; stderr: string }) => CliOutputMetrics;
+```
+
+When `parseOutput` is not provided, the runner uses raw stdout as agent output with no token data.
+
+### Creating a CLI Model with Token Parsing
+
+Use `CliModel` from `agent-eval/providers/cli` — it implements `ICliModel`:
+
+```ts
+import { CliModel } from "agent-eval/providers/cli";
+
+// Simple CLI — no token parsing (e.g., Copilot)
+const copilot = new CliModel({
+  command: 'gh copilot suggest "{{prompt}}"',
+});
+
+// CLI with token usage extraction (e.g., Claude Code)
+const claudeCode = new CliModel({
+  command: 'claude -p "{{prompt}}" --output-format json --allowedTools "Edit,Write,Bash"',
+  parseOutput: ({ stdout }) => {
+    const json = JSON.parse(stdout);
+    return {
+      tokenUsage: json.usage
+        ? {
+            inputTokens: json.usage.input_tokens,
+            outputTokens: json.usage.output_tokens,
+            totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+          }
+        : undefined,
+      agentOutput: json.result,
+    };
+  },
+});
+```
+
+::: info Token availability
+
+- **API models** (`IModelPlugin`): Token usage is always available from the Vercel AI SDK response.
+- **CLI models with `parseOutput`**: Token usage depends on what the CLI tool exposes.
+- **CLI models without `parseOutput`**: Token usage is `undefined` — the dashboard shows "N/A".
+  :::

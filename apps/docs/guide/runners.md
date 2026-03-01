@@ -97,9 +97,28 @@ Use `--no-auto-commits` so AgentEval captures the raw diff before any commit. Us
 ```ts
 {
   name: "claude-code",
-  model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
+  model: new CliModel({
+    command: 'claude -p "{{prompt}}" --output-format json --allowedTools "Edit,Write,Bash"',
+    parseOutput: ({ stdout }) => {
+      const json = JSON.parse(stdout);
+      return {
+        tokenUsage: json.usage
+          ? {
+              inputTokens: json.usage.input_tokens,
+              outputTokens: json.usage.output_tokens,
+              totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+            }
+          : undefined,
+        agentOutput: json.result,
+      };
+    },
+  }),
 }
 ```
+
+::: tip Token extraction
+Use `--output-format json` with `parseOutput` to extract token usage from Claude Code's structured output. See [Token Usage Extraction](#token-usage-extraction) below.
+:::
 
 #### OpenAI Codex CLI
 
@@ -122,6 +141,45 @@ You can wrap any logic in a script and use it as a runner:
 ```
 
 Your script receives the prompt as a CLI argument and should modify files in the current working directory. See `apps/example-target-app/scripts/mock-agent.mjs` for an example.
+
+### Token Usage Extraction
+
+CLI agents don't inherently report token usage like API runners do. The optional `parseOutput` callback on `CliModel` lets you extract token data and clean up the raw stdout from agents that expose usage metrics.
+
+```ts
+import type { CliOutputParser, CliOutputMetrics } from "agent-eval";
+
+// parseOutput receives { stdout, stderr } and returns CliOutputMetrics
+const parser: CliOutputParser = ({ stdout }) => {
+  const json = JSON.parse(stdout);
+  return {
+    tokenUsage: {
+      inputTokens: json.usage.input_tokens,
+      outputTokens: json.usage.output_tokens,
+      totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+    },
+    agentOutput: json.result, // cleaned output (without JSON wrapper)
+  };
+};
+```
+
+When `parseOutput` is **not provided**, the runner uses raw stdout as the agent output and token usage is `undefined`. The dashboard displays "N/A" for token metrics in that case.
+
+#### CLI Token Support Status
+
+| Agent            | Token Reporting        | `parseOutput` Needed? | Notes                                    |
+| ---------------- | ---------------------- | --------------------- | ---------------------------------------- |
+| Claude Code      | ✅ JSON `usage` field  | ✅ Yes                | Use `--output-format json`               |
+| Aider            | ✅ Stdout text summary | ✅ Yes                | Parse "Tokens: Xk sent, Yk received"     |
+| GitHub Copilot   | ❌ None                | ❌ No                 | Token usage unavailable                  |
+| Cursor           | ❌ None                | ❌ No                 | Token usage unavailable                  |
+| Cline            | ❌ None                | ❌ No                 | Token usage unavailable                  |
+| OpenAI Codex CLI | ❌ None                | ❌ No                 | Token usage unavailable                  |
+| Custom script    | Depends                | If available          | Implement parsing for your output format |
+
+::: info Best effort
+Token usage is **best effort** for CLI models. API models (`IModelPlugin`) always have token data from the Vercel AI SDK response. CLI models only have token data when `parseOutput` is provided and the agent exposes usage metrics.
+:::
 
 ---
 
@@ -279,14 +337,15 @@ flowchart LR
 Both CLI and API runners execute within the configured [environment plugin](/guide/plugins-environments). By default, the **LocalEnvironment** is used (git reset + local exec). You can configure Docker or custom environments — see [Environments](/guide/plugins-environments).
 :::
 
-| Aspect        | CLI Runner               | API Runner                    |
-| ------------- | ------------------------ | ----------------------------- |
-| **Execution** | Spawns shell command     | HTTP API call                 |
-| **Agent**     | IDE agents, CLI tools    | Raw LLM models                |
-| **Timeout**   | 600s default             | Network-dependent             |
-| **Output**    | Agent writes files       | AgentEval writes from JSON    |
-| **CI**        | Needs agent installed    | Only needs API key            |
-| **Use case**  | Real-world agent testing | Model comparison, headless CI |
+| Aspect         | CLI Runner                   | API Runner                    |
+| -------------- | ---------------------------- | ----------------------------- |
+| **Execution**  | Spawns shell command         | HTTP API call                 |
+| **Agent**      | IDE agents, CLI tools        | Raw LLM models                |
+| **Timeout**    | 600s default                 | Network-dependent             |
+| **Output**     | Agent writes files           | AgentEval writes from JSON    |
+| **Token data** | Optional (via `parseOutput`) | Always available (AI SDK)     |
+| **CI**         | Needs agent installed        | Only needs API key            |
+| **Use case**   | Real-world agent testing     | Model comparison, headless CI |
 
 ---
 
