@@ -569,6 +569,39 @@ This file tracks the implementation progress of the AgentEval framework. It is u
 
 ---
 
+## Phase 22 — Modern CLI UX & Dynamic Reporter ✅
+
+- [x] **Terminal Styling**
+  - [x] Replace `chalk` and `ora` with `picocolors` (14x faster, zero dependencies)
+  - [x] Non-TUI approach: no terminal clearing, all output stays in scrollback history
+  - [x] Unicode symbols for pipeline steps: ✓ (done), ● (running), ✗ (error)
+
+- [x] **Pipeline Step Visualization**
+  - [x] `onPipelineStep(event, step, status, detail?)` on Reporter interface
+  - [x] `PipelineStep` type: `setup | agent | diff | afterEach | task | judge`
+  - [x] `StepStatus` type: `running | done | error`
+  - [x] Runner emits pipeline events at each stage (declarative + setup)
+  - [x] Batch progress counter `[N/M]` for matrix testing
+
+- [x] **CI Auto-Detection**
+  - [x] `isCI()` utility checking: CI, GITHUB_ACTIONS, GITLAB_CI, JENKINS_URL, CIRCLECI, BUILDKITE, TF_BUILD, CODEBUILD_BUILD_ID, !isTTY
+  - [x] `CIReporter`: plain text, no colors, machine-readable output
+  - [x] CLI auto-selects CIReporter when CI detected
+
+- [x] **Reporters**
+  - [x] `DefaultReporter`: non-TUI with pipeline steps, progress counter, summary table
+  - [x] `VerboseReporter`: detailed pipeline steps with judge reasoning
+  - [x] `SilentReporter`: no-op (unchanged)
+  - [x] `CIReporter`: new, plain text for CI environments
+  - [x] All reporters implement `onPipelineStep`
+
+- [x] **Tests & Documentation**
+  - [x] Reporter tests rewritten: DefaultReporter, VerboseReporter, CIReporter, isCI, onPipelineStep
+  - [x] Updated CLI docs with non-TUI output examples, CI detection, custom reporter API
+  - [x] Exported `CIReporter`, `isCI`, `PipelineStep`, `StepStatus` from public API
+
+---
+
 ## Future — Planned
 
 - [ ] Benchmark suites — Curated evaluation sets for common tasks (React components, API endpoints, refactoring)

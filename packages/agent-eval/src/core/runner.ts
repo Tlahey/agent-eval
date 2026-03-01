@@ -414,8 +414,10 @@ export async function runTest(
     rep.onTestStart(event);
 
     // Setup workspace via environment plugin (git reset, docker create, etc.)
+    rep.onPipelineStep(event, "setup", "running");
     rep.onGitReset(event);
     await env.setup(cwd);
+    rep.onPipelineStep(event, "setup", "done");
 
     const ctx = new EvalContext(cwd, env);
     const { agent, state } = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
@@ -553,24 +555,34 @@ async function executeDeclarativePipeline(
   start: number,
   thresholds: import("./types.js").Thresholds,
 ): Promise<LedgerEntry> {
+  const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
+
   // 1. Execute the agent instruction
+  reporter.onPipelineStep(event, "agent", "running");
   await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, config, env);
+  reporter.onPipelineStep(event, "agent", "done");
 
   // 2. Auto storeDiff
+  reporter.onPipelineStep(event, "diff", "running");
   await ctx.storeDiffAsync();
+  reporter.onPipelineStep(event, "diff", "done");
 
   // 3. Run config afterEach commands
   if (config.afterEach) {
+    reporter.onPipelineStep(event, "afterEach", "running");
     for (const cmd of config.afterEach) {
       await ctx.runCommand(cmd.name, cmd.command);
     }
+    reporter.onPipelineStep(event, "afterEach", "done");
   }
 
   // 4. Execute registered tasks and collect results
   const taskResults: Array<{ task: TaskDefinition; result: CommandResult }> = [];
   for (const task of ctx.tasks) {
+    reporter.onPipelineStep(event, "task", "running", task.name);
     const result = await task.action();
     taskResults.push({ task, result });
+    reporter.onPipelineStep(event, "task", "done", task.name);
   }
 
   // 5. Auto judge evaluation
@@ -578,8 +590,10 @@ async function executeDeclarativePipeline(
 
   if (taskResults.length > 0) {
     // Build a weighted judge prompt from task criteria
+    reporter.onPipelineStep(event, "judge", "running");
     const prompt = buildDeclarativeJudgePrompt(instruction, taskResults, ctx);
     const judgeResult = await runJudge(ctx, prompt, config.judge);
+    reporter.onPipelineStep(event, "judge", "done");
 
     const status = computeStatus(judgeResult.score, thresholds);
     return {

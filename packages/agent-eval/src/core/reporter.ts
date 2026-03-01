@@ -1,6 +1,31 @@
-import chalk from "chalk";
-import ora, { type Ora } from "ora";
+import pc from "picocolors";
 import type { LedgerEntry } from "./types.js";
+
+// ─── CI Environment Detection ───
+
+/**
+ * Detect if running in a CI/non-interactive environment.
+ * Checks common CI env vars and TTY status.
+ */
+export function isCI(): boolean {
+  return !!(
+    process.env.CI ||
+    process.env.GITHUB_ACTIONS ||
+    process.env.GITLAB_CI ||
+    process.env.JENKINS_URL ||
+    process.env.CIRCLECI ||
+    process.env.BUILDKITE ||
+    process.env.TF_BUILD ||
+    process.env.CODEBUILD_BUILD_ID ||
+    !process.stdout.isTTY
+  );
+}
+
+// ─── Pipeline Step Types ───
+
+export type PipelineStep = "setup" | "agent" | "diff" | "afterEach" | "task" | "judge";
+
+export type StepStatus = "running" | "done" | "error";
 
 // ─── Reporter Interface ───
 
@@ -30,6 +55,8 @@ export interface Reporter {
   onGitReset(event: TestEvent): void;
   /** Called when a file is written by an API runner */
   onFileWrite(event: TestEvent, filePath: string): void;
+  /** Called when a pipeline step starts or completes */
+  onPipelineStep(event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void;
   /** Called when a test passes */
   onTestPass(event: TestResultEvent): void;
   /** Called when a test gets a warning (score between fail and warn thresholds) */
@@ -42,96 +69,87 @@ export interface Reporter {
   onRunEnd(results: TestResultEvent[], durationMs: number): void;
 }
 
-// ─── Default Reporter (rich terminal output with spinners and summary table) ───
+// ─── Step labels ───
+
+const STEP_LABELS: Record<PipelineStep, string> = {
+  setup: "Environment setup",
+  agent: "Agent execution",
+  diff: "Diff capture",
+  afterEach: "Post-agent commands",
+  task: "Task verification",
+  judge: "Judge evaluation",
+};
+
+const STEP_ICON_DONE = "✓";
+const STEP_ICON_FAIL = "✗";
+const STEP_ICON_RUN = "●";
+
+// ─── Default Reporter (non-TUI, scrollback-safe with pipeline steps) ───
 
 export class DefaultReporter implements Reporter {
-  private spinner: Ora | null = null;
+  private progress = { current: 0, total: 0 };
 
-  onRunStart(_totalTests: number, _totalRunners: number): void {
-    // Intentionally empty — executeRun prints its own header
+  onRunStart(totalTests: number, totalRunners: number): void {
+    this.progress.total = totalTests * totalRunners;
+    this.progress.current = 0;
+    console.log(pc.bold(`\n🧪 AgentEval — ${totalTests} test(s) × ${totalRunners} runner(s)\n`));
   }
 
   onFileStart(filePath: string): void {
-    console.log(chalk.bold(`\n📄 ${filePath}`));
+    console.log(pc.bold(`📄 ${filePath}`));
   }
 
   onTestStart(event: TestEvent): void {
-    this.spinner = ora({
-      text: `${chalk.blue(event.testId)} ${chalk.gray(`[${event.runner}]`)}`,
-      spinner: "dots",
-    }).start();
+    this.progress.current++;
+    const counter = pc.dim(`[${this.progress.current}/${this.progress.total}]`);
+    console.log(`\n  ${counter} ${pc.blue(event.testId)} ${pc.gray(`[${event.runner}]`)}`);
   }
 
   onGitReset(_event: TestEvent): void {
-    // Spinner is already running — no additional output needed
+    // Covered by onPipelineStep(setup)
   }
 
   onFileWrite(_event: TestEvent, filePath: string): void {
-    if (this.spinner) {
-      this.spinner.text += chalk.dim(` 📝 ${filePath}`);
+    console.log(pc.dim(`       📝 ${filePath}`));
+  }
+
+  onPipelineStep(_event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void {
+    const label = STEP_LABELS[step];
+    const suffix = detail ? pc.dim(` ${detail}`) : "";
+    if (status === "running") {
+      console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
+    } else if (status === "done") {
+      console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
+    } else {
+      console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
   }
 
   onTestPass(event: TestResultEvent): void {
-    const score = chalk.yellow(event.entry.score.toFixed(2));
-    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    if (this.spinner) {
-      this.spinner.succeed(
-        `${chalk.blue(event.testId)} ${chalk.gray(`[${event.runner}]`)} ${chalk.green("PASS")} ${score} ${dur}`,
-      );
-      this.spinner = null;
-    }
+    const score = pc.yellow(event.entry.score.toFixed(2));
+    const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${pc.green("✓ PASS")} ${score} ${dur}`);
   }
 
   onTestWarn(event: TestResultEvent): void {
-    const score = chalk.yellow(event.entry.score.toFixed(2));
-    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    if (this.spinner) {
-      this.spinner.warn(
-        `${chalk.blue(event.testId)} ${chalk.gray(`[${event.runner}]`)} ${chalk.yellow("WARN")} ${score} ${dur}`,
-      );
-      this.spinner = null;
-    }
+    const score = pc.yellow(event.entry.score.toFixed(2));
+    const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${pc.yellow("⚠ WARN")} ${score} ${dur}`);
   }
 
   onTestFail(event: TestResultEvent): void {
-    const score = chalk.yellow(event.entry.score.toFixed(2));
-    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    if (this.spinner) {
-      this.spinner.fail(
-        `${chalk.blue(event.testId)} ${chalk.gray(`[${event.runner}]`)} ${chalk.red("FAIL")} ${score} ${dur}`,
-      );
-      this.spinner = null;
-    }
+    const score = pc.yellow(event.entry.score.toFixed(2));
+    const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${pc.red("✗ FAIL")} ${score} ${dur}`);
   }
 
-  onTestError(event: TestEvent, error: string): void {
-    if (this.spinner) {
-      this.spinner.fail(
-        `${chalk.blue(event.testId)} ${chalk.gray(`[${event.runner}]`)} ${chalk.red("ERROR")}`,
-      );
-      this.spinner = null;
-    }
-    console.log(chalk.red(`    ${error}`));
+  onTestError(_event: TestEvent, error: string): void {
+    console.log(`  ${pc.red("✗ ERROR")} ${pc.red(error)}`);
   }
 
   onRunEnd(results: TestResultEvent[], durationMs: number): void {
-    const passed = results.filter((r) => r.entry.status === "PASS").length;
-    const warned = results.filter((r) => r.entry.status === "WARN").length;
-    const failed = results.filter((r) => r.entry.status === "FAIL").length;
-
-    console.log("");
     printSummaryTable(results);
-
-    console.log(chalk.bold("\n─── Summary ───"));
-    console.log(chalk.green(`  ✓ ${passed} passed`));
-    if (warned > 0) {
-      console.log(chalk.yellow(`  ⚠ ${warned} warnings`));
-    }
-    if (failed > 0) {
-      console.log(chalk.red(`  ✗ ${failed} failed`));
-    }
-    console.log(chalk.dim(`  ⏱ ${(durationMs / 1000).toFixed(1)}s total\n`));
+    printSummaryFooter(results, durationMs);
   }
 }
 
@@ -143,6 +161,12 @@ export class SilentReporter implements Reporter {
   onTestStart(_event: TestEvent): void {}
   onGitReset(_event: TestEvent): void {}
   onFileWrite(_event: TestEvent, _filePath: string): void {}
+  onPipelineStep(
+    _event: TestEvent,
+    _step: PipelineStep,
+    _status: StepStatus,
+    _detail?: string,
+  ): void {}
   onTestPass(_event: TestResultEvent): void {}
   onTestWarn(_event: TestResultEvent): void {}
   onTestFail(_event: TestResultEvent): void {}
@@ -153,80 +177,155 @@ export class SilentReporter implements Reporter {
 // ─── Verbose Reporter (detailed output with full reasoning) ───
 
 export class VerboseReporter implements Reporter {
+  private progress = { current: 0, total: 0 };
+
   onRunStart(totalTests: number, totalRunners: number): void {
-    console.log(chalk.bold(`\n🧪 AgentEval — ${totalTests} test(s) × ${totalRunners} runner(s)\n`));
+    this.progress.total = totalTests * totalRunners;
+    this.progress.current = 0;
+    console.log(pc.bold(`\n🧪 AgentEval — ${totalTests} test(s) × ${totalRunners} runner(s)\n`));
   }
 
   onFileStart(filePath: string): void {
-    console.log(chalk.bold(`\n📄 ${filePath}`));
+    console.log(pc.bold(`\n📄 ${filePath}`));
   }
 
   onTestStart(event: TestEvent): void {
-    console.log(chalk.blue(`\n▶ ${event.testId}`) + chalk.gray(` [${event.runner}]`));
+    this.progress.current++;
+    const counter = pc.dim(`[${this.progress.current}/${this.progress.total}]`);
+    console.log(`\n  ${counter} ${pc.blue(event.testId)} ${pc.gray(`[${event.runner}]`)}`);
   }
 
   onGitReset(_event: TestEvent): void {
-    console.log(chalk.dim("  ↺ git reset --hard && git clean -fd"));
+    console.log(pc.dim("    ↺ git reset --hard && git clean -fd"));
   }
 
   onFileWrite(_event: TestEvent, filePath: string): void {
-    console.log(chalk.dim(`  📝 wrote ${filePath}`));
+    console.log(pc.dim(`       📝 ${filePath}`));
+  }
+
+  onPipelineStep(_event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void {
+    const label = STEP_LABELS[step];
+    const suffix = detail ? pc.dim(` ${detail}`) : "";
+    if (status === "running") {
+      console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
+    } else if (status === "done") {
+      console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
+    } else {
+      console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
+    }
   }
 
   onTestPass(event: TestResultEvent): void {
-    const score = chalk.yellow(event.entry.score.toFixed(2));
-    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    console.log(`  ${chalk.green("✓")} Score: ${score} – ${chalk.green("PASS")} ${dur}`);
+    const score = pc.yellow(event.entry.score.toFixed(2));
+    const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${pc.green("✓ PASS")} ${score} ${dur}`);
     if (event.entry.reason) {
-      console.log(chalk.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
+      console.log(pc.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
     }
   }
 
   onTestWarn(event: TestResultEvent): void {
-    const score = chalk.yellow(event.entry.score.toFixed(2));
-    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    console.log(`  ${chalk.yellow("⚠")} Score: ${score} – ${chalk.yellow("WARN")} ${dur}`);
+    const score = pc.yellow(event.entry.score.toFixed(2));
+    const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${pc.yellow("⚠ WARN")} ${score} ${dur}`);
     if (event.entry.reason) {
-      console.log(chalk.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
+      console.log(pc.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
     }
     if (event.entry.improvement) {
-      console.log(chalk.dim(`    Improve: ${truncate(event.entry.improvement, 120)}`));
+      console.log(pc.dim(`    Improve: ${truncate(event.entry.improvement, 120)}`));
     }
   }
 
   onTestFail(event: TestResultEvent): void {
-    const score = chalk.yellow(event.entry.score.toFixed(2));
-    const dur = chalk.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    console.log(`  ${chalk.red("✗")} Score: ${score} – ${chalk.red("FAIL")} ${dur}`);
+    const score = pc.yellow(event.entry.score.toFixed(2));
+    const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  ${pc.red("✗ FAIL")} ${score} ${dur}`);
     if (event.entry.reason) {
-      console.log(chalk.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
+      console.log(pc.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
     }
     if (event.entry.improvement) {
-      console.log(chalk.dim(`    Improve: ${truncate(event.entry.improvement, 120)}`));
+      console.log(pc.dim(`    Improve: ${truncate(event.entry.improvement, 120)}`));
     }
   }
 
-  onTestError(event: TestEvent, error: string): void {
-    console.log(`  ${chalk.red("✗")} ${chalk.red("Error:")} ${error}`);
+  onTestError(_event: TestEvent, error: string): void {
+    console.log(`  ${pc.red("✗ ERROR")} ${pc.red(error)}`);
+  }
+
+  onRunEnd(results: TestResultEvent[], durationMs: number): void {
+    printSummaryTable(results);
+    printSummaryFooter(results, durationMs);
+  }
+}
+
+// ─── CI Reporter (static logging, no colors, no animations) ───
+
+export class CIReporter implements Reporter {
+  private progress = { current: 0, total: 0 };
+
+  onRunStart(totalTests: number, totalRunners: number): void {
+    this.progress.total = totalTests * totalRunners;
+    this.progress.current = 0;
+    console.log(`AgentEval: ${totalTests} test(s) x ${totalRunners} runner(s)`);
+  }
+
+  onFileStart(filePath: string): void {
+    console.log(`\nFile: ${filePath}`);
+  }
+
+  onTestStart(event: TestEvent): void {
+    this.progress.current++;
+    console.log(
+      `[${this.progress.current}/${this.progress.total}] ${event.testId} [${event.runner}]`,
+    );
+  }
+
+  onGitReset(_event: TestEvent): void {}
+
+  onFileWrite(_event: TestEvent, filePath: string): void {
+    console.log(`  wrote: ${filePath}`);
+  }
+
+  onPipelineStep(_event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void {
+    const label = STEP_LABELS[step];
+    const suffix = detail ? ` ${detail}` : "";
+    console.log(
+      `  ${status === "done" ? "[ok]" : status === "error" ? "[err]" : "[...]"} ${label}${suffix}`,
+    );
+  }
+
+  onTestPass(event: TestResultEvent): void {
+    console.log(
+      `  PASS score=${event.entry.score.toFixed(2)} ${(event.durationMs / 1000).toFixed(1)}s`,
+    );
+  }
+
+  onTestWarn(event: TestResultEvent): void {
+    console.log(
+      `  WARN score=${event.entry.score.toFixed(2)} ${(event.durationMs / 1000).toFixed(1)}s`,
+    );
+  }
+
+  onTestFail(event: TestResultEvent): void {
+    console.log(
+      `  FAIL score=${event.entry.score.toFixed(2)} ${(event.durationMs / 1000).toFixed(1)}s`,
+    );
+    if (event.entry.reason) {
+      console.log(`  reason: ${truncate(event.entry.reason, 200)}`);
+    }
+  }
+
+  onTestError(_event: TestEvent, error: string): void {
+    console.log(`  ERROR: ${error}`);
   }
 
   onRunEnd(results: TestResultEvent[], durationMs: number): void {
     const passed = results.filter((r) => r.entry.status === "PASS").length;
     const warned = results.filter((r) => r.entry.status === "WARN").length;
     const failed = results.filter((r) => r.entry.status === "FAIL").length;
-
-    console.log("");
-    printSummaryTable(results);
-
-    console.log(chalk.bold("\n─── Summary ───"));
-    console.log(chalk.green(`  ✓ ${passed} passed`));
-    if (warned > 0) {
-      console.log(chalk.yellow(`  ⚠ ${warned} warnings`));
-    }
-    if (failed > 0) {
-      console.log(chalk.red(`  ✗ ${failed} failed`));
-    }
-    console.log(chalk.dim(`  ⏱ ${(durationMs / 1000).toFixed(1)}s total\n`));
+    console.log(
+      `\nSummary: ${passed} passed, ${warned} warnings, ${failed} failed (${(durationMs / 1000).toFixed(1)}s)`,
+    );
   }
 }
 
@@ -235,36 +334,35 @@ export class VerboseReporter implements Reporter {
 function printSummaryTable(results: TestResultEvent[]): void {
   if (results.length === 0) return;
 
-  // Column widths
   const testCol = Math.max(6, ...results.map((r) => r.testId.length)) + 2;
   const runnerCol = Math.max(8, ...results.map((r) => r.runner.length)) + 2;
 
   const hdr =
-    chalk.dim("  ") +
+    pc.dim("  ") +
     pad("Test", testCol) +
     pad("Runner", runnerCol) +
     pad("Score", 8) +
     pad("Status", 8) +
     pad("Duration", 10);
 
-  const sep = chalk.dim("  " + "─".repeat(testCol + runnerCol + 8 + 8 + 10));
+  const sep = pc.dim("  " + "─".repeat(testCol + runnerCol + 8 + 8 + 10));
 
-  console.log(chalk.bold("─── Results ───\n"));
+  console.log(pc.bold("\n─── Results ───\n"));
   console.log(hdr);
   console.log(sep);
 
   for (const r of results) {
     const statusMap = {
-      PASS: chalk.green("PASS"),
-      WARN: chalk.yellow("WARN"),
-      FAIL: chalk.red("FAIL"),
+      PASS: pc.green("PASS"),
+      WARN: pc.yellow("WARN"),
+      FAIL: pc.red("FAIL"),
     };
-    const status = statusMap[r.entry.status] ?? chalk.red("FAIL");
-    const score = chalk.yellow(r.entry.score.toFixed(2));
+    const status = statusMap[r.entry.status] ?? pc.red("FAIL");
+    const score = pc.yellow(r.entry.score.toFixed(2));
     const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
 
     console.log(
-      chalk.dim("  ") +
+      pc.dim("  ") +
         pad(r.testId, testCol) +
         pad(r.runner, runnerCol) +
         pad(score, 8) +
@@ -272,6 +370,22 @@ function printSummaryTable(results: TestResultEvent[]): void {
         pad(dur, 10),
     );
   }
+}
+
+function printSummaryFooter(results: TestResultEvent[], durationMs: number): void {
+  const passed = results.filter((r) => r.entry.status === "PASS").length;
+  const warned = results.filter((r) => r.entry.status === "WARN").length;
+  const failed = results.filter((r) => r.entry.status === "FAIL").length;
+
+  console.log(pc.bold("\n─── Summary ───"));
+  console.log(pc.green(`  ✓ ${passed} passed`));
+  if (warned > 0) {
+    console.log(pc.yellow(`  ⚠ ${warned} warnings`));
+  }
+  if (failed > 0) {
+    console.log(pc.red(`  ✗ ${failed} failed`));
+  }
+  console.log(pc.dim(`  ⏱ ${(durationMs / 1000).toFixed(1)}s total\n`));
 }
 
 // ─── Helpers ───
