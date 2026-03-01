@@ -703,8 +703,6 @@ function buildImperativeEntry(
     durationMs,
     thresholds,
   };
-
-  return entry;
 }
 
 // ─── Global judge result store (set by expect().toPassJudge) ───
