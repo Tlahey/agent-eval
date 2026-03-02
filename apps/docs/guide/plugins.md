@@ -137,23 +137,146 @@ AgentEval validates plugins at startup. Missing or invalid methods produce clear
 
 ## Creating Custom Plugins
 
-Each plugin category has a typed interface you can implement:
+Each plugin category has a typed interface you can implement. Custom plugins can live **inside your project** or be published as **standalone npm packages** that anyone can install and use.
+
+### Inline Plugin (same project)
+
+Create a plugin directly in your codebase:
 
 ```ts
-import type { IModelPlugin, ILedgerPlugin, IEnvironmentPlugin } from "agent-eval";
+// my-plugins/mistral-model.ts
+import type { IModelPlugin } from "agent-eval";
 
-class MyModel implements IModelPlugin {
-  /* ... */
-}
-class MyLedger implements ILedgerPlugin {
-  /* ... */
-}
-class MyEnv implements IEnvironmentPlugin {
-  /* ... */
+export class MistralModel implements IModelPlugin {
+  readonly name = "mistral";
+  readonly modelId: string;
+
+  constructor(private opts: { model: string; apiKey?: string }) {
+    this.modelId = opts.model;
+  }
+
+  async createModel() {
+    const { createMistral } = await import("@ai-sdk/mistral");
+    return createMistral({ apiKey: this.opts.apiKey })(this.opts.model);
+  }
 }
 ```
 
-See each plugin page for complete interface definitions and examples.
+Then import it in your config:
+
+```ts
+// agenteval.config.ts
+import { defineConfig } from "agent-eval";
+import { MistralModel } from "./my-plugins/mistral-model";
+
+export default defineConfig({
+  runners: [{ name: "mistral", model: new MistralModel({ model: "mistral-large-latest" }) }],
+  judge: { llm: new MistralModel({ model: "mistral-large-latest" }) },
+});
+```
+
+### External Plugin (npm package)
+
+You can publish a plugin as an **independent npm package** so others can install and use it. This is the recommended approach for reusable plugins.
+
+```mermaid
+flowchart LR
+    PKG["📦 agenteval-plugin-mistral<br/>(npm package)"] -->|"pnpm add"| CONFIG["agenteval.config.ts"]
+    CONFIG --> AE["AgentEval Framework"]
+
+    style PKG fill:#f59e0b,color:#000
+    style CONFIG fill:#6366f1,color:#fff
+    style AE fill:#10b981,color:#fff
+```
+
+#### Step 1: Create the package
+
+```bash
+mkdir agenteval-plugin-mistral && cd agenteval-plugin-mistral
+npm init -y
+pnpm add agent-eval @ai-sdk/mistral
+```
+
+#### Step 2: Implement the interface
+
+```ts
+// src/index.ts
+import type { IModelPlugin } from "agent-eval";
+
+export class MistralModel implements IModelPlugin {
+  readonly name = "mistral";
+  readonly modelId: string;
+
+  constructor(private opts: { model: string; apiKey?: string }) {
+    this.modelId = opts.model;
+  }
+
+  async createModel() {
+    const { createMistral } = await import("@ai-sdk/mistral");
+    return createMistral({ apiKey: this.opts.apiKey })(this.opts.model);
+  }
+}
+```
+
+#### Step 3: Publish
+
+```bash
+npm publish
+```
+
+#### Step 4: Use in any project
+
+```bash
+pnpm add -D agent-eval agenteval-plugin-mistral
+```
+
+```ts
+// agenteval.config.ts
+import { defineConfig } from "agent-eval";
+import { MistralModel } from "agenteval-plugin-mistral";
+
+export default defineConfig({
+  runners: [{ name: "mistral", model: new MistralModel({ model: "mistral-large-latest" }) }],
+  judge: { llm: new MistralModel({ model: "mistral-large-latest" }) },
+});
+```
+
+::: tip Naming convention
+We recommend prefixing community plugins with `agenteval-plugin-` for discoverability:
+
+- `agenteval-plugin-mistral` — Mistral model plugin
+- `agenteval-plugin-postgres` — PostgreSQL ledger plugin
+- `agenteval-plugin-kubernetes` — K8s environment plugin
+  :::
+
+### What You Can Build
+
+Any of the three plugin types can be external packages:
+
+| Plugin type     | Interface            | Example packages                                                                 |
+| --------------- | -------------------- | -------------------------------------------------------------------------------- |
+| **Model**       | `IModelPlugin`       | `agenteval-plugin-mistral`, `agenteval-plugin-cohere`, `agenteval-plugin-gemini` |
+| **Ledger**      | `ILedgerPlugin`      | `agenteval-plugin-postgres`, `agenteval-plugin-mongodb`, `agenteval-plugin-s3`   |
+| **Environment** | `IEnvironmentPlugin` | `agenteval-plugin-kubernetes`, `agenteval-plugin-ssh`, `agenteval-plugin-wasm`   |
+
+All interfaces are exported from the main `"agent-eval"` entry point — your package only needs `agent-eval` as a **peer dependency**:
+
+```json
+{
+  "name": "agenteval-plugin-mistral",
+  "peerDependencies": {
+    "agent-eval": ">=0.1.0"
+  }
+}
+```
+
+See each plugin page for complete interface definitions and examples:
+
+- **[Models (LLM)](./plugins-llm)** — `IModelPlugin` for wrapping LLM providers
+- **[Ledger (Storage)](./plugins-ledger)** — `ILedgerPlugin` for result persistence and querying
+- **[Environments](./plugins-environments)** — `IEnvironmentPlugin` for workspace isolation and command execution
+
+Runners are plain config objects (`RunnerConfig`) documented in the [Runners](./runners) page.
 
 ## Dependency Flow
 

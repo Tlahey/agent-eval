@@ -13,7 +13,7 @@ This file provides instructions for AI coding agents working on the AgentEval fr
 ```
 agent-eval/
 ├── AGENTS.md              ← You are here
-├── PRD.md                 ← Product requirements document
+├── ROADMAP.md             ← Project roadmap
 ├── pnpm-workspace.yaml    ← Workspace config (apps/* + packages/*)
 ├── .github/workflows/
 │   ├── ci.yml             ← CI pipeline (lint → test → build → typecheck)
@@ -682,7 +682,7 @@ agenteval ui                   # API server on :4747
 
 ---
 
-## 🔮 Roadmap (from PRD)
+## 🔮 Roadmap
 
 - [x] **Phase 1**: Core runner, config, test/expect API, CLI, JSONL ledger
 - [x] **Phase 2a**: SQLite ledger migration (node:sqlite), ADRs
