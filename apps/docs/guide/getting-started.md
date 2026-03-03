@@ -28,13 +28,13 @@ flowchart LR
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { AnthropicModel } from "agent-eval/llm";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [
     {
       name: "copilot",
-      command: 'gh copilot suggest "{{prompt}}"',
+      model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }),
     },
   ],
   judge: {

@@ -25,10 +25,10 @@ Uses Anthropic's Claude models via `@ai-sdk/anthropic`.
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { AnthropicModel } from "agent-eval/llm";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
-  runners: [{ name: "copilot", command: "gh copilot -p '{{prompt}}'" }],
+  runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
   judge: {
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },

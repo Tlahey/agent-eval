@@ -280,7 +280,7 @@ flowchart TB
     CONFIG --> CLI["CLI"]
 
     RUNNER -->|"config.runners[]"| RC["RunnerConfig[]"]
-    RUNNER -->|"config.judge.model"| MP["IModelPlugin"]
+    RUNNER -->|"config.judge.model"| MP["LlmConfig"]
     RUNNER -->|"config.ledger"| LEDGER["ILedgerPlugin"]
     RUNNER -->|"config.environment"| ENV["IEnvironmentPlugin"]
     CLI -->|"config.ledger"| LEDGER

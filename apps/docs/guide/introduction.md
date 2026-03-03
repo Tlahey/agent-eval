@@ -100,9 +100,11 @@ A **runner** is the AI agent being evaluated. It can be:
 You can define **multiple runners** in your config to compare agents head-to-head on the same tests.
 
 ```ts
+import { AnthropicModel, CliModel } from "agent-eval/llm";
+
 export default defineConfig({
   runners: [
-    { name: "copilot", command: 'gh copilot suggest "{{prompt}}"' },
+    { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
     { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
   ],
 });
