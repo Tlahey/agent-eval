@@ -157,11 +157,11 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { OpenAIModel } from "agent-eval/llm";
+import { CliModel, OpenAIModel } from "agent-eval/llm";
 
 export default defineConfig({
-  runners: [{ name: "copilot", command: 'gh copilot "{{prompt}}"' }],
-  judge: { llm: new OpenAIModel({ model: "gpt-4o" }) },
+  runners: [{ name: "copilot", model: new CliModel({ command: 'gh copilot "{{prompt}}"' }) }],
+  judge: { model: new OpenAIModel({ model: "gpt-4o" }) },
 
   beforeEach: ({ ctx }) => {
     ctx.addTask({

@@ -228,6 +228,7 @@ export type {
   JudgmentData,
   RunReport,
   RunnerConfig,
+  LlmConfig,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
 export { validateRunnerNames } from "./core/config.js";

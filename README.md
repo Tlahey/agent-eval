@@ -101,7 +101,7 @@ export default defineConfig({
 
   // Judge — LLM model used to score every test
   judge: {
-    llm: new OpenAIModel({ model: "gpt-4o" }),
+    model: new OpenAIModel({ model: "gpt-4o" }),
   },
 
   // Ledger plugin (default: SQLite)

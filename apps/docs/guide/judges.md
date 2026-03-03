@@ -21,10 +21,14 @@ flowchart TD
     A["Evaluation triggered"] --> B["Build judge prompt"]
     B --> C["Include: criteria + diff + commands + file scope"]
 
-    C --> E["generateObject()<br/>Vercel AI SDK + Zod"]
+    C --> D{"Model type?"}
+    D -- "API (IModelPlugin)" --> E["generateObject()<br/>Vercel AI SDK + Zod"]
+    D -- "CLI (ICliModel)" --> F["execSync(command)<br/>Parse JSON stdout"]
 
     E --> J["Zod validation"]
+    F --> J2["JSON.parse + field check"]
     J --> K{"Compute status<br/>via thresholds"}
+    J2 --> K
     K -- "score ≥ 0.8" --> L["✅ PASS"]
     K -- "score ≥ 0.5" --> L2["⚠️ WARN"]
     K -- "score < 0.5" --> M["❌ FAIL"]
@@ -34,6 +38,7 @@ flowchart TD
     N --> O["📝 Append to ledger"]
 
     style E fill:#6366f1,color:#fff
+    style F fill:#f59e0b,color:#000
     style L fill:#10b981,color:#fff
     style M fill:#ef4444,color:#fff
 ```
@@ -60,7 +65,8 @@ flowchart TD
 import { AnthropicModel } from "agent-eval/llm";
 
 judge: {
-  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  name: "claude-judge",
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
 }
 ```
 
@@ -78,7 +84,7 @@ Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in constructor).
 import { OpenAIModel } from "agent-eval/llm";
 
 judge: {
-  llm: new OpenAIModel({ model: "gpt-4o" }),
+  model: new OpenAIModel({ model: "gpt-4o" }),
 }
 ```
 
@@ -96,7 +102,7 @@ Requires `OPENAI_API_KEY` environment variable (or `apiKey` in constructor).
 import { OllamaModel } from "agent-eval/llm";
 
 judge: {
-  llm: new OllamaModel({ model: "llama3" }),
+  model: new OllamaModel({ model: "llama3" }),
 }
 ```
 
@@ -128,11 +134,52 @@ class CompanyModel implements IModelPlugin {
 
 // In config:
 judge: {
-  llm: new CompanyModel();
+  model: new CompanyModel();
 }
 ```
 
 This works with **Azure OpenAI**, **Together AI**, **Fireworks**, **Groq**, and any provider exposing an OpenAI-compatible API.
+
+### CLI Model as Judge
+
+You can also use a CLI-based model (e.g., `claude`, `gemini`) as the judge. The CLI command must output valid JSON matching `{ pass, score, reason, improvement }`.
+
+```ts
+import { CliModel } from "agent-eval/llm";
+
+judge: {
+  model: new CliModel({
+    command: 'claude -p "{{prompt}}" --output-format json',
+  }),
+}
+```
+
+The framework will:
+
+1. Build the judge evaluation prompt (same as API models)
+2. Replace `{{prompt}}` in the CLI command with the prompt
+3. Execute the command and capture stdout
+4. Parse the JSON output to extract `{ pass, score, reason, improvement }`
+
+If the `pass` field is missing, it's inferred from the score (`score >= 0.5` → `pass: true`).
+
+::: tip Custom output parsing
+If your CLI tool's stdout isn't raw JSON (e.g., it includes extra output or uses a different format), implement `parseOutput` on your `CliModel` to extract the relevant JSON:
+
+```ts
+new CliModel({
+  command: 'my-tool "{{prompt}}"',
+  parseOutput: ({ stdout, stderr }) => ({
+    agentOutput: extractJsonFromOutput(stdout),
+  }),
+});
+```
+
+:::
+
+::: warning
+CLI judges are less reliable than API judges — they depend on the CLI tool outputting valid JSON. Always use `maxRetries` to handle occasional parsing failures.
+:::
 
 ## Retry Configuration
 
@@ -140,15 +187,16 @@ The judge **must** return valid structured data (`{ pass, score, reason, improve
 
 ```ts
 judge: {
-  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   maxRetries: 3, // default: 2
 }
 ```
 
-| Option       | Type           | Default | Description                                          |
-| ------------ | -------------- | ------- | ---------------------------------------------------- |
-| `llm`        | `IModelPlugin` | —       | LLM plugin for judge evaluation                      |
-| `maxRetries` | `number`       | `2`     | Number of retry attempts on failure (0 = no retries) |
+| Option       | Type        | Default | Description                                          |
+| ------------ | ----------- | ------- | ---------------------------------------------------- |
+| `name`       | `string`    | —       | Human-readable name for the judge                    |
+| `model`      | `LlmConfig` | —       | LLM for judge evaluation (API or CLI model)          |
+| `maxRetries` | `number`    | `2`     | Number of retry attempts on failure (0 = no retries) |
 
 After all attempts are exhausted, the judge throws an error with the last failure message.
 
@@ -246,4 +294,4 @@ flowchart TD
 
 Sections marked in amber are **conditionally included** — only when the test uses `instruct()` or `addTask()`.
 
-The response is enforced via Zod structured output (`generateObject`), guaranteeing `{ pass, score, reason, improvement }` — no prompt injection or malformed JSON.
+The response is enforced via Zod structured output (`generateObject`) for API models, or JSON parsing for CLI models — guaranteeing `{ pass, score, reason, improvement }`.

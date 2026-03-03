@@ -25,7 +25,7 @@ export default defineConfig({
   ],
 
   judge: {
-    llm: new OpenAIModel({ model: "gpt-4o" }),
+    model: new OpenAIModel({ model: "gpt-4o" }),
   },
 
   beforeEach: ({ ctx }) => {

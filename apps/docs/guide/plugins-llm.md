@@ -25,12 +25,12 @@ Uses Anthropic's Claude models via `@ai-sdk/anthropic`.
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { AnthropicModel } from "agent-eval/llm";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
-  runners: [{ name: "copilot", command: "gh copilot -p '{{prompt}}'" }],
+  runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
   judge: {
-    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
 ```
@@ -60,7 +60,7 @@ const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
   runners: [{ name: "gpt-4o", model: gpt4o }],
-  judge: { llm: gpt4o },
+  judge: { model: gpt4o },
 });
 ```
 
@@ -103,7 +103,7 @@ const llama = new OllamaModel({ model: "llama3" });
 
 export default defineConfig({
   runners: [{ name: "llama3", model: llama }],
-  judge: { llm: llama },
+  judge: { model: llama },
 });
 ```
 
@@ -165,7 +165,7 @@ flowchart LR
     style F fill:#10b981,color:#fff
 ```
 
-- The **judge** calls `config.judge.llm.createModel()` to get the model, then uses `generateObject()` with a Zod schema to get structured `{ pass, score, reason }`.
+- The **judge** calls `config.judge.model.createModel()` to get the model, then uses `generateObject()` with a Zod schema to get structured `{ pass, score, reason }`.
 - The **API runner** calls its model plugin's `createModel()` to get the model, then uses `generateObject()` with a file schema to generate code files.
 
 ## ICliModel

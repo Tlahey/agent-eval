@@ -20,7 +20,7 @@ export default defineConfig({
     { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
   ],
   judge: {
-    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
   beforeEach: ({ ctx }) => {
     ctx.addTask({
@@ -54,7 +54,7 @@ interface AgentEvalConfig {
 // Runner config — plain object with a name and model
 interface RunnerConfig {
   name: string; // Unique runner identifier
-  model: IModelPlugin | ICliModel; // Model or CLI model
+  model: LlmConfig; // Model or CLI model
 }
 
 interface ICliModel {
@@ -62,9 +62,13 @@ interface ICliModel {
 }
 
 interface JudgeConfig {
-  llm?: IModelPlugin; // LLM plugin for judging
+  name?: string; // Human-readable name for the judge
+  model?: LlmConfig; // LLM for judging (IModelPlugin | ICliModel)
   maxRetries?: number; // Retry attempts on failure (default: 2)
 }
+
+// Shared model type for runners and judge
+type LlmConfig = IModelPlugin | ICliModel;
 
 // Plugin interfaces
 interface IModelPlugin {
@@ -86,7 +90,7 @@ interface AfterEachCommand {
 | `rootDir`     | `string`                 | `process.cwd()`                          | Project root directory                                      |
 | `testFiles`   | `string \| string[]`     | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
 | `runners`     | `RunnerConfig[]`         | _required_                               | Runner config objects (`{ name, model }`)                   |
-| `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration                                     |
+| `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration (`{ name, model }`)                 |
 | `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                          |
 | `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)     |
 | `matrix`      | `{ runners?: string[] }` | —                                        | Filter which runners to execute                             |

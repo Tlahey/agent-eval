@@ -27,7 +27,7 @@ export default defineConfig({
   ],
 
   judge: {
-    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   beforeEach: ({ ctx }) => {

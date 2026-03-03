@@ -110,7 +110,7 @@ new DockerEnvironment({
 ```ts
 import { defineConfig } from "agent-eval";
 import { DockerEnvironment } from "agent-eval/environment";
-import { AnthropicModel } from "agent-eval/llm";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
   environment: new DockerEnvironment({
@@ -125,11 +125,11 @@ export default defineConfig({
     },
     {
       name: "claude-code",
-      command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"',
+      model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
     },
   ],
   judge: {
-    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
 ```

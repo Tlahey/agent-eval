@@ -44,7 +44,7 @@ export default defineConfig({
 
   // Use the same model for judging all runners
   judge: {
-    llm: claude,
+    model: claude,
   },
 
   beforeEach: ({ ctx }) => {

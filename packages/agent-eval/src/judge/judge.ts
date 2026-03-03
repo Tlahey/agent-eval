@@ -1,4 +1,5 @@
 import { generateObject, type LanguageModelV1 } from "ai";
+import { execSync } from "node:child_process";
 import { z } from "zod";
 import type {
   ExecutionData,
@@ -7,6 +8,8 @@ import type {
   TestContext,
   TokenUsage,
 } from "../core/types.js";
+import { isCliModel } from "../core/interfaces.js";
+import type { IModelPlugin, ICliModel } from "../core/interfaces.js";
 
 const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),
@@ -19,16 +22,73 @@ const JudgeResultSchema = z.object({
 
 /**
  * Resolve the AI SDK model instance from judge config.
- * Requires the `llm` plugin field.
+ * Requires the `llm` plugin field and must be an IModelPlugin (not CLI).
  */
-async function resolveModel(config: JudgeConfig): Promise<LanguageModelV1> {
-  if (!config.llm) {
+async function resolveApiModel(llm: IModelPlugin): Promise<LanguageModelV1> {
+  return (await llm.createModel()) as LanguageModelV1;
+}
+
+/**
+ * Execute a CLI model as judge: run the command with the prompt, parse JSON output.
+ * The CLI command must output valid JSON: { pass, score, reason, improvement }.
+ */
+async function executeCliJudge(
+  cliModel: ICliModel,
+  prompt: string,
+): Promise<{ result: JudgeResult; tokenUsage?: TokenUsage }> {
+  const escapedPrompt = prompt.replace(/'/g, "'\\''");
+  const cmd = cliModel.command.replace("{{prompt}}", escapedPrompt);
+
+  let stdout: string;
+  let stderr = "";
+  try {
+    stdout = execSync(cmd, {
+      encoding: "utf-8",
+      timeout: 120_000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch (err: unknown) {
+    const e = err as { stdout?: string; stderr?: string; status?: number };
+    stdout = e.stdout ?? "";
+    stderr = e.stderr ?? "";
+    if (!stdout) {
+      throw new Error(`CLI judge command failed (exit ${e.status ?? 1}): ${stderr.slice(0, 500)}`, {
+        cause: err,
+      });
+    }
+  }
+
+  // If the CLI model has a parseOutput function, use it
+  if (cliModel.parseOutput) {
+    const metrics = cliModel.parseOutput({ stdout, stderr });
+    if (metrics.agentOutput) stdout = metrics.agentOutput;
+  }
+
+  // Parse the JSON output
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
     throw new Error(
-      'Judge requires an "llm" plugin in judge config.\n' +
-        'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
+      `CLI judge output is not valid JSON.\nCommand: ${cmd.slice(0, 200)}\nOutput: ${stdout.slice(0, 500)}`,
     );
   }
-  return (await config.llm.createModel()) as LanguageModelV1;
+
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.score !== "number" || typeof obj.reason !== "string") {
+    throw new Error(
+      `CLI judge JSON missing required fields (score, reason).\nGot: ${JSON.stringify(obj).slice(0, 500)}`,
+    );
+  }
+
+  return {
+    result: {
+      pass: typeof obj.pass === "boolean" ? obj.pass : obj.score >= 0.5,
+      score: obj.score,
+      reason: obj.reason,
+      improvement: typeof obj.improvement === "string" ? obj.improvement : "",
+    },
+  };
 }
 
 /**
@@ -163,6 +223,7 @@ const DEFAULT_MAX_RETRIES = 2;
 
 /**
  * Execute LLM-as-a-Judge evaluation with retry logic.
+ * Supports both API models (generateObject) and CLI models (shell exec + JSON parse).
  * Retries on invalid/unparseable responses to guarantee valid structured output.
  * Returns both the judge result and token usage.
  */
@@ -171,10 +232,38 @@ export async function judge(
   prompt: string,
   config: JudgeConfig,
 ): Promise<JudgeCallResult> {
-  const model = await resolveModel(config);
-  const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
+  if (!config.model) {
+    throw new Error(
+      'Judge requires a "model" in judge config.\n' +
+        'Example: judge: { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) }',
+    );
+  }
 
+  const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   let lastError: Error | null = null;
+
+  // CLI model path: execute shell command, parse JSON output
+  if (isCliModel(config.model)) {
+    const cliModel = config.model;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await executeCliJudge(cliModel, prompt);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < maxRetries) {
+          console.warn(
+            `⚠️ CLI Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying... (${lastError.message.slice(0, 100)})`,
+          );
+        }
+      }
+    }
+    throw new Error(
+      `CLI Judge failed after ${maxRetries + 1} attempts. Last error: ${lastError!.message}`,
+    );
+  }
+
+  // API model path: use generateObject with Zod schema
+  const model = await resolveApiModel(config.model);
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
