@@ -27,10 +27,10 @@ interface RunnerConfig {
 
 ## CLI Runners
 
-CLI runners execute a shell command. Use `CliModel` from `agent-eval/providers/cli`. The `{{prompt}}` placeholder is replaced with the test instruction at runtime. The agent is expected to modify files on disk.
+CLI runners execute a shell command. Use `CliModel` from `agent-eval/llm`. The `{{prompt}}` placeholder is replaced with the test instruction at runtime. The agent is expected to modify files on disk.
 
 ```ts
-import { CliModel } from "agent-eval/providers/cli";
+import { CliModel } from "agent-eval/llm";
 
 {
   name: "my-agent",
@@ -196,7 +196,7 @@ This is useful when you want to:
 An API runner is a plain config object with an `IModelPlugin` as its `model`:
 
 ```ts
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel } from "agent-eval/llm";
 
 {
   name: "claude-api",
@@ -209,7 +209,7 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
 #### Anthropic
 
 ```ts
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel } from "agent-eval/llm";
 
 {
   name: "claude-sonnet",
@@ -226,7 +226,7 @@ import { AnthropicModel } from "agent-eval/providers/anthropic";
 #### OpenAI
 
 ```ts
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { OpenAIModel } from "agent-eval/llm";
 
 {
   name: "gpt-4o",
@@ -245,7 +245,7 @@ import { OpenAIModel } from "agent-eval/providers/openai";
 Run models locally with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
-import { OllamaModel } from "agent-eval/providers/ollama";
+import { OllamaModel } from "agent-eval/llm";
 
 {
   name: "llama3-local",
@@ -269,7 +269,7 @@ Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama
 Any OpenAI-compatible API can be used via `OpenAIModel` with a custom `baseURL`:
 
 ```ts
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { OpenAIModel } from "agent-eval/llm";
 
 {
   name: "company-llm",
@@ -406,9 +406,7 @@ Use the `matrix` option to select which runners to execute per run:
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { AnthropicModel, CliModel, OpenAIModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [

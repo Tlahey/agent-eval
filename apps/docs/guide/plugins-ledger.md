@@ -34,7 +34,7 @@ Uses Node 22's built-in `node:sqlite` for zero-dependency SQL storage. This is t
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { SqliteLedger } from "agent-eval/ledger";
 
 export default defineConfig({
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
@@ -96,7 +96,7 @@ Stores results as JSONL (one JSON object per line). Works with any Node.js versi
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { JsonLedger } from "agent-eval/ledger/json";
+import { JsonLedger } from "agent-eval/ledger";
 
 export default defineConfig({
   ledger: new JsonLedger({ outputDir: ".agenteval" }),

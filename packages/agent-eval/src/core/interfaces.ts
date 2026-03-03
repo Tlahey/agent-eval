@@ -70,11 +70,11 @@ export interface IModelPlugin {
  * The core runner replaces `{{prompt}}` with the test instruction and executes
  * the command via the environment plugin.
  *
- * Built-in: `CliModel` from `agent-eval/providers/cli`.
+ * Built-in: `CliModel` from `agent-eval/llm`.
  *
  * @example
  * ```ts
- * import { CliModel } from "agent-eval/providers/cli";
+ * import { CliModel } from "agent-eval/llm";
  *
  * const aider = new CliModel({
  *   command: 'aider --message "{{prompt}}" --yes --no-auto-commits',

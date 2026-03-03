@@ -255,7 +255,7 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { OpenAIModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [{ name: "copilot", command: 'gh copilot "{{prompt}}"' }],

@@ -1,6 +1,5 @@
 import { render, type RenderOptions } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, type MemoryRouterProps } from "react-router-dom";
-import { Outlet } from "react-router-dom";
+import { MemoryRouter, Outlet, Route, Routes, type MemoryRouterProps } from "react-router-dom";
 import { useState, type ReactElement } from "react";
 import type { LedgerRun } from "../lib/api";
 

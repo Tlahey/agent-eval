@@ -57,7 +57,7 @@ flowchart TD
 ### Anthropic
 
 ```ts
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel } from "agent-eval/llm";
 
 judge: {
   llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
@@ -75,7 +75,7 @@ Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in constructor).
 ### OpenAI
 
 ```ts
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { OpenAIModel } from "agent-eval/llm";
 
 judge: {
   llm: new OpenAIModel({ model: "gpt-4o" }),
@@ -93,7 +93,7 @@ Requires `OPENAI_API_KEY` environment variable (or `apiKey` in constructor).
 ### Ollama (Local)
 
 ```ts
-import { OllamaModel } from "agent-eval/providers/ollama";
+import { OllamaModel } from "agent-eval/llm";
 
 judge: {
   llm: new OllamaModel({ model: "llama3" }),

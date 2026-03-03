@@ -190,7 +190,7 @@ export function validatePlugins(config: {
             plugin: `Runner[${i}]`,
             member: "model",
             expected: "property",
-            message: `Runner[${i}].model must be an IModelPlugin (with createModel()) or CliModel (with type: "cli" and command). Import from agent-eval/providers/*.`,
+            message: `Runner[${i}].model must be an IModelPlugin (with createModel()) or CliModel (with type: "cli" and command). Import from agent-eval/llm.`,
           });
         }
       }

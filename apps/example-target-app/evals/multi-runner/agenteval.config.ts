@@ -1,7 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { AnthropicModel, CliModel, OpenAIModel } from "agent-eval/llm";
 
 /**
  * Multi-Runner — Compare multiple agents on the same eval

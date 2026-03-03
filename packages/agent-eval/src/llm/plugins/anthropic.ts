@@ -15,7 +15,7 @@ export interface AnthropicModelOptions {
  *
  * @example
  * ```ts
- * import { AnthropicModel } from "agent-eval/providers/anthropic";
+ * import { AnthropicModel } from "agent-eval/llm";
  * const model = new AnthropicModel({ model: "claude-sonnet-4-20250514" });
  * ```
  */

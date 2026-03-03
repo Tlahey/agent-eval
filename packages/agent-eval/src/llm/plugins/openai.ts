@@ -15,7 +15,7 @@ export interface OpenAIModelOptions {
  *
  * @example
  * ```ts
- * import { OpenAIModel } from "agent-eval/providers/openai";
+ * import { OpenAIModel } from "agent-eval/llm";
  * const model = new OpenAIModel({ model: "gpt-4o" });
  * ```
  */

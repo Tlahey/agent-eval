@@ -90,9 +90,8 @@ agenteval --version
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { SqliteLedger } from "agent-eval/ledger/sqlite";
+import { CliModel, OpenAIModel } from "agent-eval/llm";
+import { SqliteLedger } from "agent-eval/ledger";
 
 export default defineConfig({
   // Agent runners — plain { name, model } objects
@@ -185,14 +184,9 @@ AgentEval is built around SOLID plugin interfaces. Every major concern is swappa
 All plugins are imported via **sub-path exports** — unused providers are never bundled:
 
 ```ts
-import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { OllamaModel } from "agent-eval/providers/ollama";
-import { CliModel } from "agent-eval/providers/cli";
-import { SqliteLedger } from "agent-eval/ledger/sqlite";
-import { JsonLedger } from "agent-eval/ledger/json";
-import { LocalEnvironment } from "agent-eval/environment/local";
-import { DockerEnvironment } from "agent-eval/environment/docker";
+import { AnthropicModel, CliModel, OllamaModel, OpenAIModel } from "agent-eval/llm";
+import { JsonLedger, SqliteLedger } from "agent-eval/ledger";
+import { DockerEnvironment, LocalEnvironment } from "agent-eval/environment";
 ```
 
 > 📖 How to create your own plugin: [Plugin Architecture](https://tlahey.github.io/agent-eval/guide/plugins) · [LLM Plugins](https://tlahey.github.io/agent-eval/guide/plugins-llm) · [Ledger Plugins](https://tlahey.github.io/agent-eval/guide/plugins-ledger) · [Environments](https://tlahey.github.io/agent-eval/guide/plugins-environments)

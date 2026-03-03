@@ -27,8 +27,7 @@ flowchart TD
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [
@@ -47,11 +46,9 @@ export default defineConfig({
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { SqliteLedger } from "agent-eval/ledger/sqlite";
-import { LocalEnvironment } from "agent-eval/environment/local";
+import { AnthropicModel, CliModel, OpenAIModel } from "agent-eval/llm";
+import { SqliteLedger } from "agent-eval/ledger";
+import { LocalEnvironment } from "agent-eval/environment";
 
 export default defineConfig({
   // ── Plugins ────────────────────────────────────
@@ -117,10 +114,9 @@ AgentEval is extensible via three plugin axes: **Models** (`IModelPlugin`), **Le
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { SqliteLedger } from "agent-eval/ledger/sqlite";
-import { LocalEnvironment } from "agent-eval/environment/local";
+import { CliModel, OpenAIModel } from "agent-eval/llm";
+import { SqliteLedger } from "agent-eval/ledger";
+import { LocalEnvironment } from "agent-eval/environment";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
@@ -236,10 +232,10 @@ Runners are **plain config objects** with a `name` and a `model`. The `model` ca
 
 ### CLI Runners
 
-Use `CliModel` from `agent-eval/providers/cli` to spawn a shell command. The `{{prompt}}` placeholder is replaced with the test instruction at runtime.
+Use `CliModel` from `agent-eval/llm` to spawn a shell command. The `{{prompt}}` placeholder is replaced with the test instruction at runtime.
 
 ```ts
-import { CliModel } from "agent-eval/providers/cli";
+import { CliModel } from "agent-eval/llm";
 
 runners: [
   {
@@ -262,8 +258,7 @@ runners: [
 Pass an `IModelPlugin` directly as the `model` — no wrapper class needed:
 
 ```ts
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel, OpenAIModel } from "agent-eval/llm";
 
 runners: [
   { name: "claude-api", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
@@ -276,9 +271,7 @@ runners: [
 Run **multiple runners** on the same tests to compare them side-by-side:
 
 ```ts
-import { CliModel } from "agent-eval/providers/cli";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { AnthropicModel, CliModel, OpenAIModel } from "agent-eval/llm";
 
 runners: [
   { name: "claude-sonnet", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
@@ -303,7 +296,7 @@ See the dedicated [Runners guide](/guide/runners) for all supported agents and d
 The judge evaluates agent output using an LLM. See the [Judges guide](/guide/judges) for full details.
 
 ```ts
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel } from "agent-eval/llm";
 
 judge: {
   llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),

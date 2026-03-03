@@ -13,7 +13,7 @@ export interface OllamaModelOptions {
  *
  * @example
  * ```ts
- * import { OllamaModel } from "agent-eval/providers/ollama";
+ * import { OllamaModel } from "agent-eval/llm";
  * const model = new OllamaModel({ model: "llama3" });
  * ```
  */
