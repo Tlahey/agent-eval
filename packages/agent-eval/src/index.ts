@@ -262,11 +262,6 @@ export type { PluginValidationError } from "./core/plugin-validator.js";
 
 // ─── Built-in plugins are NOT re-exported from the main entry. ───
 // Import them from their sub-paths:
-//   import { CliModel } from "agent-eval/providers/cli";
-//   import { OpenAIModel } from "agent-eval/providers/openai";
-//   import { AnthropicModel } from "agent-eval/providers/anthropic";
-//   import { OllamaModel } from "agent-eval/providers/ollama";
-//   import { LocalEnvironment } from "agent-eval/environment/local";
-//   import { DockerEnvironment } from "agent-eval/environment/docker";
-//   import { SqliteLedger } from "agent-eval/ledger/sqlite";
-//   import { JsonLedger } from "agent-eval/ledger/json";
+//   import { AnthropicModel, OpenAIModel, OllamaModel, CliModel } from "agent-eval/llm";
+//   import { LocalEnvironment, DockerEnvironment } from "agent-eval/environment";
+//   import { SqliteLedger, JsonLedger } from "agent-eval/ledger";

@@ -40,7 +40,7 @@ Runs tests directly on the host machine. Uses Git for workspace isolation and `c
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { LocalEnvironment } from "agent-eval/environment/local";
+import { LocalEnvironment } from "agent-eval/environment";
 
 export default defineConfig({
   // LocalEnvironment is used automatically when no environment is specified
@@ -70,7 +70,7 @@ Runs each test iteration inside a **Docker container** with the project director
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { DockerEnvironment } from "agent-eval/environment/docker";
+import { DockerEnvironment } from "agent-eval/environment";
 
 export default defineConfig({
   environment: new DockerEnvironment({
@@ -109,8 +109,8 @@ new DockerEnvironment({
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { DockerEnvironment } from "agent-eval/environment/docker";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { DockerEnvironment } from "agent-eval/environment";
+import { AnthropicModel } from "agent-eval/llm";
 
 export default defineConfig({
   environment: new DockerEnvironment({

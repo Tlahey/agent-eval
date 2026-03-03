@@ -1,6 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel, OpenAIModel } from "agent-eval/llm";
 
 /**
  * Runner — OpenAI GPT-4o

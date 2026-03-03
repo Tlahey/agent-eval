@@ -13,8 +13,7 @@ function defineConfig(config: AgentEvalConfig): AgentEvalConfig;
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [

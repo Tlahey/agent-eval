@@ -679,15 +679,3 @@ agenteval ui                   # API server on :4747
 6. **Node 22 required** – `node:sqlite` (DatabaseSync) is only available in Node 22+.
 7. **`@ts-expect-error`** is needed on `import { DatabaseSync } from "node:sqlite"` (no stable types yet).
 8. **Model plugins use dynamic imports** – ensure the AI SDK provider package (e.g., `@ai-sdk/anthropic`) is installed when using a model plugin.
-
----
-
-## 🔮 Roadmap
-
-- [x] **Phase 1**: Core runner, config, test/expect API, CLI, JSONL ledger
-- [x] **Phase 2a**: SQLite ledger migration (node:sqlite), ADRs
-- [x] **Phase 2b**: API-based agent runners (anthropic, openai, ollama)
-- [x] **Phase 2c**: CI/CD pipeline (GitHub Actions)
-- [x] **Phase 3**: E2E integration test with dummy target app
-- [x] **Phase 4**: Visual dashboard (`apps/eval-ui` with React + Recharts)
-- [ ] **Future**: Benchmark suites, plugin system, remote execution

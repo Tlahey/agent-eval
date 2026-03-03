@@ -6,7 +6,7 @@ export interface JudgeConfig {
    *
    * @example
    * ```ts
-   * import { OpenAIModel } from "agent-eval/providers/openai";
+   * import { OpenAIModel } from "agent-eval/llm";
    * judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }
    * ```
    */
@@ -57,8 +57,7 @@ export function computeStatus(
  *
  * @example
  * ```ts
- * import { AnthropicModel } from "agent-eval/providers/anthropic";
- * import { CliModel } from "agent-eval/providers/cli";
+ * import { AnthropicModel, CliModel } from "agent-eval/llm";
  *
  * const runners: RunnerConfig[] = [
  *   { name: "claude-sonnet", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
@@ -86,9 +85,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { AnthropicModel } from "agent-eval/providers/anthropic";
-   * import { OpenAIModel } from "agent-eval/providers/openai";
-   * import { CliModel } from "agent-eval/providers/cli";
+   * import { AnthropicModel, CliModel, OpenAIModel } from "agent-eval/llm";
    *
    * runners: [
    *   { name: "claude", model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
@@ -146,7 +143,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { SqliteLedger } from "agent-eval/ledger/sqlite";
+   * import { SqliteLedger } from "agent-eval/ledger";
    * export default defineConfig({
    *   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
    *   // ...
@@ -161,7 +158,7 @@ export interface AgentEvalConfig {
    *
    * @example
    * ```ts
-   * import { DockerEnvironment } from "agent-eval/environment/docker";
+   * import { DockerEnvironment } from "agent-eval/environment";
    * export default defineConfig({
    *   environment: new DockerEnvironment({ image: "node:22" }),
    *   // ...

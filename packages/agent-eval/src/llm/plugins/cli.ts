@@ -40,7 +40,7 @@ export interface CliModelOptions {
  *
  * @example
  * ```ts
- * import { CliModel } from "agent-eval/providers/cli";
+ * import { CliModel } from "agent-eval/llm";
  *
  * // Simple CLI (no token parsing)
  * const copilot = new CliModel({

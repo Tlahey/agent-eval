@@ -1,6 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 /**
  * Default config — runs the mock agent against ALL eval scenarios.

@@ -25,7 +25,7 @@ Uses Anthropic's Claude models via `@ai-sdk/anthropic`.
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [{ name: "copilot", command: "gh copilot -p '{{prompt}}'" }],
@@ -54,7 +54,7 @@ Uses OpenAI's GPT models via `@ai-sdk/openai`.
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { OpenAIModel } from "agent-eval/providers/openai";
+import { OpenAIModel } from "agent-eval/llm";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
@@ -97,7 +97,7 @@ Run models **locally** with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { OllamaModel } from "agent-eval/providers/ollama";
+import { OllamaModel } from "agent-eval/llm";
 
 const llama = new OllamaModel({ model: "llama3" });
 
@@ -198,10 +198,10 @@ When `parseOutput` is not provided, the runner uses raw stdout as agent output w
 
 ### Creating a CLI Model with Token Parsing
 
-Use `CliModel` from `agent-eval/providers/cli` — it implements `ICliModel`:
+Use `CliModel` from `agent-eval/llm` — it implements `ICliModel`:
 
 ```ts
-import { CliModel } from "agent-eval/providers/cli";
+import { CliModel } from "agent-eval/llm";
 
 // Simple CLI — no token parsing (e.g., Copilot)
 const copilot = new CliModel({

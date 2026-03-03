@@ -62,32 +62,26 @@ Runners are plain config objects (`RunnerConfig`), not plugin instances. See the
 
 ## Import Map
 
-Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each plugin has its own sub-path to keep your bundle lean (unused providers are never loaded).
+Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each plugin category has its own barrel export:
 
-| Import                           | What you get                                                          |
-| -------------------------------- | --------------------------------------------------------------------- |
-| `agent-eval`                     | Core: `test`, `expect`, `describe`, `defineConfig`, types, interfaces |
-| `agent-eval/providers/openai`    | `OpenAIModel`                                                         |
-| `agent-eval/providers/anthropic` | `AnthropicModel`                                                      |
-| `agent-eval/providers/ollama`    | `OllamaModel`                                                         |
-| `agent-eval/providers/cli`       | `CliModel` (shell command model)                                      |
-| `agent-eval/ledger/sqlite`       | `SqliteLedger`                                                        |
-| `agent-eval/ledger/json`         | `JsonLedger`                                                          |
-| `agent-eval/environment/local`   | `LocalEnvironment`                                                    |
-| `agent-eval/environment/docker`  | `DockerEnvironment`                                                   |
+| Import                   | What you get                                                          |
+| ------------------------ | --------------------------------------------------------------------- |
+| `agent-eval`             | Core: `test`, `expect`, `describe`, `defineConfig`, types, interfaces |
+| `agent-eval/llm`         | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `CliModel`            |
+| `agent-eval/ledger`      | `SqliteLedger`, `JsonLedger`                                          |
+| `agent-eval/environment` | `LocalEnvironment`, `DockerEnvironment`                               |
 
-::: tip Why sub-path imports?
-Each provider plugin dynamically imports its AI SDK package (`@ai-sdk/openai`, `@ai-sdk/anthropic`, etc.). By isolating them in separate entry points, **only the providers you actually use are loaded** — no unnecessary dependencies.
+::: tip Why separate entry points?
+Each plugin category dynamically imports its dependencies (`@ai-sdk/openai`, `@ai-sdk/anthropic`, `node:sqlite`, etc.). By isolating them in separate entry points, **only the plugins you actually use are loaded** — no unnecessary dependencies.
 :::
 
 ## Quick Configuration
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { CliModel } from "agent-eval/providers/cli";
-import { OpenAIModel } from "agent-eval/providers/openai";
-import { SqliteLedger } from "agent-eval/ledger/sqlite";
-import { LocalEnvironment } from "agent-eval/environment/local";
+import { CliModel, OpenAIModel } from "agent-eval/llm";
+import { SqliteLedger } from "agent-eval/ledger";
+import { LocalEnvironment } from "agent-eval/environment";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 

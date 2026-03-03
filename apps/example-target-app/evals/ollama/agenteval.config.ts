@@ -1,6 +1,5 @@
 import { defineConfig } from "agent-eval";
-import { OllamaModel } from "agent-eval/providers/ollama";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel, OllamaModel } from "agent-eval/llm";
 
 /**
  * Runner — Ollama (Local)

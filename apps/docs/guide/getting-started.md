@@ -28,7 +28,7 @@ flowchart LR
 ```ts
 // agenteval.config.ts
 import { defineConfig } from "agent-eval";
-import { AnthropicModel } from "agent-eval/providers/anthropic";
+import { AnthropicModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [
