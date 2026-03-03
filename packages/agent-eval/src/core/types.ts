@@ -2,15 +2,24 @@
 
 export interface JudgeConfig {
   /**
-   * LLM plugin used for evaluation.
+   * LLM used for evaluation. Accepts any model plugin (API) or CLI model.
+   *
+   * - **IModelPlugin**: Uses `generateObject()` with Zod schema for guaranteed structured output.
+   * - **ICliModel**: Executes the CLI command with the judge prompt as `{{prompt}}`,
+   *   expects JSON output matching `{ pass, score, reason, improvement }`.
    *
    * @example
    * ```ts
-   * import { OpenAIModel } from "agent-eval/llm";
+   * import { OpenAIModel, CliModel } from "agent-eval/llm";
+   *
+   * // API model (recommended — structured output guaranteed)
    * judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }
+   *
+   * // CLI model (parses JSON from stdout)
+   * judge: { llm: new CliModel({ command: 'claude -p "{{prompt}}" --output-format json' }) }
    * ```
    */
-  llm?: import("./interfaces.js").IModelPlugin;
+  llm?: LlmConfig;
   /**
    * Maximum retry attempts if the judge LLM returns an invalid or unparseable response.
    * The judge **must** return valid structured data — retries ensure reliability.
@@ -47,6 +56,19 @@ export function computeStatus(
   return "FAIL";
 }
 
+// ─── LLM Configuration ───
+
+/**
+ * Unified model type for both runners and the judge.
+ * Accepts either an API model plugin or a CLI execution model.
+ *
+ * - **IModelPlugin**: LLM API call via Vercel AI SDK (e.g., AnthropicModel, OpenAIModel)
+ * - **ICliModel**: Shell command with `{{prompt}}` placeholder (e.g., CliModel)
+ */
+export type LlmConfig =
+  | import("./interfaces.js").IModelPlugin
+  | import("./interfaces.js").ICliModel;
+
 // ─── Runner Configuration ───
 
 /**
@@ -69,7 +91,7 @@ export interface RunnerConfig {
   /** Unique name for the runner (e.g., "claude-sonnet", "gpt-4o", "aider") */
   name: string;
   /** Model or CLI execution model */
-  model: import("./interfaces.js").IModelPlugin | import("./interfaces.js").ICliModel;
+  model: LlmConfig;
 }
 
 // ─── Main Configuration ───

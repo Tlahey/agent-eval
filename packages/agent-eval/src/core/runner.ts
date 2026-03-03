@@ -14,6 +14,7 @@ import type {
   JudgeOptions,
   JudgeResult,
   LedgerEntry,
+  LlmConfig,
   RunnerConfig,
   TaskDefinition,
   TaskResult,
@@ -29,6 +30,12 @@ import type { Reporter, TestResultEvent } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
+/** Get the model identifier from an LlmConfig (IModelPlugin or ICliModel). */
+function resolveModelId(llm: LlmConfig | undefined): string {
+  if (!llm) return "unknown";
+  return isCliModel(llm) ? llm.name : (llm.modelId ?? "unknown");
+}
 
 /**
  * Execute a runner config against a prompt.
@@ -530,7 +537,7 @@ export async function runTest(
         agentOutput: ctx.agentOutput,
         logs: ctx.logs,
         // Judgment data (error case)
-        judgeModel: config.judge.llm?.modelId ?? "unknown",
+        judgeModel: resolveModelId(config.judge.llm),
         score: 0,
         pass: false,
         status: "FAIL",
@@ -699,7 +706,7 @@ async function executeDeclarativePipeline(
     agentOutput: ctx.agentOutput,
     logs: ctx.logs,
     // Judgment data
-    judgeModel: config.judge.llm?.modelId ?? "unknown",
+    judgeModel: resolveModelId(config.judge.llm),
     score: judgeResult.score,
     pass: status !== "FAIL",
     status,
@@ -755,7 +762,7 @@ function buildImperativeEntry(
     agentOutput: ctx.agentOutput,
     logs: ctx.logs,
     // Judgment data
-    judgeModel: config.judge.llm?.modelId ?? "unknown",
+    judgeModel: resolveModelId(config.judge.llm),
     score: judgeResult.score,
     pass: judgeResult.pass,
     status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),

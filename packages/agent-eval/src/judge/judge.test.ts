@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { TestContext, JudgeConfig, ExecutionData } from "../core/types.js";
-import type { IModelPlugin } from "../core/interfaces.js";
+import type { IModelPlugin, ICliModel } from "../core/interfaces.js";
 
 // Mock the AI SDK
 vi.mock("ai", () => ({
   generateObject: vi.fn(),
 }));
 
+// Mock child_process for CLI judge tests
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(),
+}));
+
 import { generateObject } from "ai";
+import { execSync } from "node:child_process";
 import { judge, buildJudgePrompt, extractChangedFiles } from "./judge.js";
 
 function createMockModel(modelId = "test-model"): IModelPlugin {
@@ -177,6 +183,110 @@ describe("judge", () => {
     );
     // 1 initial + 2 default retries = 3 calls
     expect(generateObject).toHaveBeenCalledTimes(3);
+  });
+
+  describe("CLI judge", () => {
+    function createCliJudgeModel(overrides: Partial<ICliModel> = {}): ICliModel {
+      return {
+        type: "cli" as const,
+        name: "cli-judge",
+        command: 'claude -p "{{prompt}}" --output-format json',
+        ...overrides,
+      };
+    }
+
+    it("executes CLI command and parses JSON result", async () => {
+      const judgeResult = { pass: true, score: 0.9, reason: "well done", improvement: "none" };
+      vi.mocked(execSync).mockReturnValue(JSON.stringify(judgeResult));
+
+      const config: JudgeConfig = { llm: createCliJudgeModel() };
+      const { result } = await judge(createMockContext(), "evaluate this", config);
+
+      expect(result).toEqual(judgeResult);
+      expect(execSync).toHaveBeenCalledOnce();
+      expect(generateObject).not.toHaveBeenCalled();
+    });
+
+    it("replaces {{prompt}} in CLI command", async () => {
+      vi.mocked(execSync).mockReturnValue(
+        JSON.stringify({ pass: true, score: 1, reason: "ok", improvement: "" }),
+      );
+
+      const config: JudgeConfig = { llm: createCliJudgeModel() };
+      await judge(createMockContext(), "my test prompt", config);
+
+      const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
+      expect(calledCmd).toContain("my test prompt");
+      expect(calledCmd).not.toContain("{{prompt}}");
+    });
+
+    it("uses parseOutput when provided on CLI model", async () => {
+      const rawJson = {
+        result: { pass: true, score: 0.8, reason: "good", improvement: "none" },
+        extra: "data",
+      };
+      vi.mocked(execSync).mockReturnValue(JSON.stringify(rawJson));
+
+      const parseOutput = vi.fn().mockReturnValue({
+        agentOutput: JSON.stringify(rawJson.result),
+      });
+
+      const config: JudgeConfig = {
+        llm: createCliJudgeModel({ parseOutput }),
+      };
+      const { result } = await judge(createMockContext(), "prompt", config);
+
+      expect(parseOutput).toHaveBeenCalledOnce();
+      expect(result.score).toBe(0.8);
+    });
+
+    it("throws on invalid JSON from CLI", async () => {
+      vi.mocked(execSync).mockReturnValue("not valid json");
+
+      const config: JudgeConfig = { llm: createCliJudgeModel(), maxRetries: 0 };
+
+      await expect(judge(createMockContext(), "prompt", config)).rejects.toThrow(
+        "CLI judge output is not valid JSON",
+      );
+    });
+
+    it("throws on missing required fields", async () => {
+      vi.mocked(execSync).mockReturnValue(JSON.stringify({ foo: "bar" }));
+
+      const config: JudgeConfig = { llm: createCliJudgeModel(), maxRetries: 0 };
+
+      await expect(judge(createMockContext(), "prompt", config)).rejects.toThrow(
+        "CLI judge JSON missing required fields",
+      );
+    });
+
+    it("retries CLI judge on failure", async () => {
+      vi.mocked(execSync)
+        .mockImplementationOnce(() => {
+          throw Object.assign(new Error("timeout"), { stdout: "", stderr: "timeout", status: 1 });
+        })
+        .mockReturnValueOnce(
+          JSON.stringify({ pass: true, score: 0.7, reason: "ok", improvement: "" }),
+        );
+
+      const config: JudgeConfig = { llm: createCliJudgeModel(), maxRetries: 1 };
+      const { result } = await judge(createMockContext(), "prompt", config);
+
+      expect(result.score).toBe(0.7);
+      expect(execSync).toHaveBeenCalledTimes(2);
+    });
+
+    it("defaults pass based on score when pass field is missing", async () => {
+      vi.mocked(execSync).mockReturnValue(
+        JSON.stringify({ score: 0.3, reason: "poor", improvement: "try harder" }),
+      );
+
+      const config: JudgeConfig = { llm: createCliJudgeModel() };
+      const { result } = await judge(createMockContext(), "prompt", config);
+
+      expect(result.pass).toBe(false); // 0.3 < 0.5
+      expect(result.score).toBe(0.3);
+    });
   });
 });
 

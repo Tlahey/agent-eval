@@ -96,7 +96,7 @@ export default defineConfig({
 | Option        | Type                             | Default                                  | Description                                           |
 | ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
 | `runners`     | `RunnerConfig[]`                 | _required_                               | Runner config objects (`{ name, model }`)             |
-| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration                               |
+| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration (`llm` accepts `LlmConfig`)   |
 | `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                    |
 | `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                |
 | `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                               |
@@ -110,7 +110,7 @@ export default defineConfig({
 
 ## Plugins
 
-AgentEval is extensible via three plugin axes: **Models** (`IModelPlugin`), **Ledger** (`ILedgerPlugin`), and **Environment** (`IEnvironmentPlugin`). Runners are plain config objects — not plugins. When no plugins are configured for ledger or environment, sensible defaults are used.
+AgentEval is extensible via three plugin axes: **Models** (`IModelPlugin` / `ICliModel`), **Ledger** (`ILedgerPlugin`), and **Environment** (`IEnvironmentPlugin`). Both runners and judges accept `LlmConfig` (= `IModelPlugin | ICliModel`). When no plugins are configured for ledger or environment, sensible defaults are used.
 
 ```ts
 import { defineConfig } from "agent-eval";
@@ -127,7 +127,7 @@ export default defineConfig({
     { name: "gpt-4o", model: gpt4o },
   ],
 
-  // Judge uses a model plugin
+  // Judge uses an LLM model (API or CLI)
   judge: { llm: gpt4o },
 
   // Pick one ledger plugin — or omit for SqliteLedger
