@@ -147,8 +147,8 @@ describe("validatePlugins", () => {
   });
 
   it("validates judge plugin only if it has a judge method", () => {
-    // Plain JudgeConfig (provider + model) should NOT be validated as a plugin
-    const errors = validatePlugins({ judge: { provider: "openai", model: "gpt-4o" } });
+    // Plain JudgeConfig without model should NOT be validated as a plugin
+    const errors = validatePlugins({ judge: { maxRetries: 2 } });
     expect(errors).toEqual([]);
   });
 
@@ -270,9 +270,9 @@ describe("validatePlugins - runners", () => {
     expect(errors).toEqual([]);
   });
 
-  it("validates judge.llm when present", () => {
+  it("validates judge.model when present", () => {
     const errors = validatePlugins({
-      judge: { llm: { name: "openai" } },
+      judge: { model: { name: "openai" } },
     });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].plugin).toBe("ModelPlugin");

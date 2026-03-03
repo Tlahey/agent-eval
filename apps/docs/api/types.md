@@ -270,7 +270,7 @@ interface JudgeResult {
 
 ## LlmConfig
 
-A union type shared by both `RunnerConfig.model` and `JudgeConfig.llm`. Accepts either an API model plugin or a CLI model.
+A union type shared by both `RunnerConfig.model` and `JudgeConfig.model`. Accepts either an API model plugin or a CLI model.
 
 ```ts
 type LlmConfig = IModelPlugin | ICliModel;
@@ -281,7 +281,7 @@ Use the `isCliModel()` type guard to discriminate at runtime:
 ```ts
 import { isCliModel } from "agent-eval";
 
-if (isCliModel(config.llm)) {
+if (isCliModel(config.model)) {
   // CLI model — has command, type: "cli"
 } else {
   // API model — has createModel(), modelId
@@ -292,7 +292,8 @@ if (isCliModel(config.llm)) {
 
 ```ts
 interface JudgeConfig {
-  llm?: LlmConfig; // LLM plugin for evaluation (API or CLI model)
+  name?: string; // Human-readable name for the judge
+  model?: LlmConfig; // LLM for evaluation (API or CLI model)
   maxRetries?: number; // Retry attempts on failure (default: 2)
 }
 ```

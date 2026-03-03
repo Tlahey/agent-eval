@@ -133,18 +133,18 @@ export function validatePlugins(config: {
     errors.push(...validateJudgePlugin(config.judge));
   }
 
-  // Validate judge.llm if present (accepts IModelPlugin or ICliModel)
+  // Validate judge.model if present (accepts IModelPlugin or ICliModel)
   if (
     config.judge !== undefined &&
     typeof config.judge === "object" &&
     config.judge !== null &&
-    "llm" in config.judge &&
-    (config.judge as Record<string, unknown>).llm !== undefined
+    "model" in config.judge &&
+    (config.judge as Record<string, unknown>).model !== undefined
   ) {
-    const llm = (config.judge as Record<string, unknown>).llm as Record<string, unknown>;
+    const model = (config.judge as Record<string, unknown>).model as Record<string, unknown>;
     // CLI models have type: "cli" — skip IModelPlugin validation for them
-    if (!(llm.type === "cli" && typeof llm.command === "string")) {
-      errors.push(...validateModelPlugin(llm));
+    if (!(model.type === "cli" && typeof model.command === "string")) {
+      errors.push(...validateModelPlugin(model));
     }
   }
 

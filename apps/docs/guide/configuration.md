@@ -37,7 +37,7 @@ export default defineConfig({
     },
   ],
   judge: {
-    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
 ```
@@ -65,7 +65,7 @@ export default defineConfig({
   ],
 
   // ── Judge ──────────────────────────────────────
-  judge: { llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+  judge: { model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
 
   // ── Lifecycle hooks ────────────────────────────
   beforeEach: ({ ctx }) => {
@@ -96,7 +96,7 @@ export default defineConfig({
 | Option        | Type                             | Default                                  | Description                                           |
 | ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
 | `runners`     | `RunnerConfig[]`                 | _required_                               | Runner config objects (`{ name, model }`)             |
-| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration (`llm` accepts `LlmConfig`)   |
+| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration (`{ name, model }`)           |
 | `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                    |
 | `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                |
 | `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                               |
@@ -128,7 +128,7 @@ export default defineConfig({
   ],
 
   // Judge uses an LLM model (API or CLI)
-  judge: { llm: gpt4o },
+  judge: { model: gpt4o },
 
   // Pick one ledger plugin — or omit for SqliteLedger
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
@@ -299,7 +299,7 @@ The judge evaluates agent output using an LLM. See the [Judges guide](/guide/jud
 import { AnthropicModel } from "agent-eval/llm";
 
 judge: {
-  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   maxRetries: 2, // retry on invalid responses (default: 2)
 }
 ```

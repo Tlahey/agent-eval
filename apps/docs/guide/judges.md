@@ -65,7 +65,8 @@ flowchart TD
 import { AnthropicModel } from "agent-eval/llm";
 
 judge: {
-  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  name: "claude-judge",
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
 }
 ```
 
@@ -83,7 +84,7 @@ Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in constructor).
 import { OpenAIModel } from "agent-eval/llm";
 
 judge: {
-  llm: new OpenAIModel({ model: "gpt-4o" }),
+  model: new OpenAIModel({ model: "gpt-4o" }),
 }
 ```
 
@@ -101,7 +102,7 @@ Requires `OPENAI_API_KEY` environment variable (or `apiKey` in constructor).
 import { OllamaModel } from "agent-eval/llm";
 
 judge: {
-  llm: new OllamaModel({ model: "llama3" }),
+  model: new OllamaModel({ model: "llama3" }),
 }
 ```
 
@@ -133,7 +134,7 @@ class CompanyModel implements IModelPlugin {
 
 // In config:
 judge: {
-  llm: new CompanyModel();
+  model: new CompanyModel();
 }
 ```
 
@@ -147,7 +148,7 @@ You can also use a CLI-based model (e.g., `claude`, `gemini`) as the judge. The 
 import { CliModel } from "agent-eval/llm";
 
 judge: {
-  llm: new CliModel({
+  model: new CliModel({
     command: 'claude -p "{{prompt}}" --output-format json',
   }),
 }
@@ -186,14 +187,15 @@ The judge **must** return valid structured data (`{ pass, score, reason, improve
 
 ```ts
 judge: {
-  llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   maxRetries: 3, // default: 2
 }
 ```
 
 | Option       | Type        | Default | Description                                          |
 | ------------ | ----------- | ------- | ---------------------------------------------------- |
-| `llm`        | `LlmConfig` | —       | LLM plugin for judge evaluation (API or CLI model)   |
+| `name`       | `string`    | —       | Human-readable name for the judge                    |
+| `model`      | `LlmConfig` | —       | LLM for judge evaluation (API or CLI model)          |
 | `maxRetries` | `number`    | `2`     | Number of retry attempts on failure (0 = no retries) |
 
 After all attempts are exhausted, the judge throws an error with the last failure message.

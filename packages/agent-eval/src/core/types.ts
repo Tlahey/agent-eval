@@ -2,7 +2,13 @@
 
 export interface JudgeConfig {
   /**
+   * Human-readable name for the judge (e.g., "gpt-4o-judge", "claude-judge").
+   * Used for identification in logs and the dashboard.
+   */
+  name?: string;
+  /**
    * LLM used for evaluation. Accepts any model plugin (API) or CLI model.
+   * Same `LlmConfig` type used by `RunnerConfig.model`.
    *
    * - **IModelPlugin**: Uses `generateObject()` with Zod schema for guaranteed structured output.
    * - **ICliModel**: Executes the CLI command with the judge prompt as `{{prompt}}`,
@@ -13,13 +19,13 @@ export interface JudgeConfig {
    * import { OpenAIModel, CliModel } from "agent-eval/llm";
    *
    * // API model (recommended — structured output guaranteed)
-   * judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }
+   * judge: { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) }
    *
    * // CLI model (parses JSON from stdout)
-   * judge: { llm: new CliModel({ command: 'claude -p "{{prompt}}" --output-format json' }) }
+   * judge: { name: "claude-cli", model: new CliModel({ command: 'claude -p "{{prompt}}" --output-format json' }) }
    * ```
    */
-  llm?: LlmConfig;
+  model?: LlmConfig;
   /**
    * Maximum retry attempts if the judge LLM returns an invalid or unparseable response.
    * The judge **must** return valid structured data — retries ensure reliability.

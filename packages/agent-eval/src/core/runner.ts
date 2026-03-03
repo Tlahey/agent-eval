@@ -537,7 +537,7 @@ export async function runTest(
         agentOutput: ctx.agentOutput,
         logs: ctx.logs,
         // Judgment data (error case)
-        judgeModel: resolveModelId(config.judge.llm),
+        judgeModel: resolveModelId(config.judge.model),
         score: 0,
         pass: false,
         status: "FAIL",
@@ -706,7 +706,7 @@ async function executeDeclarativePipeline(
     agentOutput: ctx.agentOutput,
     logs: ctx.logs,
     // Judgment data
-    judgeModel: resolveModelId(config.judge.llm),
+    judgeModel: resolveModelId(config.judge.model),
     score: judgeResult.score,
     pass: status !== "FAIL",
     status,
@@ -762,7 +762,7 @@ function buildImperativeEntry(
     agentOutput: ctx.agentOutput,
     logs: ctx.logs,
     // Judgment data
-    judgeModel: resolveModelId(config.judge.llm),
+    judgeModel: resolveModelId(config.judge.model),
     score: judgeResult.score,
     pass: judgeResult.pass,
     status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),

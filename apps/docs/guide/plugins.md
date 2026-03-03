@@ -91,7 +91,7 @@ export default defineConfig({
     { name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) },
     { name: "gpt-4o", model: gpt4o },
   ],
-  judge: { llm: gpt4o },
+  judge: { model: gpt4o },
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
   environment: new LocalEnvironment(),
 });
@@ -165,7 +165,7 @@ import { MistralModel } from "./my-plugins/mistral-model";
 
 export default defineConfig({
   runners: [{ name: "mistral", model: new MistralModel({ model: "mistral-large-latest" }) }],
-  judge: { llm: new MistralModel({ model: "mistral-large-latest" }) },
+  judge: { model: new MistralModel({ model: "mistral-large-latest" }) },
 });
 ```
 
@@ -231,7 +231,7 @@ import { MistralModel } from "agenteval-plugin-mistral";
 
 export default defineConfig({
   runners: [{ name: "mistral", model: new MistralModel({ model: "mistral-large-latest" }) }],
-  judge: { llm: new MistralModel({ model: "mistral-large-latest" }) },
+  judge: { model: new MistralModel({ model: "mistral-large-latest" }) },
 });
 ```
 
@@ -280,7 +280,7 @@ flowchart TB
     CONFIG --> CLI["CLI"]
 
     RUNNER -->|"config.runners[]"| RC["RunnerConfig[]"]
-    RUNNER -->|"config.judge.llm"| MP["IModelPlugin"]
+    RUNNER -->|"config.judge.model"| MP["IModelPlugin"]
     RUNNER -->|"config.ledger"| LEDGER["ILedgerPlugin"]
     RUNNER -->|"config.environment"| ENV["IEnvironmentPlugin"]
     CLI -->|"config.ledger"| LEDGER

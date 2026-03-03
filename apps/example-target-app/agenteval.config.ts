@@ -32,7 +32,7 @@ export default defineConfig({
   // ⚠️ The judge must be a strong model capable of understanding code diffs,
   // test output, and making nuanced pass/fail decisions.
   judge: {
-    llm: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 
   testFiles: "evals/**/*.eval.ts",

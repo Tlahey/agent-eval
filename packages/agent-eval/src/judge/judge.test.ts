@@ -90,7 +90,7 @@ describe("judge", () => {
       finishReason: "stop",
     } as never);
 
-    const config: JudgeConfig = { llm: createMockModel("claude-sonnet-4-20250514") };
+    const config: JudgeConfig = { model: createMockModel("claude-sonnet-4-20250514") };
     const ctx = createMockContext();
     const prompt = buildJudgePrompt({
       criteria: "has close button",
@@ -114,7 +114,7 @@ describe("judge", () => {
       object: { pass: true, score: 1, reason: "ok", improvement: "none" },
     } as never);
 
-    const config: JudgeConfig = { llm: mockModel };
+    const config: JudgeConfig = { model: mockModel };
     await judge(createMockContext(), "criteria", config);
 
     expect(mockModel.createModel).toHaveBeenCalledOnce();
@@ -127,7 +127,7 @@ describe("judge", () => {
     } as never);
 
     const ctx = createMockContext({ logs: "", diff: null, commands: [] });
-    const config: JudgeConfig = { llm: createMockModel() };
+    const config: JudgeConfig = { model: createMockModel() };
     const prompt = buildJudgePrompt({
       criteria: "criteria",
       execution: createMockExecution({ logs: "", diff: null, changedFiles: [], commands: [] }),
@@ -144,7 +144,7 @@ describe("judge", () => {
     const config: JudgeConfig = {};
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
-      'Judge requires an "llm" plugin',
+      'Judge requires a "model"',
     );
   });
 
@@ -154,7 +154,7 @@ describe("judge", () => {
       .mockRejectedValueOnce(new Error("Invalid response format"))
       .mockResolvedValueOnce({ object: mockResult } as never);
 
-    const config: JudgeConfig = { llm: createMockModel(), maxRetries: 2 };
+    const config: JudgeConfig = { model: createMockModel(), maxRetries: 2 };
     const { result } = await judge(createMockContext(), "criteria", config);
 
     expect(result).toEqual(mockResult);
@@ -164,7 +164,7 @@ describe("judge", () => {
   it("throws after exhausting all retries", async () => {
     vi.mocked(generateObject).mockRejectedValue(new Error("Schema validation failed"));
 
-    const config: JudgeConfig = { llm: createMockModel(), maxRetries: 1 };
+    const config: JudgeConfig = { model: createMockModel(), maxRetries: 1 };
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
       "Judge failed after 2 attempts",
@@ -176,7 +176,7 @@ describe("judge", () => {
   it("defaults to 2 retries when maxRetries is not set", async () => {
     vi.mocked(generateObject).mockRejectedValue(new Error("bad response"));
 
-    const config: JudgeConfig = { llm: createMockModel() };
+    const config: JudgeConfig = { model: createMockModel() };
 
     await expect(judge(createMockContext(), "criteria", config)).rejects.toThrow(
       "Judge failed after 3 attempts",
@@ -199,7 +199,7 @@ describe("judge", () => {
       const judgeResult = { pass: true, score: 0.9, reason: "well done", improvement: "none" };
       vi.mocked(execSync).mockReturnValue(JSON.stringify(judgeResult));
 
-      const config: JudgeConfig = { llm: createCliJudgeModel() };
+      const config: JudgeConfig = { model: createCliJudgeModel() };
       const { result } = await judge(createMockContext(), "evaluate this", config);
 
       expect(result).toEqual(judgeResult);
@@ -212,7 +212,7 @@ describe("judge", () => {
         JSON.stringify({ pass: true, score: 1, reason: "ok", improvement: "" }),
       );
 
-      const config: JudgeConfig = { llm: createCliJudgeModel() };
+      const config: JudgeConfig = { model: createCliJudgeModel() };
       await judge(createMockContext(), "my test prompt", config);
 
       const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
@@ -232,7 +232,7 @@ describe("judge", () => {
       });
 
       const config: JudgeConfig = {
-        llm: createCliJudgeModel({ parseOutput }),
+        model: createCliJudgeModel({ parseOutput }),
       };
       const { result } = await judge(createMockContext(), "prompt", config);
 
@@ -243,7 +243,7 @@ describe("judge", () => {
     it("throws on invalid JSON from CLI", async () => {
       vi.mocked(execSync).mockReturnValue("not valid json");
 
-      const config: JudgeConfig = { llm: createCliJudgeModel(), maxRetries: 0 };
+      const config: JudgeConfig = { model: createCliJudgeModel(), maxRetries: 0 };
 
       await expect(judge(createMockContext(), "prompt", config)).rejects.toThrow(
         "CLI judge output is not valid JSON",
@@ -253,7 +253,7 @@ describe("judge", () => {
     it("throws on missing required fields", async () => {
       vi.mocked(execSync).mockReturnValue(JSON.stringify({ foo: "bar" }));
 
-      const config: JudgeConfig = { llm: createCliJudgeModel(), maxRetries: 0 };
+      const config: JudgeConfig = { model: createCliJudgeModel(), maxRetries: 0 };
 
       await expect(judge(createMockContext(), "prompt", config)).rejects.toThrow(
         "CLI judge JSON missing required fields",
@@ -269,7 +269,7 @@ describe("judge", () => {
           JSON.stringify({ pass: true, score: 0.7, reason: "ok", improvement: "" }),
         );
 
-      const config: JudgeConfig = { llm: createCliJudgeModel(), maxRetries: 1 };
+      const config: JudgeConfig = { model: createCliJudgeModel(), maxRetries: 1 };
       const { result } = await judge(createMockContext(), "prompt", config);
 
       expect(result.score).toBe(0.7);
@@ -281,7 +281,7 @@ describe("judge", () => {
         JSON.stringify({ score: 0.3, reason: "poor", improvement: "try harder" }),
       );
 
-      const config: JudgeConfig = { llm: createCliJudgeModel() };
+      const config: JudgeConfig = { model: createCliJudgeModel() };
       const { result } = await judge(createMockContext(), "prompt", config);
 
       expect(result.pass).toBe(false); // 0.3 < 0.5

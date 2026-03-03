@@ -39,7 +39,7 @@ function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
 }
 
 const judgeConfig: JudgeConfig = {
-  llm: {
+  model: {
     name: "mock",
     modelId: "gpt-4o",
     createModel: async () => ({ modelId: "gpt-4o", provider: "mock" }),

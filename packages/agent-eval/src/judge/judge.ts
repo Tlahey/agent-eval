@@ -232,10 +232,10 @@ export async function judge(
   prompt: string,
   config: JudgeConfig,
 ): Promise<JudgeCallResult> {
-  if (!config.llm) {
+  if (!config.model) {
     throw new Error(
-      'Judge requires an "llm" plugin in judge config.\n' +
-        'Example: judge: { llm: new OpenAIModel({ model: "gpt-4o" }) }',
+      'Judge requires a "model" in judge config.\n' +
+        'Example: judge: { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) }',
     );
   }
 
@@ -243,8 +243,8 @@ export async function judge(
   let lastError: Error | null = null;
 
   // CLI model path: execute shell command, parse JSON output
-  if (isCliModel(config.llm)) {
-    const cliModel = config.llm;
+  if (isCliModel(config.model)) {
+    const cliModel = config.model;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         return await executeCliJudge(cliModel, prompt);
@@ -263,7 +263,7 @@ export async function judge(
   }
 
   // API model path: use generateObject with Zod schema
-  const model = await resolveApiModel(config.llm);
+  const model = await resolveApiModel(config.model);
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

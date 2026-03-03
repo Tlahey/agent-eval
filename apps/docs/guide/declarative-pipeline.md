@@ -259,7 +259,7 @@ import { OpenAIModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [{ name: "copilot", command: 'gh copilot "{{prompt}}"' }],
-  judge: { llm: new OpenAIModel({ model: "gpt-4o" }) },
+  judge: { model: new OpenAIModel({ model: "gpt-4o" }) },
 
   // Runs before every test — great for common verification tasks
   beforeEach: ({ ctx }) => {
