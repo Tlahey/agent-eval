@@ -6,51 +6,30 @@ Model plugins abstract AI provider calls for **judge evaluation** and **API-base
 
 ```ts
 interface IModelPlugin {
-  /** Human-readable name of the model provider (e.g., "anthropic", "openai") */
   readonly name: string;
-  /** Model identifier (e.g., "claude-sonnet-4-20250514", "gpt-4o") */
   readonly modelId: string;
-  /** Optional generation settings forwarded to generateObject() / generateText() */
   readonly settings?: ModelSettings;
-  /** Create and return a Vercel AI SDK LanguageModel instance */
+  readonly tools?: Record<string, unknown>;
   createModel(): unknown | Promise<unknown>;
 }
 ```
 
-The framework calls `createModel()` whenever it needs a model — for judge evaluation (`generateObject()`) or for API runners (`generateObject()` with file schema). When `settings` is provided, its values (temperature, maxTokens, topP) are forwarded to the `generateObject()` call.
+The framework calls `createModel()` whenever it needs a model — for judge evaluation (`generateObject()`) or for API runners (`generateObject()` without tools, `generateText()` with tools).
 
 ## ModelSettings
 
-Generation settings that are forwarded to the Vercel AI SDK at call time. These can be set on any `IModelPlugin` implementation.
+Generation settings forwarded to the AI SDK at call time:
 
 ```ts
 interface ModelSettings {
-  /** Sampling temperature (0 = deterministic, 1 = creative) */
-  temperature?: number;
-  /** Maximum tokens in the response */
-  maxTokens?: number;
-  /** Nucleus sampling threshold (0-1) */
-  topP?: number;
+  temperature?: number; // 0 = deterministic, 1 = creative
+  maxTokens?: number; // Max tokens in the response
+  topP?: number; // Nucleus sampling (0-1)
+  maxSteps?: number; // Max tool-calling rounds (default: 10)
 }
 ```
 
-**Example:**
-
-```ts
-import { GitHubModelsModel } from "agent-eval/llm";
-
-const judge = new GitHubModelsModel({
-  model: "openai/gpt-5-mini",
-  settings: { temperature: 1, maxTokens: 4096, topP: 1 },
-});
-```
-
-::: tip When to tune settings
-
-- **Judge**: Lower temperature (0–0.3) for consistent evaluations
-- **API Runners**: Higher temperature (0.7–1.0) for creative code generation
-- **maxTokens**: Increase for complex tasks that produce large diffs
-  :::
+`maxSteps` only applies when `tools` are provided — it controls how many rounds of tool calling the model can perform.
 
 ## Built-in Plugins
 
@@ -163,45 +142,126 @@ Local models lack the reasoning depth for reliable code evaluation. Use them onl
 
 ### GitHubModelsModel
 
-Uses the [GitHub Models](https://github.com/marketplace/models) inference API. **Recommended as judge** — natively supports `response_format: { type: "json_object" }` for guaranteed structured JSON output.
-
-Authentication uses your GitHub token (`GH_COPILOT_TOKEN` or `GITHUB_TOKEN`). Get one with `gh auth token`.
+Uses GitHub Models inference API (`models.github.ai`). OpenAI-compatible, with **structured JSON output** and **tool calling** support.
 
 ```ts
 import { defineConfig } from "agent-eval";
-import { GitHubModelsModel, CliModel } from "agent-eval/llm";
+import { GitHubModelsModel } from "agent-eval/llm";
 
 export default defineConfig({
-  runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
+  runners: [
+    {
+      name: "gpt-5-mini",
+      model: new GitHubModelsModel({
+        model: "openai/gpt-5-mini",
+        settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+      }),
+    },
+  ],
   judge: {
     name: "gpt-5-mini",
-    model: new GitHubModelsModel({
-      model: "openai/gpt-5-mini",
-      settings: { temperature: 1, maxTokens: 4096, topP: 1 },
-    }),
+    model: new GitHubModelsModel({ model: "openai/gpt-5-mini" }),
   },
 });
 ```
 
-| Option     | Type            | Default                                 | Description                                        |
-| ---------- | --------------- | --------------------------------------- | -------------------------------------------------- |
-| `model`    | `string`        | `openai/gpt-4o`                         | Model from GitHub Models catalog                   |
-| `token`    | `string`        | `GH_COPILOT_TOKEN` / `GITHUB_TOKEN` env | GitHub auth token                                  |
-| `baseURL`  | `string`        | `https://models.github.ai/inference`    | Custom inference endpoint                          |
-| `settings` | `ModelSettings` | —                                       | Generation settings (temperature, maxTokens, topP) |
+| Option     | Type                      | Default                                | Description                        |
+| ---------- | ------------------------- | -------------------------------------- | ---------------------------------- |
+| `model`    | `string`                  | `"openai/gpt-4o"`                      | Model ID (catalog format)          |
+| `token`    | `string`                  | `GH_COPILOT_TOKEN` → `GITHUB_TOKEN`    | GitHub token for auth              |
+| `baseURL`  | `string`                  | `"https://models.github.ai/inference"` | Inference endpoint                 |
+| `settings` | `ModelSettings`           | —                                      | Generation settings                |
+| `tools`    | `Record<string, unknown>` | —                                      | AI SDK tools for agentic execution |
 
-::: tip Why use GitHub Models as judge?
-GitHub Models supports `response_format: { type: "json_object" }`, which guarantees valid JSON output — unlike raw CLI tools that often return markdown. This makes it the most reliable built-in option for judge evaluation.
+::: tip Recommended as judge
+GitHubModelsModel uses `structuredOutputs: true` which guarantees valid JSON output — ideal for the judge role.
 :::
 
-**Available models (via GitHub Models catalog):**
+**Available models (catalog format):**
 
-| Model                | Best for                   |
-| -------------------- | -------------------------- |
-| `openai/gpt-5-mini`  | Fast, cost-effective judge |
-| `openai/gpt-4o`      | High capability (default)  |
-| `openai/gpt-5.1`     | Most capable OpenAI model  |
-| `meta/llama-4-scout` | Open-source alternative    |
+| Model ID             | Best for              |
+| -------------------- | --------------------- |
+| `openai/gpt-5-mini`  | Fast, cost-effective  |
+| `openai/gpt-4o`      | Best cost/performance |
+| `meta/llama-4-scout` | Open-source option    |
+
+## Tools (Agentic Execution) {#tools}
+
+Any `IModelPlugin` can declare **tools** — AI SDK tool definitions the model can call during execution. When tools are present, the runner switches from `generateObject()` (file schema) to `generateText()` with multi-step tool calling.
+
+The framework passes tools directly to the [AI SDK](https://ai-sdk.dev/docs/foundations/tools). You define the tools, the model calls them. File changes are captured by `storeDiff()` via git.
+
+### Example: API runner with tools
+
+```ts
+import { defineConfig } from "agent-eval";
+import { GitHubModelsModel } from "agent-eval/llm";
+import { tool } from "ai";
+import { z } from "zod";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
+
+const coder = new GitHubModelsModel({
+  model: "openai/gpt-5-mini",
+  settings: { temperature: 0.7, maxTokens: 8192, maxSteps: 15 },
+  tools: {
+    readFile: tool({
+      description: "Read a file from the project",
+      parameters: z.object({ path: z.string() }),
+      execute: async ({ path }) => readFileSync(path, "utf-8"),
+    }),
+    writeFile: tool({
+      description: "Write content to a file (creates directories if needed)",
+      parameters: z.object({ path: z.string(), content: z.string() }),
+      execute: async ({ path, content }) => {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, content, "utf-8");
+        return `wrote ${path}`;
+      },
+    }),
+    listFiles: tool({
+      description: "List files in a directory",
+      parameters: z.object({ dir: z.string() }),
+      execute: async ({ dir }) => {
+        const { readdirSync } = await import("fs");
+        return readdirSync(dir, { recursive: true }).join("\n");
+      },
+    }),
+  },
+});
+
+export default defineConfig({
+  runners: [{ name: "gpt-5-mini-agent", model: coder }],
+  judge: {
+    name: "gpt-5-mini",
+    model: new GitHubModelsModel({ model: "openai/gpt-5-mini" }),
+  },
+});
+```
+
+### How it works
+
+```mermaid
+flowchart LR
+    MP["IModelPlugin<br/>+ tools"] --> |"generateText()"| TS["Multi-step<br/>tool calling"]
+    TS --> TC1["readFile()"]
+    TS --> TC2["writeFile()"]
+    TS --> TCN["...more tools"]
+    TC2 --> GD["storeDiff()<br/>(git diff)"]
+
+    style MP fill:#6366f1,color:#fff
+    style TS fill:#f59e0b,color:#000
+    style TC1 fill:#10b981,color:#fff
+    style TC2 fill:#10b981,color:#fff
+    style TCN fill:#10b981,color:#fff
+    style GD fill:#8b5cf6,color:#fff
+```
+
+::: info Tools vs no tools
+
+- **No tools** → `generateObject()` with file schema → framework writes files to disk
+- **With tools** → `generateText()` with multi-step → tools handle everything, git captures changes
+  :::
 
 ## Creating a Custom Model Plugin
 

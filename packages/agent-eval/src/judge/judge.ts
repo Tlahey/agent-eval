@@ -399,9 +399,7 @@ export async function judge(
 
   // API model path: use generateObject with Zod schema
   const model = await resolveApiModel(config.model);
-
-  // Collect model-level settings (temperature, maxTokens, topP)
-  const modelSettings = !isCliModel(config.model) ? config.model.settings : undefined;
+  const { maxSteps: _ms, ...modelSettings } = config.model.settings ?? {};
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

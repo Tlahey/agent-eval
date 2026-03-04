@@ -34,6 +34,8 @@ export interface ModelSettings {
   maxTokens?: number;
   /** Nucleus sampling threshold (0-1). */
   topP?: number;
+  /** Maximum number of tool-calling rounds (multi-step agentic). Default: 10. */
+  maxSteps?: number;
 }
 
 /**
@@ -69,9 +71,44 @@ export interface IModelPlugin {
 
   /**
    * Optional generation settings forwarded to `generateObject()` / `generateText()`.
-   * These override the framework defaults (temperature, maxTokens, topP).
+   * These override the framework defaults (temperature, maxTokens, topP, maxSteps).
    */
   readonly settings?: ModelSettings;
+
+  /**
+   * Optional AI SDK tools the model can use during execution.
+   * When tools are present, the runner uses `generateText()` with multi-step tool calling
+   * instead of `generateObject()` for file operations.
+   *
+   * The tools are passed directly to the AI SDK — define any tools you need
+   * (readFile, writeFile, runCommand, etc.) and the model will call them autonomously.
+   * File changes are captured by `storeDiff()` via git, not by the framework.
+   *
+   * @see https://ai-sdk.dev/docs/foundations/tools
+   *
+   * @example
+   * ```ts
+   * import { tool } from "ai";
+   * import { z } from "zod";
+   *
+   * new GitHubModelsModel({
+   *   model: "openai/gpt-5-mini",
+   *   tools: {
+   *     readFile: tool({
+   *       description: "Read a file from the project",
+   *       parameters: z.object({ path: z.string() }),
+   *       execute: async ({ path }) => fs.readFileSync(path, "utf-8"),
+   *     }),
+   *     writeFile: tool({
+   *       description: "Write content to a file",
+   *       parameters: z.object({ path: z.string(), content: z.string() }),
+   *       execute: async ({ path, content }) => { fs.writeFileSync(path, content); return "ok"; },
+   *     }),
+   *   },
+   * })
+   * ```
+   */
+  readonly tools?: Record<string, unknown>;
 
   /**
    * Create and return a Vercel AI SDK LanguageModel instance.

@@ -79,14 +79,36 @@ async function executeRunner(
       exitCode: result.exitCode,
     };
   } else {
-    // API execution: call LLM via generateObject, write files to disk
-    const { generateObject } = await import("ai");
-    const { z } = await import("zod");
-
+    // Collect model-level settings (temperature, maxTokens, topP)
+    const { maxSteps: _maxSteps, ...modelSettings } = runner.model.settings ?? {};
     const model = await runner.model.createModel();
 
-    // Collect model-level settings (temperature, maxTokens, topP)
-    const modelSettings = !isCliModel(runner.model) ? runner.model.settings : undefined;
+    // ─── Agentic mode: tools present → generateText() with multi-step ───
+    if (runner.model.tools && Object.keys(runner.model.tools).length > 0) {
+      const { generateText } = await import("ai");
+
+      const { text, usage } = await generateText({
+        model: model as Parameters<typeof generateText>[0]["model"],
+        tools: runner.model.tools as Parameters<typeof generateText>[0]["tools"],
+        maxSteps: _maxSteps ?? 10,
+        prompt,
+        ...modelSettings,
+      });
+
+      const tokenUsage = usage
+        ? {
+            inputTokens: usage.promptTokens,
+            outputTokens: usage.completionTokens,
+            totalTokens: usage.totalTokens,
+          }
+        : undefined;
+
+      return { tokenUsage, output: text };
+    }
+
+    // ─── Standard mode: no tools → generateObject() for file operations ───
+    const { generateObject } = await import("ai");
+    const { z } = await import("zod");
 
     const FileOperationSchema = z.object({
       files: z
@@ -120,7 +142,6 @@ Respond with the list of files to create or modify. Each file must include the f
       filesWritten.push(file.path);
     }
 
-    // Map token usage from the AI SDK response
     const tokenUsage = usage
       ? {
           inputTokens: usage.promptTokens,

@@ -21,7 +21,7 @@ export interface GitHubModelsOptions {
   baseURL?: string;
   /**
    * Generation settings forwarded to `generateObject()` / `generateText()`.
-   * These are applied at call time (temperature, maxTokens, topP).
+   * These are applied at call time (temperature, maxTokens, topP, maxSteps).
    *
    * @example
    * ```ts
@@ -32,6 +32,38 @@ export interface GitHubModelsOptions {
    * ```
    */
   settings?: ModelSettings;
+  /**
+   * AI SDK tools the model can call during execution.
+   * When provided, the runner uses `generateText()` with multi-step tool calling
+   * instead of `generateObject()`. Define any tools your agent needs — the framework
+   * passes them directly to the AI SDK. File changes are captured by git diff.
+   *
+   * @see https://ai-sdk.dev/docs/foundations/tools
+   *
+   * @example
+   * ```ts
+   * import { tool } from "ai";
+   * import { z } from "zod";
+   * import { readFileSync, writeFileSync } from "fs";
+   *
+   * new GitHubModelsModel({
+   *   model: "openai/gpt-5-mini",
+   *   tools: {
+   *     readFile: tool({
+   *       description: "Read a file from the project",
+   *       parameters: z.object({ path: z.string() }),
+   *       execute: async ({ path }) => readFileSync(path, "utf-8"),
+   *     }),
+   *     writeFile: tool({
+   *       description: "Write content to a file",
+   *       parameters: z.object({ path: z.string(), content: z.string() }),
+   *       execute: async ({ path, content }) => { writeFileSync(path, content); return "ok"; },
+   *     }),
+   *   },
+   * })
+   * ```
+   */
+  tools?: Record<string, unknown>;
 }
 
 /**
@@ -54,14 +86,24 @@ export interface GitHubModelsOptions {
  *   // ...
  * });
  *
- * // Use with generation settings
+ * // Use with tools (agentic mode)
+ * import { tool } from "ai";
+ * import { z } from "zod";
+ *
  * defineConfig({
  *   runners: [
  *     {
- *       name: "gpt-5-mini",
+ *       name: "gpt-5-mini-agent",
  *       model: new GitHubModelsModel({
  *         model: "openai/gpt-5-mini",
- *         settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+ *         settings: { temperature: 1, maxTokens: 4096, maxSteps: 15 },
+ *         tools: {
+ *           readFile: tool({
+ *             description: "Read a file",
+ *             parameters: z.object({ path: z.string() }),
+ *             execute: async ({ path }) => require("fs").readFileSync(path, "utf-8"),
+ *           }),
+ *         },
  *       }),
  *     },
  *   ],
@@ -73,6 +115,7 @@ export class GitHubModelsModel implements IModelPlugin {
   readonly name = "github-models";
   readonly modelId: string;
   readonly settings?: ModelSettings;
+  readonly tools?: Record<string, unknown>;
   private token?: string;
   private baseURL: string;
 
@@ -81,6 +124,7 @@ export class GitHubModelsModel implements IModelPlugin {
     this.token = options.token;
     this.baseURL = options.baseURL ?? "https://models.github.ai/inference";
     this.settings = options.settings;
+    this.tools = options.tools;
   }
 
   private resolveToken(): string {

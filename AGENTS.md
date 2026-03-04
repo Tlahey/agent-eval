@@ -63,7 +63,7 @@ agent-eval/
 │       │   │       ├── anthropic.ts       ← AnthropicModel
 │       │   │       ├── openai.ts          ← OpenAIModel
 │       │   │       ├── ollama.ts          ← OllamaModel
-│       │   │       ├── github-models.ts   ← GitHubModelsModel (GitHub Models API)
+│       │   │       ├── github-models.ts   ← GitHubModelsModel (GitHub Models API + tools)
 │       │   │       ├── cli.ts             ← CliModel (CLI command execution)
 │       │   │       └── model-plugins.test.ts
 │       │   ├── environment/ ← Execution environment plugins

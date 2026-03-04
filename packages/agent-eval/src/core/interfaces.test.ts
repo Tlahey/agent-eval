@@ -145,28 +145,63 @@ describe("Plugin Interfaces", () => {
       expect(result).toEqual({ type: "async-model" });
     });
 
-    it("accepts optional settings (temperature, maxTokens, topP)", () => {
-      const settings: ModelSettings = {
-        temperature: 0.7,
-        maxTokens: 2048,
-        topP: 0.9,
-      };
+    it("accepts optional settings (ModelSettings)", () => {
       const model: IModelPlugin = {
         name: "openai",
         modelId: "gpt-4o",
-        settings,
-        createModel: () => ({ type: "mock-model" }),
+        settings: { temperature: 0.7, maxTokens: 2048, topP: 0.9 },
+        createModel: () => ({}),
       };
-      expect(model.settings).toEqual({ temperature: 0.7, maxTokens: 2048, topP: 0.9 });
+      expect(model.settings?.temperature).toBe(0.7);
+      expect(model.settings?.maxTokens).toBe(2048);
+      expect(model.settings?.topP).toBe(0.9);
     });
 
-    it("settings is optional — undefined by default", () => {
+    it("accepts optional tools", () => {
+      const mockTool = { description: "Read a file", parameters: {}, execute: () => "content" };
       const model: IModelPlugin = {
         name: "openai",
         modelId: "gpt-4o",
-        createModel: () => ({ type: "mock-model" }),
+        tools: { readFile: mockTool },
+        createModel: () => ({}),
       };
-      expect(model.settings).toBeUndefined();
+      expect(model.tools).toBeDefined();
+      expect(model.tools!.readFile).toBe(mockTool);
+    });
+
+    it("accepts maxSteps in ModelSettings for agentic tool calling", () => {
+      const model: IModelPlugin = {
+        name: "github-models",
+        modelId: "openai/gpt-5-mini",
+        settings: { temperature: 1, maxSteps: 15 },
+        tools: { someAction: {} },
+        createModel: () => ({}),
+      };
+      expect(model.settings?.maxSteps).toBe(15);
+      expect(model.tools).toBeDefined();
+    });
+  });
+
+  describe("ModelSettings type", () => {
+    it("allows all fields to be optional", () => {
+      const settings: ModelSettings = {};
+      expect(settings.temperature).toBeUndefined();
+      expect(settings.maxTokens).toBeUndefined();
+      expect(settings.topP).toBeUndefined();
+      expect(settings.maxSteps).toBeUndefined();
+    });
+
+    it("accepts all generation settings", () => {
+      const settings: ModelSettings = {
+        temperature: 0.5,
+        maxTokens: 4096,
+        topP: 0.95,
+        maxSteps: 10,
+      };
+      expect(settings.temperature).toBe(0.5);
+      expect(settings.maxTokens).toBe(4096);
+      expect(settings.topP).toBe(0.95);
+      expect(settings.maxSteps).toBe(10);
     });
   });
 
