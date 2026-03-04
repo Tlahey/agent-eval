@@ -153,20 +153,38 @@ export class LivePanel {
   private maxLines: number;
   private renderedLines = 0;
   private isTTY: boolean;
+  private lineBuffer = "";
 
   constructor(maxLines = 8) {
     this.maxLines = maxLines;
     this.isTTY = !!process.stdout.isTTY;
   }
 
-  /** Feed new data into the panel. Splits by newline and keeps last N lines. */
+  /** Feed new data into the panel. Buffers incomplete lines to avoid word cuts. */
   write(data: string): void {
     if (!this.isTTY) return;
 
-    const incoming = data.split("\n").filter((l) => l.trim().length > 0);
-    if (incoming.length === 0) return;
+    // Append to buffer and split on newlines
+    this.lineBuffer += data;
+    const parts = this.lineBuffer.split("\n");
 
-    this.lines.push(...incoming);
+    // Last part is incomplete (no trailing newline) — keep it in buffer
+    this.lineBuffer = parts.pop() ?? "";
+
+    // All complete lines go into the display
+    const complete = parts.filter((l) => l.trim().length > 0);
+    if (complete.length === 0) {
+      // If buffer is long enough (e.g. a very long line with no newlines), flush it
+      if (this.lineBuffer.length > 200) {
+        this.lines.push(this.lineBuffer);
+        this.lineBuffer = "";
+      } else {
+        return;
+      }
+    } else {
+      this.lines.push(...complete);
+    }
+
     if (this.lines.length > this.maxLines) {
       this.lines = this.lines.slice(-this.maxLines);
     }
@@ -182,6 +200,7 @@ export class LivePanel {
       process.stdout.write("\x1b[A\x1b[2K");
     }
     this.lines = [];
+    this.lineBuffer = "";
     this.renderedLines = 0;
   }
 

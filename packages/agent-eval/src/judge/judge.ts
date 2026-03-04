@@ -118,6 +118,12 @@ async function executeCliJudge(
       }
     }
     if (!parsed) {
+      // Last resort: parse score/reason from free-form text (markdown, etc.)
+      const textResult = parseTextAsJudgeResult(stdout);
+      if (textResult) {
+        debug(`Parsed judge result from text: score=${textResult.score}, pass=${textResult.pass}`);
+        return { result: textResult };
+      }
       // Show both stdout and stderr in error for debugging
       const preview = stdout.slice(0, 800) || "(empty)";
       const stderrPreview = stderr ? `\nStderr: ${stderr.slice(0, 400)}` : "";
@@ -171,6 +177,53 @@ export function extractJsonFromText(text: string): string | null {
   if (braceMatch) return braceMatch[0];
 
   return null;
+}
+
+/**
+ * Last-resort parser: extract a JudgeResult from free-form text when the LLM
+ * ignores the JSON instruction and returns markdown/prose instead.
+ *
+ * Looks for patterns like:
+ *   - "score: 0.40" or "(score: 0.40)" or "Score: 0.4"
+ *   - ✅ / ❌ counts to derive pass/fail
+ *   - The full text is used as the reason
+ */
+export function parseTextAsJudgeResult(text: string): JudgeResult | null {
+  // Try to find a numeric score (0-1 range)
+  const scoreMatch = text.match(/(?:score|rating|grade)\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)/i);
+  // Also try parenthesized pattern like "(score: 0.40)"
+  const parenMatch = text.match(/\(\s*score\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*\)/i);
+  // Also try "0.XX/1" or "XX%" patterns
+  const fractionMatch = text.match(/(0(?:\.\d+)?|1(?:\.0+)?)\s*\/\s*1(?:\.0)?/);
+  const percentMatch = text.match(/(\d{1,3})\s*%/);
+
+  let score: number | null = null;
+
+  if (scoreMatch) {
+    score = parseFloat(scoreMatch[1]);
+  } else if (parenMatch) {
+    score = parseFloat(parenMatch[1]);
+  } else if (fractionMatch) {
+    score = parseFloat(fractionMatch[1]);
+  } else if (percentMatch) {
+    const pct = parseInt(percentMatch[1], 10);
+    if (pct <= 100) score = pct / 100;
+  }
+
+  if (score === null) return null;
+
+  // Extract improvement section if present
+  const improvementMatch = text.match(
+    /(?:improvement|suggestion|fix|recommend)[s]?\s*[:]\s*([\s\S]*?)(?:\n#{1,3}\s|\n---|\n\*\*\*|$)/i,
+  );
+  const improvement = improvementMatch ? improvementMatch[1].trim().slice(0, 2000) : "";
+
+  return {
+    pass: score >= 0.5,
+    score,
+    reason: text.trim().slice(0, 4000),
+    improvement,
+  };
 }
 
 /**
@@ -283,7 +336,16 @@ ${taskScoringInstructions}
 - Provide a detailed Markdown explanation in "reason".
 - Provide actionable Markdown suggestions in "improvement" to help the agent achieve a higher score. If the score is 1.0, write "No improvement needed.".
 - Be strict but fair. Partial credit is encouraged.
-- Respond ONLY with valid JSON: { "pass": boolean, "score": number, "reason": string, "improvement": string }`;
+
+## CRITICAL — Output format
+You MUST respond with ONLY a single JSON object and NOTHING else.
+No markdown, no explanation, no commentary — just the JSON object below:
+
+{ "pass": boolean, "score": number, "reason": "string", "improvement": "string" }
+
+The "reason" field should contain a detailed Markdown explanation.
+The "improvement" field should contain actionable Markdown suggestions to update the AGENTS.md instructions (or "No improvement needed." if score is 1.0).
+Do NOT wrap the JSON in a code fence. Do NOT include any text before or after the JSON.`;
 }
 
 /** Result from judge() including token usage */
