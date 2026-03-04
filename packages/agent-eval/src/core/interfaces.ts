@@ -24,12 +24,27 @@ import type {
 // ─── Model Plugin ───
 
 /**
+ * Generation settings passed to the LLM at call time.
+ * These are forwarded to `generateObject()` / `generateText()` calls.
+ */
+export interface ModelSettings {
+  /** Sampling temperature (0 = deterministic, 1 = creative). */
+  temperature?: number;
+  /** Maximum tokens in the response. */
+  maxTokens?: number;
+  /** Nucleus sampling threshold (0-1). */
+  topP?: number;
+  /** Maximum number of tool-calling rounds (multi-step agentic). Default: 10. */
+  maxSteps?: number;
+}
+
+/**
  * Contract for LLM model providers.
  *
  * Wraps a Vercel AI SDK model instance. The framework calls `createModel()`
  * to get a model that can be passed to `generateObject()` / `generateText()`.
  *
- * Built-in: AnthropicModel, OpenAIModel, OllamaModel.
+ * Built-in: AnthropicModel, OpenAIModel, OllamaModel, GitHubModelsModel.
  * Third parties can implement this to add any provider (Mistral, Gemini, etc.).
  *
  * @example
@@ -53,6 +68,47 @@ export interface IModelPlugin {
 
   /** Model identifier (e.g., "claude-3-5-sonnet-latest", "gpt-4o") */
   readonly modelId: string;
+
+  /**
+   * Optional generation settings forwarded to `generateObject()` / `generateText()`.
+   * These override the framework defaults (temperature, maxTokens, topP, maxSteps).
+   */
+  readonly settings?: ModelSettings;
+
+  /**
+   * Optional AI SDK tools the model can use during execution.
+   * When tools are present, the runner uses `generateText()` with multi-step tool calling
+   * instead of `generateObject()` for file operations.
+   *
+   * The tools are passed directly to the AI SDK — define any tools you need
+   * (readFile, writeFile, runCommand, etc.) and the model will call them autonomously.
+   * File changes are captured by `storeDiff()` via git, not by the framework.
+   *
+   * @see https://ai-sdk.dev/docs/foundations/tools
+   *
+   * @example
+   * ```ts
+   * import { tool } from "ai";
+   * import { z } from "zod";
+   *
+   * new GitHubModelsModel({
+   *   model: "openai/gpt-5-mini",
+   *   tools: {
+   *     readFile: tool({
+   *       description: "Read a file from the project",
+   *       parameters: z.object({ path: z.string() }),
+   *       execute: async ({ path }) => fs.readFileSync(path, "utf-8"),
+   *     }),
+   *     writeFile: tool({
+   *       description: "Write content to a file",
+   *       parameters: z.object({ path: z.string(), content: z.string() }),
+   *       execute: async ({ path, content }) => { fs.writeFileSync(path, content); return "ok"; },
+   *     }),
+   *   },
+   * })
+   * ```
+   */
+  readonly tools?: Record<string, unknown>;
 
   /**
    * Create and return a Vercel AI SDK LanguageModel instance.

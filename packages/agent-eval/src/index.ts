@@ -257,6 +257,7 @@ export type {
   ICliModel,
   CliOutputMetrics,
   CliOutputParser,
+  ModelSettings,
   RunnerContext,
   RunnerExecResult,
   ILedgerPlugin,

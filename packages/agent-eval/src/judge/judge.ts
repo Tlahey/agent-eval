@@ -264,6 +264,7 @@ export async function judge(
 
   // API model path: use generateObject with Zod schema
   const model = await resolveApiModel(config.model);
+  const { maxSteps: _ms, ...modelSettings } = config.model.settings ?? {};
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -271,6 +272,7 @@ export async function judge(
         model,
         schema: JudgeResultSchema,
         prompt,
+        ...modelSettings,
       });
 
       const tokenUsage: TokenUsage | undefined = response.usage
