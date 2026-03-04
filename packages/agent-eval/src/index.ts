@@ -209,6 +209,8 @@ export {
   SilentReporter,
   VerboseReporter,
   CIReporter,
+  LivePanel,
+  Spinner,
   isCI,
 } from "./core/reporter.js";
 export type {
@@ -254,16 +256,17 @@ export { validateRunnerNames } from "./core/config.js";
 
 export type {
   IModelPlugin,
+  ModelSettings,
   ICliModel,
   CliOutputMetrics,
   CliOutputParser,
-  ModelSettings,
   RunnerContext,
   RunnerExecResult,
   ILedgerPlugin,
   IJudgePlugin,
   IEnvironmentPlugin,
   EnvironmentCommandResult,
+  EnvironmentExecOptions,
   RunnerStats,
   TestTreeNode,
 } from "./core/interfaces.js";
@@ -278,6 +281,10 @@ export {
   formatPluginErrors,
 } from "./core/plugin-validator.js";
 export type { PluginValidationError } from "./core/plugin-validator.js";
+
+// ─── Debug utilities ───
+
+export { setDebug, isDebug, debug } from "./core/debug.js";
 
 // ─── Built-in plugins are NOT re-exported from the main entry. ───
 // Import them from their sub-paths:

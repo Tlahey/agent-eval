@@ -114,6 +114,127 @@ describe("OllamaModel", () => {
   });
 });
 
+describe("GitHubModelsModel", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("has correct name and modelId", () => {
+    const model = new GitHubModelsModel({ model: "openai/gpt-5-mini" });
+    expect(model.name).toBe("github-models");
+    expect(model.modelId).toBe("openai/gpt-5-mini");
+  });
+
+  it("defaults to openai/gpt-4o", () => {
+    const model = new GitHubModelsModel();
+    expect(model.modelId).toBe("openai/gpt-4o");
+  });
+
+  it("creates model via @ai-sdk/openai with GitHub Models baseURL", async () => {
+    process.env.GH_COPILOT_TOKEN = "ghp_test123";
+    const model = new GitHubModelsModel({ model: "openai/gpt-5-mini" });
+    await model.createModel();
+
+    expect(createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: "https://models.github.ai/inference",
+        apiKey: "ghp_test123",
+      }),
+    );
+  });
+
+  it("falls back to GITHUB_TOKEN when GH_COPILOT_TOKEN is not set", async () => {
+    delete process.env.GH_COPILOT_TOKEN;
+    process.env.GITHUB_TOKEN = "gho_fallback";
+    const model = new GitHubModelsModel({ model: "openai/gpt-4o" });
+    await model.createModel();
+
+    expect(createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: "gho_fallback",
+      }),
+    );
+  });
+
+  it("prefers explicit token over env vars", async () => {
+    process.env.GH_COPILOT_TOKEN = "ghp_env";
+    const model = new GitHubModelsModel({
+      model: "openai/gpt-5-mini",
+      token: "ghp_explicit",
+    });
+    await model.createModel();
+
+    expect(createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: "ghp_explicit",
+      }),
+    );
+  });
+
+  it("throws when no token is available", async () => {
+    delete process.env.GH_COPILOT_TOKEN;
+    delete process.env.GITHUB_TOKEN;
+    const model = new GitHubModelsModel({ model: "openai/gpt-5-mini" });
+
+    await expect(model.createModel()).rejects.toThrow("GitHub Models requires a token");
+  });
+
+  it("allows custom baseURL", async () => {
+    process.env.GH_COPILOT_TOKEN = "ghp_test";
+    const model = new GitHubModelsModel({
+      model: "openai/gpt-5-mini",
+      baseURL: "https://custom.models.api/v1",
+    });
+    await model.createModel();
+
+    expect(createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: "https://custom.models.api/v1",
+      }),
+    );
+  });
+
+  it("stores generation settings (temperature, maxTokens, topP)", () => {
+    const model = new GitHubModelsModel({
+      model: "openai/gpt-5-mini",
+      settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+    });
+    expect(model.settings).toEqual({
+      temperature: 1,
+      maxTokens: 4096,
+      topP: 1,
+    });
+  });
+
+  it("has undefined settings when not provided", () => {
+    const model = new GitHubModelsModel({ model: "openai/gpt-4o" });
+    expect(model.settings).toBeUndefined();
+  });
+
+  it("enables structuredOutputs for guaranteed JSON", async () => {
+    process.env.GH_COPILOT_TOKEN = "ghp_test";
+    const mockProvider = vi.fn((_model: string, _opts?: unknown) => ({
+      modelId: _model,
+      provider: "openai-mock",
+    }));
+    vi.mocked(createOpenAI).mockReturnValueOnce(
+      mockProvider as unknown as ReturnType<typeof createOpenAI>,
+    );
+
+    const model = new GitHubModelsModel({ model: "openai/gpt-5-mini" });
+    await model.createModel();
+
+    expect(mockProvider).toHaveBeenCalledWith("openai/gpt-5-mini", { structuredOutputs: true });
+  });
+
+  // Restore env
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+});
+
 describe("CliModel", () => {
   let CliModel: typeof import("./cli.js").CliModel;
 

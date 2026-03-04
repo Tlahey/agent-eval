@@ -1,5 +1,5 @@
 import { judge as runJudge, buildJudgePrompt, extractChangedFiles } from "../judge/judge.js";
-import { setLastJudgeOptions, setLastJudgeResult } from "./runner.js";
+import { setLastJudgeOptions, setLastJudgeResult, getJudgeReporterContext } from "./runner.js";
 import type {
   ExpectChain,
   JudgeConfig,
@@ -98,7 +98,20 @@ export function expect(ctx: TestContext): ExpectChain {
         expectedFiles: options.expectedFiles,
       });
 
-      const { result } = await runJudge(ctx, prompt, globals.judgeConfig);
+      // Emit judge pipeline step via global reporter context
+      const rCtx = getJudgeReporterContext();
+      if (rCtx) rCtx.reporter.onPipelineStep(rCtx.event, "judge", "running");
+
+      let result: JudgeResult;
+      try {
+        const judgeCall = await runJudge(ctx, prompt, globals.judgeConfig);
+        result = judgeCall.result;
+      } catch (err) {
+        if (rCtx) rCtx.reporter.onPipelineStep(rCtx.event, "judge", "error");
+        throw err;
+      }
+
+      if (rCtx) rCtx.reporter.onPipelineStep(rCtx.event, "judge", "done");
 
       // Compute status from thresholds (per-test > global > defaults)
       const thresholds = options.thresholds ?? globals.globalThresholds;

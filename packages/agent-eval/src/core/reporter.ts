@@ -57,6 +57,8 @@ export interface Reporter {
   onFileWrite(event: TestEvent, filePath: string): void;
   /** Called when a pipeline step starts or completes */
   onPipelineStep(event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void;
+  /** Called when live output is received during a pipeline step (agent execution, etc.) */
+  onPipelineOutput?(event: TestEvent, step: PipelineStep, data: string): void;
   /** Called when a test passes */
   onTestPass(event: TestResultEvent): void;
   /** Called when a test gets a warning (score between fail and warn thresholds) */
@@ -81,12 +83,164 @@ const STEP_LABELS: Record<PipelineStep, string> = {
 
 const STEP_ICON_DONE = "✓";
 const STEP_ICON_FAIL = "✗";
-const STEP_ICON_RUN = "●";
+
+// ─── Spinner (TTY-only animated indicator) ───
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/**
+ * Simple terminal spinner that animates while a long-running step is in progress.
+ * Uses ANSI escape codes — only active in TTY terminals.
+ */
+export class Spinner {
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private frameIndex = 0;
+  private label = "";
+  private isTTY: boolean;
+
+  constructor() {
+    this.isTTY = !!process.stdout.isTTY;
+  }
+
+  /** Start spinning with a label (e.g., "Agent execution...") */
+  start(label: string): void {
+    this.stop();
+    this.label = label;
+    this.frameIndex = 0;
+
+    if (!this.isTTY) {
+      // Non-TTY: just print a static line
+      process.stdout.write(`    ● ${label}\n`);
+      return;
+    }
+
+    this.renderFrame();
+    this.timer = setInterval(() => this.renderFrame(), 80);
+  }
+
+  /** Stop the spinner and clear the line. */
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    if (this.isTTY && this.label) {
+      // Clear the spinner line
+      process.stdout.write("\x1b[A\x1b[2K");
+    }
+    this.label = "";
+  }
+
+  private renderFrame(): void {
+    const frame = SPINNER_FRAMES[this.frameIndex % SPINNER_FRAMES.length];
+    if (this.frameIndex > 0) {
+      process.stdout.write("\x1b[A\x1b[2K");
+    }
+    process.stdout.write(`    ${pc.cyan(frame)} ${this.label}\n`);
+    this.frameIndex++;
+  }
+}
+
+// ─── Live Output Panel (TTY inline display) ───
+
+/**
+ * Renders a live-updating panel of the last N lines in the terminal.
+ * Uses ANSI escape codes to overwrite previous output in-place.
+ * Only active in TTY (interactive) terminals.
+ */
+export class LivePanel {
+  private lines: string[] = [];
+  private maxLines: number;
+  private renderedLines = 0;
+  private isTTY: boolean;
+  private lineBuffer = "";
+
+  constructor(maxLines = 8) {
+    this.maxLines = maxLines;
+    this.isTTY = !!process.stdout.isTTY;
+  }
+
+  /** Feed new data into the panel. Buffers incomplete lines to avoid word cuts. */
+  write(data: string): void {
+    if (!this.isTTY) return;
+
+    // Append to buffer and split on newlines
+    this.lineBuffer += data;
+    const parts = this.lineBuffer.split("\n");
+
+    // Last part is incomplete (no trailing newline) — keep it in buffer
+    this.lineBuffer = parts.pop() ?? "";
+
+    // All complete lines go into the display
+    const complete = parts.filter((l) => l.trim().length > 0);
+    if (complete.length === 0) {
+      // If buffer is long enough (e.g. a very long line with no newlines), flush it
+      if (this.lineBuffer.length > 200) {
+        this.lines.push(this.lineBuffer);
+        this.lineBuffer = "";
+      } else {
+        return;
+      }
+    } else {
+      this.lines.push(...complete);
+    }
+
+    if (this.lines.length > this.maxLines) {
+      this.lines = this.lines.slice(-this.maxLines);
+    }
+    this.render();
+  }
+
+  /** Erase the panel from the terminal. */
+  clear(): void {
+    if (!this.isTTY || this.renderedLines === 0) return;
+
+    // Move up and clear each rendered line
+    for (let i = 0; i < this.renderedLines; i++) {
+      process.stdout.write("\x1b[A\x1b[2K");
+    }
+    this.lines = [];
+    this.lineBuffer = "";
+    this.renderedLines = 0;
+  }
+
+  private render(): void {
+    // Erase previous render
+    if (this.renderedLines > 0) {
+      for (let i = 0; i < this.renderedLines; i++) {
+        process.stdout.write("\x1b[A\x1b[2K");
+      }
+    }
+
+    // Draw the box
+    const cols = Math.min(process.stdout.columns ?? 80, 100);
+    const innerWidth = cols - 10; // padding for "    │ " prefix and " │" suffix
+
+    process.stdout.write(pc.dim(`    ┌${"─".repeat(innerWidth + 2)}┐\n`));
+    for (const line of this.lines) {
+      const trimmed = line.length > innerWidth ? line.slice(0, innerWidth - 1) + "…" : line;
+      const padded = trimmed + " ".repeat(Math.max(0, innerWidth - stripAnsi(trimmed).length));
+      process.stdout.write(pc.dim("    │ ") + pc.dim(padded) + pc.dim(" │\n"));
+    }
+    process.stdout.write(pc.dim(`    └${"─".repeat(innerWidth + 2)}┘\n`));
+
+    // +2 for top/bottom border lines
+    this.renderedLines = this.lines.length + 2;
+  }
+}
+
+/** Strip ANSI escape codes for length calculation */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
+}
 
 // ─── Default Reporter (non-TUI, scrollback-safe with pipeline steps) ───
 
 export class DefaultReporter implements Reporter {
   private progress = { current: 0, total: 0 };
+  private livePanel = new LivePanel();
+  private spinner = new Spinner();
 
   onRunStart(totalTests: number, totalRunners: number): void {
     this.progress.total = totalTests * totalRunners;
@@ -116,12 +270,21 @@ export class DefaultReporter implements Reporter {
     const label = STEP_LABELS[step];
     const suffix = detail ? pc.dim(` ${detail}`) : "";
     if (status === "running") {
-      console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
+      this.spinner.start(`${label}...${suffix}`);
     } else if (status === "done") {
+      this.spinner.stop();
+      this.livePanel.clear();
       console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
     } else {
+      this.spinner.stop();
+      this.livePanel.clear();
       console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
+  }
+
+  onPipelineOutput(_event: TestEvent, _step: PipelineStep, data: string): void {
+    this.spinner.stop();
+    this.livePanel.write(data);
   }
 
   onTestPass(event: TestResultEvent): void {
@@ -177,6 +340,8 @@ export class SilentReporter implements Reporter {
 
 export class VerboseReporter implements Reporter {
   private progress = { current: 0, total: 0 };
+  private livePanel = new LivePanel();
+  private spinner = new Spinner();
 
   onRunStart(totalTests: number, totalRunners: number): void {
     this.progress.total = totalTests * totalRunners;
@@ -206,12 +371,21 @@ export class VerboseReporter implements Reporter {
     const label = STEP_LABELS[step];
     const suffix = detail ? pc.dim(` ${detail}`) : "";
     if (status === "running") {
-      console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
+      this.spinner.start(`${label}...${suffix}`);
     } else if (status === "done") {
+      this.spinner.stop();
+      this.livePanel.clear();
       console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
     } else {
+      this.spinner.stop();
+      this.livePanel.clear();
       console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
+  }
+
+  onPipelineOutput(_event: TestEvent, _step: PipelineStep, data: string): void {
+    this.spinner.stop();
+    this.livePanel.write(data);
   }
 
   onTestPass(event: TestResultEvent): void {

@@ -69,15 +69,15 @@ describe("LocalEnvironment", () => {
   });
 
   describe("execute", () => {
-    it("captures stdout for successful commands", () => {
-      const result = env.execute("echo hello", tmpDir);
+    it("captures stdout for successful commands", async () => {
+      const result = await env.execute("echo hello", tmpDir);
       expect(result.stdout.trim()).toBe("hello");
       expect(result.stderr).toBe("");
       expect(result.exitCode).toBe(0);
     });
 
-    it("captures stderr and exit code for failing commands", () => {
-      const result = env.execute(
+    it("captures stderr and exit code for failing commands", async () => {
+      const result = await env.execute(
         "node -e \"process.stderr.write('oops'); process.exit(2)\"",
         tmpDir,
       );
@@ -85,10 +85,21 @@ describe("LocalEnvironment", () => {
       expect(result.stderr).toContain("oops");
     });
 
-    it("respects timeout option", () => {
-      const result = env.execute("sleep 10", tmpDir, { timeout: 100 });
+    it("respects timeout option", async () => {
+      const result = await env.execute("sleep 10", tmpDir, { timeout: 100 });
       // Should exit with non-zero (killed by timeout)
       expect(result.exitCode).not.toBe(0);
+    });
+
+    it("streams stdout via onStdout callback", async () => {
+      const chunks: string[] = [];
+      const result = await env.execute('echo "line1" && echo "line2"', tmpDir, {
+        onStdout: (data) => chunks.push(data),
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("line1");
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.join("")).toContain("line1");
     });
   });
 

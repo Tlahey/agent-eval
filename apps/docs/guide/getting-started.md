@@ -151,10 +151,11 @@ sequenceDiagram
 
 Set API keys for your LLM providers:
 
-| Variable            | Provider  | Required when using         |
-| ------------------- | --------- | --------------------------- |
-| `ANTHROPIC_API_KEY` | Anthropic | Anthropic runners or judges |
-| `OPENAI_API_KEY`    | OpenAI    | OpenAI runners or judges    |
+| Variable            | Provider      | Required when using                 |
+| ------------------- | ------------- | ----------------------------------- |
+| `ANTHROPIC_API_KEY` | Anthropic     | Anthropic runners or judges         |
+| `OPENAI_API_KEY`    | OpenAI        | OpenAI runners or judges            |
+| `GH_COPILOT_TOKEN`  | GitHub Models | GitHubModelsModel (`gh auth token`) |
 
 You can also pass `apiKey` directly in the config, but env vars are recommended.
 

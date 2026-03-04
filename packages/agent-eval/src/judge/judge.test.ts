@@ -12,9 +12,25 @@ vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
 }));
 
+// Mock fs for temp file operations in CLI judge
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  return {
+    ...actual,
+    writeFileSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    mkdirSync: vi.fn(),
+  };
+});
+
+// Mock crypto for deterministic temp file names
+vi.mock("node:crypto", () => ({
+  randomBytes: vi.fn().mockReturnValue({ toString: () => "deadbeef" }),
+}));
+
 import { generateObject } from "ai";
 import { execSync } from "node:child_process";
-import { judge, buildJudgePrompt, extractChangedFiles } from "./judge.js";
+import { judge, buildJudgePrompt, extractChangedFiles, extractJsonFromText } from "./judge.js";
 
 function createMockModel(modelId = "test-model"): IModelPlugin {
   return {
@@ -207,7 +223,7 @@ describe("judge", () => {
       expect(generateObject).not.toHaveBeenCalled();
     });
 
-    it("replaces {{prompt}} in CLI command", async () => {
+    it("replaces {{prompt}} in CLI command with temp file", async () => {
       vi.mocked(execSync).mockReturnValue(
         JSON.stringify({ pass: true, score: 1, reason: "ok", improvement: "" }),
       );
@@ -216,7 +232,8 @@ describe("judge", () => {
       await judge(createMockContext(), "my test prompt", config);
 
       const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
-      expect(calledCmd).toContain("my test prompt");
+      expect(calledCmd).toContain("$(cat ");
+      expect(calledCmd).toContain(".judge-prompt-deadbeef.txt");
       expect(calledCmd).not.toContain("{{prompt}}");
     });
 
@@ -491,5 +508,35 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
     expect(prompt).toContain("## Evaluation Criteria");
     expect(prompt).toContain("test");
     expect(prompt).toContain("## Scoring Instructions");
+  });
+});
+
+describe("extractJsonFromText", () => {
+  it("returns null for empty text", () => {
+    expect(extractJsonFromText("")).toBeNull();
+  });
+
+  it("extracts JSON from markdown fenced block", () => {
+    const text = `Here is my evaluation:\n\`\`\`json\n{"score": 0.8, "reason": "good"}\n\`\`\`\nHope that helps!`;
+    const result = extractJsonFromText(text);
+    expect(result).toBe('{"score": 0.8, "reason": "good"}');
+  });
+
+  it("extracts JSON from unfenced block with expected fields", () => {
+    const text = `The evaluation result is: {"pass": true, "score": 0.9, "reason": "well done", "improvement": "none"}. That's my assessment.`;
+    const result = extractJsonFromText(text);
+    expect(result).not.toBeNull();
+    const parsed = JSON.parse(result!);
+    expect(parsed.score).toBe(0.9);
+  });
+
+  it("extracts generic JSON object", () => {
+    const text = `Output: {"key": "value"} done.`;
+    const result = extractJsonFromText(text);
+    expect(result).toBe('{"key": "value"}');
+  });
+
+  it("returns null for text with no JSON", () => {
+    expect(extractJsonFromText("just plain text")).toBeNull();
   });
 });

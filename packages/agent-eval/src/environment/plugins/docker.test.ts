@@ -85,8 +85,8 @@ describe("DockerEnvironment", () => {
   });
 
   describe("execute", () => {
-    it("returns error when container not started", () => {
-      const result = env.execute("echo hi", "/project");
+    it("returns error when container not started", async () => {
+      const result = await env.execute("echo hi", "/project");
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("Container not started");
     });
@@ -100,7 +100,7 @@ describe("DockerEnvironment", () => {
 
       mockExecSync.mockReturnValueOnce("output");
 
-      const result = env.execute("echo hello", "/project");
+      const result = await env.execute("echo hello", "/project");
       expect(result.stdout).toBe("output");
       expect(result.exitCode).toBe(0);
 
@@ -129,7 +129,7 @@ describe("DockerEnvironment", () => {
         throw err;
       });
 
-      const result = env.execute("badcmd", "/project");
+      const result = await env.execute("badcmd", "/project");
       expect(result.exitCode).toBe(127);
       expect(result.stderr).toContain("command not found");
     });

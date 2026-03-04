@@ -3,9 +3,9 @@ import type {
   ILedgerPlugin,
   IJudgePlugin,
   IModelPlugin,
+  ModelSettings,
   ICliModel,
   CliOutputMetrics,
-  ModelSettings,
   RunnerStats,
   TestTreeNode,
 } from "./interfaces.js";

@@ -142,11 +142,15 @@ describe("DefaultReporter", () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Environment setup"));
   });
 
-  it("prints pipeline step with running icon", () => {
+  it("starts spinner on running pipeline step", () => {
+    const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     const reporter = new DefaultReporter();
     reporter.onPipelineStep(makeTestEvent(), "agent", "running");
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("●"));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Agent execution"));
+    // Spinner writes to stdout, not console.log
+    expect(writeSpy).toHaveBeenCalled();
+    const output = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toContain("Agent execution");
+    writeSpy.mockRestore();
   });
 
   it("prints pipeline step with error icon", () => {

@@ -42,6 +42,7 @@ flowchart TB
     style AN fill:#10b981,color:#fff
     style OA fill:#10b981,color:#fff
     style OL fill:#10b981,color:#fff
+    style GH fill:#10b981,color:#fff
     style CL fill:#10b981,color:#fff
     style SQ fill:#10b981,color:#fff
     style JS fill:#10b981,color:#fff

@@ -114,6 +114,32 @@ No API key needed. Runs entirely on your machine.
 Local models lack the reasoning depth for reliable code evaluation. Use them only for experimentation, not production evaluations.
 :::
 
+### GitHub Models
+
+```ts
+import { GitHubModelsModel } from "agent-eval/llm";
+
+judge: {
+  name: "gpt-5-mini",
+  model: new GitHubModelsModel({
+    model: "openai/gpt-5-mini",
+    settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+  }),
+}
+```
+
+Requires `GH_COPILOT_TOKEN` or `GITHUB_TOKEN` environment variable. Get one with `gh auth token`.
+
+::: tip Recommended for judge
+GitHub Models natively supports `response_format: { type: "json_object" }` with `structuredOutputs`, guaranteeing valid JSON output. This avoids the parsing failures common with CLI-based judges.
+:::
+
+| Model               | Notes                |
+| ------------------- | -------------------- |
+| `openai/gpt-5-mini` | Fast, cost-effective |
+| `openai/gpt-4o`     | Strong balance       |
+| `openai/gpt-5.1`    | Most capable         |
+
 ### Custom / Enterprise Provider
 
 Any provider can be used by implementing `IModelPlugin`:

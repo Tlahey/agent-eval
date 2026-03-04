@@ -47,11 +47,16 @@ async function executeRunner(
   cwd: string,
   env: IEnvironmentPlugin,
   timeout?: number,
+  onOutput?: (data: string) => void,
 ): Promise<RunnerExecResult> {
   if (isCliModel(runner.model)) {
     // CLI execution: replace {{prompt}} and run via environment
     const cmd = runner.model.command.replace("{{prompt}}", prompt);
-    const result = await env.execute(cmd, cwd, { timeout: timeout ?? 600_000 });
+    const result = await env.execute(cmd, cwd, {
+      timeout: timeout ?? 600_000,
+      onStdout: onOutput,
+      onStderr: onOutput,
+    });
 
     // If the CLI model has a parseOutput function, use it to extract metrics
     if (runner.model.parseOutput) {
@@ -174,7 +179,12 @@ function createRawAgent(
     model: getRunnerModelId(runner),
 
     async run(prompt: string) {
-      const result = await executeRunner(runner, prompt, cwd, env);
+      const onOutput = reporter.onPipelineOutput
+        ? (data: string) =>
+            reporter.onPipelineOutput!({ testId, runner: runner.name }, "agent", data)
+        : undefined;
+
+      const result = await executeRunner(runner, prompt, cwd, env, undefined, onOutput);
 
       // Capture agent output into context
       if (result.stdout) {
@@ -262,11 +272,18 @@ function createAgent(
       state.isImperative = true;
       ctx.setInstruction(prompt);
 
+      // Signal agent execution start
+      reporter.onPipelineStep({ testId, runner: runner.name }, "agent", "running");
+
       // Execute the agent
       await raw.run(prompt);
 
+      reporter.onPipelineStep({ testId, runner: runner.name }, "agent", "done");
+
       // Auto storeDiff after agent execution (async for env plugins)
+      reporter.onPipelineStep({ testId, runner: runner.name }, "diff", "running");
       await ctx.storeDiffAsync();
+      reporter.onPipelineStep({ testId, runner: runner.name }, "diff", "done");
     },
   };
 
@@ -480,6 +497,9 @@ export async function runTest(
         await hook.fn({ ctx });
       }
 
+      // Set reporter context so expect.ts can emit judge pipeline steps
+      setJudgeReporterContext(rep, event);
+
       // Execute the test function (registers instruction/tasks or calls run)
       await testDef.fn({ agent, ctx, judge: config.judge });
 
@@ -592,6 +612,7 @@ export async function runTest(
         passed: false,
       });
     } finally {
+      clearJudgeReporterContext();
       // Teardown environment (no-op for local, removes container for Docker)
       if (env.teardown) {
         await env.teardown(cwd);
@@ -793,12 +814,21 @@ const JUDGE_STORE_KEY = Symbol.for("__agenteval_judge_store__");
 interface JudgeStore {
   lastResult: JudgeResult | null;
   lastOptions: JudgeOptions | null;
+  /** Reporter ref so expect.ts can emit judge pipeline steps */
+  reporter: Reporter | null;
+  /** Current test event for reporter calls */
+  currentEvent: { testId: string; runner: string } | null;
 }
 
 function getJudgeStore(): JudgeStore {
   const g = globalThis as Record<symbol, JudgeStore | undefined>;
   if (!g[JUDGE_STORE_KEY]) {
-    g[JUDGE_STORE_KEY] = { lastResult: null, lastOptions: null };
+    g[JUDGE_STORE_KEY] = {
+      lastResult: null,
+      lastOptions: null,
+      reporter: null,
+      currentEvent: null,
+    };
   }
   return g[JUDGE_STORE_KEY]!;
 }
@@ -825,4 +855,33 @@ export function getLastJudgeOptions(): JudgeOptions | null {
 
 export function clearLastJudgeOptions(): void {
   getJudgeStore().lastOptions = null;
+}
+
+/** Set the active reporter + event so expect.ts can emit pipeline steps */
+export function setJudgeReporterContext(
+  reporter: Reporter,
+  event: { testId: string; runner: string },
+): void {
+  const store = getJudgeStore();
+  store.reporter = reporter;
+  store.currentEvent = event;
+}
+
+/** Get reporter context for emitting judge pipeline steps from expect.ts */
+export function getJudgeReporterContext(): {
+  reporter: Reporter;
+  event: { testId: string; runner: string };
+} | null {
+  const store = getJudgeStore();
+  if (store.reporter && store.currentEvent) {
+    return { reporter: store.reporter, event: store.currentEvent };
+  }
+  return null;
+}
+
+/** Clear the reporter context */
+export function clearJudgeReporterContext(): void {
+  const store = getJudgeStore();
+  store.reporter = null;
+  store.currentEvent = null;
 }
