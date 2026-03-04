@@ -18,6 +18,7 @@ import {
   isCI,
 } from "../core/reporter.js";
 import type { Reporter, TestResultEvent } from "../core/reporter.js";
+import { setDebug } from "../core/debug.js";
 import {
   readLedger,
   readLedgerByTestId,
@@ -85,6 +86,7 @@ interface RunOptions {
   output?: string;
   silent?: boolean;
   verbose?: boolean;
+  debug?: boolean;
   dryRun?: boolean;
 }
 
@@ -97,6 +99,7 @@ function createReporter(opts: RunOptions): Reporter {
 
 async function executeRun(opts: RunOptions): Promise<void> {
   const cwd = process.cwd();
+  if (opts.debug) setDebug(true);
   const reporter = createReporter(opts);
 
   try {
@@ -239,6 +242,7 @@ program
   .option("-o, --output <dir>", "Override output directory for the ledger database")
   .option("-s, --silent", "Suppress all output except errors")
   .option("-v, --verbose", "Show detailed output including judge reasoning")
+  .option("--debug", "Show debug output (CLI judge raw output, token sizes, etc.)")
   .option("--dry-run", "Output the execution plan without running agents or judges")
   .action(executeRun);
 

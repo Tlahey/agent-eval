@@ -157,9 +157,9 @@ export class LocalEnvironment implements IEnvironmentPlugin {
    * Rollback agent modifications and restore the original uncommitted changes.
    */
   teardown(cwd: string): void {
-    // Clean all agent changes
+    // Clean all agent changes but preserve the ledger output directory
     execSync("git reset --hard HEAD", { cwd, stdio: "pipe" });
-    execSync("git clean -fd", { cwd, stdio: "pipe" });
+    execSync("git clean -fd -e .agenteval", { cwd, stdio: "pipe" });
 
     // Restore user's original uncommitted changes
     if (this.initialDiff && this.initialDiff.trim()) {

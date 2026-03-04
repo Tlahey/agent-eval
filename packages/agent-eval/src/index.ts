@@ -210,6 +210,7 @@ export {
   VerboseReporter,
   CIReporter,
   LivePanel,
+  Spinner,
   isCI,
 } from "./core/reporter.js";
 export type {
@@ -279,6 +280,10 @@ export {
   formatPluginErrors,
 } from "./core/plugin-validator.js";
 export type { PluginValidationError } from "./core/plugin-validator.js";
+
+// ─── Debug utilities ───
+
+export { setDebug, isDebug, debug } from "./core/debug.js";
 
 // ─── Built-in plugins are NOT re-exported from the main entry. ───
 // Import them from their sub-paths:

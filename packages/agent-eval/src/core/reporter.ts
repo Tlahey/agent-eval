@@ -83,7 +83,63 @@ const STEP_LABELS: Record<PipelineStep, string> = {
 
 const STEP_ICON_DONE = "✓";
 const STEP_ICON_FAIL = "✗";
-const STEP_ICON_RUN = "●";
+
+// ─── Spinner (TTY-only animated indicator) ───
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/**
+ * Simple terminal spinner that animates while a long-running step is in progress.
+ * Uses ANSI escape codes — only active in TTY terminals.
+ */
+export class Spinner {
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private frameIndex = 0;
+  private label = "";
+  private isTTY: boolean;
+
+  constructor() {
+    this.isTTY = !!process.stdout.isTTY;
+  }
+
+  /** Start spinning with a label (e.g., "Agent execution...") */
+  start(label: string): void {
+    this.stop();
+    this.label = label;
+    this.frameIndex = 0;
+
+    if (!this.isTTY) {
+      // Non-TTY: just print a static line
+      process.stdout.write(`    ● ${label}\n`);
+      return;
+    }
+
+    this.renderFrame();
+    this.timer = setInterval(() => this.renderFrame(), 80);
+  }
+
+  /** Stop the spinner and clear the line. */
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    if (this.isTTY && this.label) {
+      // Clear the spinner line
+      process.stdout.write("\x1b[A\x1b[2K");
+    }
+    this.label = "";
+  }
+
+  private renderFrame(): void {
+    const frame = SPINNER_FRAMES[this.frameIndex % SPINNER_FRAMES.length];
+    if (this.frameIndex > 0) {
+      process.stdout.write("\x1b[A\x1b[2K");
+    }
+    process.stdout.write(`    ${pc.cyan(frame)} ${this.label}\n`);
+    this.frameIndex++;
+  }
+}
 
 // ─── Live Output Panel (TTY inline display) ───
 
@@ -165,6 +221,7 @@ function stripAnsi(str: string): string {
 export class DefaultReporter implements Reporter {
   private progress = { current: 0, total: 0 };
   private livePanel = new LivePanel();
+  private spinner = new Spinner();
 
   onRunStart(totalTests: number, totalRunners: number): void {
     this.progress.total = totalTests * totalRunners;
@@ -194,17 +251,20 @@ export class DefaultReporter implements Reporter {
     const label = STEP_LABELS[step];
     const suffix = detail ? pc.dim(` ${detail}`) : "";
     if (status === "running") {
-      console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
+      this.spinner.start(`${label}...${suffix}`);
     } else if (status === "done") {
+      this.spinner.stop();
       this.livePanel.clear();
       console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
     } else {
+      this.spinner.stop();
       this.livePanel.clear();
       console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
   }
 
   onPipelineOutput(_event: TestEvent, _step: PipelineStep, data: string): void {
+    this.spinner.stop();
     this.livePanel.write(data);
   }
 
@@ -262,6 +322,7 @@ export class SilentReporter implements Reporter {
 export class VerboseReporter implements Reporter {
   private progress = { current: 0, total: 0 };
   private livePanel = new LivePanel();
+  private spinner = new Spinner();
 
   onRunStart(totalTests: number, totalRunners: number): void {
     this.progress.total = totalTests * totalRunners;
@@ -291,17 +352,20 @@ export class VerboseReporter implements Reporter {
     const label = STEP_LABELS[step];
     const suffix = detail ? pc.dim(` ${detail}`) : "";
     if (status === "running") {
-      console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
+      this.spinner.start(`${label}...${suffix}`);
     } else if (status === "done") {
+      this.spinner.stop();
       this.livePanel.clear();
       console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
     } else {
+      this.spinner.stop();
       this.livePanel.clear();
       console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
   }
 
   onPipelineOutput(_event: TestEvent, _step: PipelineStep, data: string): void {
+    this.spinner.stop();
     this.livePanel.write(data);
   }
 

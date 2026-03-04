@@ -12,6 +12,22 @@ vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
 }));
 
+// Mock fs for temp file operations in CLI judge
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  return {
+    ...actual,
+    writeFileSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    mkdirSync: vi.fn(),
+  };
+});
+
+// Mock crypto for deterministic temp file names
+vi.mock("node:crypto", () => ({
+  randomBytes: vi.fn().mockReturnValue({ toString: () => "deadbeef" }),
+}));
+
 import { generateObject } from "ai";
 import { execSync } from "node:child_process";
 import { judge, buildJudgePrompt, extractChangedFiles, extractJsonFromText } from "./judge.js";
@@ -207,7 +223,7 @@ describe("judge", () => {
       expect(generateObject).not.toHaveBeenCalled();
     });
 
-    it("replaces {{prompt}} in CLI command", async () => {
+    it("replaces {{prompt}} in CLI command with temp file", async () => {
       vi.mocked(execSync).mockReturnValue(
         JSON.stringify({ pass: true, score: 1, reason: "ok", improvement: "" }),
       );
@@ -216,7 +232,8 @@ describe("judge", () => {
       await judge(createMockContext(), "my test prompt", config);
 
       const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
-      expect(calledCmd).toContain("my test prompt");
+      expect(calledCmd).toContain("$(cat ");
+      expect(calledCmd).toContain(".judge-prompt-deadbeef.txt");
       expect(calledCmd).not.toContain("{{prompt}}");
     });
 

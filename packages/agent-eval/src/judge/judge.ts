@@ -1,5 +1,8 @@
 import { generateObject, type LanguageModelV1 } from "ai";
 import { execSync } from "node:child_process";
+import { writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import type {
   ExecutionData,
@@ -10,6 +13,7 @@ import type {
 } from "../core/types.js";
 import { isCliModel } from "../core/interfaces.js";
 import type { IModelPlugin, ICliModel } from "../core/interfaces.js";
+import { debug } from "../core/debug.js";
 
 const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),
@@ -36,27 +40,61 @@ async function executeCliJudge(
   cliModel: ICliModel,
   prompt: string,
 ): Promise<{ result: JudgeResult; tokenUsage?: TokenUsage }> {
-  const escapedPrompt = prompt.replace(/'/g, "'\\''");
-  const cmd = cliModel.command.replace("{{prompt}}", escapedPrompt);
+  // Write prompt to a temp file to avoid shell escaping issues with large prompts
+  const tmpDir = join(process.cwd(), ".agenteval");
+  mkdirSync(tmpDir, { recursive: true });
+  const tmpFile = join(tmpDir, `.judge-prompt-${randomBytes(4).toString("hex")}.txt`);
+  writeFileSync(tmpFile, prompt, "utf-8");
+
+  // Replace {{prompt}} with the file-based approach
+  // If the command uses {{prompt}}, replace with $(cat tmpFile) for shell substitution
+  // If the command uses {{promptFile}}, replace with the file path directly
+  let cmd: string;
+  if (cliModel.command.includes("{{promptFile}}")) {
+    cmd = cliModel.command.replace("{{promptFile}}", tmpFile);
+  } else {
+    const escapedPath = tmpFile.replace(/'/g, "'\\''");
+    cmd = cliModel.command.replace("{{prompt}}", `$(cat '${escapedPath}')`);
+  }
 
   let stdout: string;
   let stderr = "";
   try {
     stdout = execSync(cmd, {
       encoding: "utf-8",
-      timeout: 120_000,
+      timeout: 300_000,
       stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: 10 * 1024 * 1024,
+      shell: "/bin/sh",
     });
   } catch (err: unknown) {
     const e = err as { stdout?: string; stderr?: string; status?: number };
     stdout = e.stdout ?? "";
     stderr = e.stderr ?? "";
-    if (!stdout) {
-      throw new Error(`CLI judge command failed (exit ${e.status ?? 1}): ${stderr.slice(0, 500)}`, {
-        cause: err,
-      });
+    if (!stdout && !stderr) {
+      throw new Error(
+        `CLI judge command failed (exit ${e.status ?? 1}): no output captured.\nCommand: ${cmd.slice(0, 300)}`,
+        { cause: err },
+      );
+    }
+    // If stdout is empty but stderr has content, try stderr as the output
+    if (!stdout && stderr) {
+      console.warn(
+        `⚠️ CLI judge stdout was empty, falling back to stderr (${stderr.length} chars)`,
+      );
+      stdout = stderr;
+    }
+  } finally {
+    // Clean up temp file
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      // ignore cleanup errors
     }
   }
+
+  // Debug: log raw output lengths
+  debug(`CLI judge raw output: stdout=${stdout.length} chars, stderr=${stderr.length} chars`);
 
   // If the CLI model has a parseOutput function, use it
   if (cliModel.parseOutput) {
@@ -72,6 +110,7 @@ async function executeCliJudge(
     // LLMs often wrap JSON in natural language or markdown fences — try to extract it
     const extracted = extractJsonFromText(stdout);
     if (extracted) {
+      debug(`Extracted JSON block (${extracted.length} chars) from text output`);
       try {
         parsed = JSON.parse(extracted);
       } catch {
@@ -79,8 +118,11 @@ async function executeCliJudge(
       }
     }
     if (!parsed) {
+      // Show both stdout and stderr in error for debugging
+      const preview = stdout.slice(0, 800) || "(empty)";
+      const stderrPreview = stderr ? `\nStderr: ${stderr.slice(0, 400)}` : "";
       throw new Error(
-        `CLI judge output is not valid JSON.\nCommand: ${cmd.slice(0, 200)}\nOutput: ${stdout.slice(0, 500)}`,
+        `CLI judge output is not valid JSON.\nCommand: ${cmd.slice(0, 200)}\nOutput (${stdout.length} chars): ${preview}${stderrPreview}`,
       );
     }
   }
@@ -283,7 +325,7 @@ export async function judge(
         lastError = err instanceof Error ? err : new Error(String(err));
         if (attempt < maxRetries) {
           console.warn(
-            `⚠️ CLI Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying... (${lastError.message.slice(0, 100)})`,
+            `\n⚠️ CLI Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying...\n   ${lastError.message.slice(0, 300)}\n`,
           );
         }
       }
