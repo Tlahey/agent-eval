@@ -4,6 +4,7 @@ All core types exported from `agent-eval`. Import them as needed:
 
 ```ts
 import type {
+  ModelSettings,
   TokenUsage,
   TaskActionResult,
   TaskResult,
@@ -287,6 +288,32 @@ if (isCliModel(config.model)) {
 }
 ```
 
+## ModelSettings
+
+Generation settings forwarded to `generateObject()` / `generateText()` calls. Set these on any `IModelPlugin` to control LLM behavior.
+
+```ts
+interface ModelSettings {
+  /** Sampling temperature (0 = deterministic, 1 = creative) */
+  temperature?: number;
+  /** Maximum tokens in the response */
+  maxTokens?: number;
+  /** Nucleus sampling threshold (0-1) */
+  topP?: number;
+}
+```
+
+Used by both the **judge** and **API runner** when calling the model:
+
+```ts
+import { GitHubModelsModel } from "agent-eval/llm";
+
+new GitHubModelsModel({
+  model: "openai/gpt-5-mini",
+  settings: { temperature: 0.3, maxTokens: 4096, topP: 1 },
+});
+```
+
 ## JudgeConfig
 
 ```ts
@@ -303,7 +330,7 @@ See [Plugins](/guide/plugins) for full documentation. Quick reference:
 
 | Interface            | Key Methods                                        | Import              |
 | -------------------- | -------------------------------------------------- | ------------------- |
-| `IModelPlugin`       | `createModel()`, `name`, `modelId`                 | `from "agent-eval"` |
+| `IModelPlugin`       | `createModel()`, `name`, `modelId`, `settings?`    | `from "agent-eval"` |
 | `ICliModel`          | `command`, `name`, `type`, `parseOutput?()`        | `from "agent-eval"` |
 | `RunnerConfig`       | `name`, `model` (plain config object)              | `from "agent-eval"` |
 | `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.     | `from "agent-eval"` |

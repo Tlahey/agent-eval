@@ -10,12 +10,47 @@ interface IModelPlugin {
   readonly name: string;
   /** Model identifier (e.g., "claude-sonnet-4-20250514", "gpt-4o") */
   readonly modelId: string;
+  /** Optional generation settings forwarded to generateObject() / generateText() */
+  readonly settings?: ModelSettings;
   /** Create and return a Vercel AI SDK LanguageModel instance */
   createModel(): unknown | Promise<unknown>;
 }
 ```
 
-The framework calls `createModel()` whenever it needs a model — for judge evaluation (`generateObject()`) or for API runners (`generateObject()` with file schema).
+The framework calls `createModel()` whenever it needs a model — for judge evaluation (`generateObject()`) or for API runners (`generateObject()` with file schema). When `settings` is provided, its values (temperature, maxTokens, topP) are forwarded to the `generateObject()` call.
+
+## ModelSettings
+
+Generation settings that are forwarded to the Vercel AI SDK at call time. These can be set on any `IModelPlugin` implementation.
+
+```ts
+interface ModelSettings {
+  /** Sampling temperature (0 = deterministic, 1 = creative) */
+  temperature?: number;
+  /** Maximum tokens in the response */
+  maxTokens?: number;
+  /** Nucleus sampling threshold (0-1) */
+  topP?: number;
+}
+```
+
+**Example:**
+
+```ts
+import { GitHubModelsModel } from "agent-eval/llm";
+
+const judge = new GitHubModelsModel({
+  model: "openai/gpt-5-mini",
+  settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+});
+```
+
+::: tip When to tune settings
+
+- **Judge**: Lower temperature (0–0.3) for consistent evaluations
+- **API Runners**: Higher temperature (0.7–1.0) for creative code generation
+- **maxTokens**: Increase for complex tasks that produce large diffs
+  :::
 
 ## Built-in Plugins
 
@@ -140,16 +175,20 @@ export default defineConfig({
   runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
   judge: {
     name: "gpt-5-mini",
-    model: new GitHubModelsModel({ model: "openai/gpt-5-mini" }),
+    model: new GitHubModelsModel({
+      model: "openai/gpt-5-mini",
+      settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+    }),
   },
 });
 ```
 
-| Option    | Type     | Default                                 | Description                      |
-| --------- | -------- | --------------------------------------- | -------------------------------- |
-| `model`   | `string` | `openai/gpt-4o`                         | Model from GitHub Models catalog |
-| `token`   | `string` | `GH_COPILOT_TOKEN` / `GITHUB_TOKEN` env | GitHub auth token                |
-| `baseURL` | `string` | `https://models.github.ai/inference`    | Custom inference endpoint        |
+| Option     | Type            | Default                                 | Description                                        |
+| ---------- | --------------- | --------------------------------------- | -------------------------------------------------- |
+| `model`    | `string`        | `openai/gpt-4o`                         | Model from GitHub Models catalog                   |
+| `token`    | `string`        | `GH_COPILOT_TOKEN` / `GITHUB_TOKEN` env | GitHub auth token                                  |
+| `baseURL`  | `string`        | `https://models.github.ai/inference`    | Custom inference endpoint                          |
+| `settings` | `ModelSettings` | —                                       | Generation settings (temperature, maxTokens, topP) |
 
 ::: tip Why use GitHub Models as judge?
 GitHub Models supports `response_format: { type: "json_object" }`, which guarantees valid JSON output — unlike raw CLI tools that often return markdown. This makes it the most reliable built-in option for judge evaluation.
