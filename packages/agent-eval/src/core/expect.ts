@@ -10,27 +10,43 @@ import type {
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 
-// ─── Global judge config (set during test execution) ───
+// ─── Global judge config (via globalThis for cross-instance singleton) ───
 
-let _judgeConfig: JudgeConfig | null = null;
-let _globalThresholds: Thresholds = DEFAULT_THRESHOLDS;
+const EXPECT_KEY = Symbol.for("__agenteval_expect__");
+
+interface ExpectGlobals {
+  judgeConfig: JudgeConfig | null;
+  globalThresholds: Thresholds;
+}
+
+function getExpectGlobals(): ExpectGlobals {
+  const g = globalThis as Record<symbol, ExpectGlobals | undefined>;
+  if (!g[EXPECT_KEY]) {
+    g[EXPECT_KEY] = {
+      judgeConfig: null,
+      globalThresholds: DEFAULT_THRESHOLDS,
+    };
+  }
+  return g[EXPECT_KEY]!;
+}
 
 export function setJudgeConfig(config: JudgeConfig): void {
-  _judgeConfig = config;
+  getExpectGlobals().judgeConfig = config;
 }
 
 export function setGlobalThresholds(thresholds: Thresholds): void {
-  _globalThresholds = thresholds;
+  getExpectGlobals().globalThresholds = thresholds;
 }
 
 export function getGlobalThresholds(): Thresholds {
-  return _globalThresholds;
+  return getExpectGlobals().globalThresholds;
 }
 
 /** @internal Reset judge config – used by tests only */
 export function clearJudgeConfig(): void {
-  _judgeConfig = null;
-  _globalThresholds = DEFAULT_THRESHOLDS;
+  const g = getExpectGlobals();
+  g.judgeConfig = null;
+  g.globalThresholds = DEFAULT_THRESHOLDS;
 }
 
 /**
@@ -43,7 +59,8 @@ export function clearJudgeConfig(): void {
 export function expect(ctx: TestContext): ExpectChain {
   return {
     async toPassJudge(options: JudgeOptions): Promise<JudgeResult> {
-      if (!_judgeConfig) {
+      const globals = getExpectGlobals();
+      if (!globals.judgeConfig) {
         throw new Error(
           "Judge config not set. Make sure you are running inside an agenteval test.",
         );
@@ -81,10 +98,10 @@ export function expect(ctx: TestContext): ExpectChain {
         expectedFiles: options.expectedFiles,
       });
 
-      const { result } = await runJudge(ctx, prompt, _judgeConfig);
+      const { result } = await runJudge(ctx, prompt, globals.judgeConfig);
 
       // Compute status from thresholds (per-test > global > defaults)
-      const thresholds = options.thresholds ?? _globalThresholds;
+      const thresholds = options.thresholds ?? globals.globalThresholds;
       const status = computeStatus(result.score, thresholds);
       const enriched: JudgeResult = {
         ...result,
