@@ -109,6 +109,11 @@ async function executeRun(opts: RunOptions): Promise<void> {
     initSession(config);
     if (!opts.silent) console.log(pc.green("✓ Config loaded"));
 
+    // Initialize ledger plugin if present
+    if (config.ledger) {
+      await config.ledger.initialize();
+    }
+
     // Discover test files
     const patterns =
       typeof config.testFiles === "string"

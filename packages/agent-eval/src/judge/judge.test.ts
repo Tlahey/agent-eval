@@ -14,7 +14,7 @@ vi.mock("node:child_process", () => ({
 
 import { generateObject } from "ai";
 import { execSync } from "node:child_process";
-import { judge, buildJudgePrompt, extractChangedFiles } from "./judge.js";
+import { judge, buildJudgePrompt, extractChangedFiles, extractJsonFromText } from "./judge.js";
 
 function createMockModel(modelId = "test-model"): IModelPlugin {
   return {
@@ -491,5 +491,35 @@ describe("buildJudgePrompt - unified adaptive prompt", () => {
     expect(prompt).toContain("## Evaluation Criteria");
     expect(prompt).toContain("test");
     expect(prompt).toContain("## Scoring Instructions");
+  });
+});
+
+describe("extractJsonFromText", () => {
+  it("returns null for empty text", () => {
+    expect(extractJsonFromText("")).toBeNull();
+  });
+
+  it("extracts JSON from markdown fenced block", () => {
+    const text = `Here is my evaluation:\n\`\`\`json\n{"score": 0.8, "reason": "good"}\n\`\`\`\nHope that helps!`;
+    const result = extractJsonFromText(text);
+    expect(result).toBe('{"score": 0.8, "reason": "good"}');
+  });
+
+  it("extracts JSON from unfenced block with expected fields", () => {
+    const text = `The evaluation result is: {"pass": true, "score": 0.9, "reason": "well done", "improvement": "none"}. That's my assessment.`;
+    const result = extractJsonFromText(text);
+    expect(result).not.toBeNull();
+    const parsed = JSON.parse(result!);
+    expect(parsed.score).toBe(0.9);
+  });
+
+  it("extracts generic JSON object", () => {
+    const text = `Output: {"key": "value"} done.`;
+    const result = extractJsonFromText(text);
+    expect(result).toBe('{"key": "value"}');
+  });
+
+  it("returns null for text with no JSON", () => {
+    expect(extractJsonFromText("just plain text")).toBeNull();
   });
 });

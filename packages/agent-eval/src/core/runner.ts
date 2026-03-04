@@ -47,11 +47,16 @@ async function executeRunner(
   cwd: string,
   env: IEnvironmentPlugin,
   timeout?: number,
+  onOutput?: (data: string) => void,
 ): Promise<RunnerExecResult> {
   if (isCliModel(runner.model)) {
     // CLI execution: replace {{prompt}} and run via environment
     const cmd = runner.model.command.replace("{{prompt}}", prompt);
-    const result = await env.execute(cmd, cwd, { timeout: timeout ?? 600_000 });
+    const result = await env.execute(cmd, cwd, {
+      timeout: timeout ?? 600_000,
+      onStdout: onOutput,
+      onStderr: onOutput,
+    });
 
     // If the CLI model has a parseOutput function, use it to extract metrics
     if (runner.model.parseOutput) {
@@ -140,7 +145,12 @@ function createRawAgent(
     model: getRunnerModelId(runner),
 
     async run(prompt: string) {
-      const result = await executeRunner(runner, prompt, cwd, env);
+      const onOutput = reporter.onPipelineOutput
+        ? (data: string) =>
+            reporter.onPipelineOutput!({ testId, runner: runner.name }, "agent", data)
+        : undefined;
+
+      const result = await executeRunner(runner, prompt, cwd, env, undefined, onOutput);
 
       // Capture agent output into context
       if (result.stdout) {

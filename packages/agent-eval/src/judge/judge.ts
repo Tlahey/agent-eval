@@ -64,14 +64,25 @@ async function executeCliJudge(
     if (metrics.agentOutput) stdout = metrics.agentOutput;
   }
 
-  // Parse the JSON output
+  // Parse the JSON output — try direct parse first, then extract from text
   let parsed: unknown;
   try {
     parsed = JSON.parse(stdout);
   } catch {
-    throw new Error(
-      `CLI judge output is not valid JSON.\nCommand: ${cmd.slice(0, 200)}\nOutput: ${stdout.slice(0, 500)}`,
-    );
+    // LLMs often wrap JSON in natural language or markdown fences — try to extract it
+    const extracted = extractJsonFromText(stdout);
+    if (extracted) {
+      try {
+        parsed = JSON.parse(extracted);
+      } catch {
+        // Fall through to error
+      }
+    }
+    if (!parsed) {
+      throw new Error(
+        `CLI judge output is not valid JSON.\nCommand: ${cmd.slice(0, 200)}\nOutput: ${stdout.slice(0, 500)}`,
+      );
+    }
   }
 
   const obj = parsed as Record<string, unknown>;
@@ -98,6 +109,26 @@ export function extractChangedFiles(diff: string | null): string[] {
   if (!diff) return [];
   const matches = diff.matchAll(/^diff --git a\/(.+?) b\//gm);
   return [...matches].map((m) => m[1]);
+}
+
+/**
+ * Try to extract a JSON object from mixed text output.
+ * Handles common LLM patterns: ```json fences, inline JSON objects.
+ */
+export function extractJsonFromText(text: string): string | null {
+  // 1. Try ```json ... ``` fenced blocks
+  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (fenceMatch) return fenceMatch[1].trim();
+
+  // 2. Try to find a top-level JSON object with expected fields
+  const jsonMatch = text.match(/\{[\s\S]*"score"\s*:[\s\S]*"reason"\s*:[\s\S]*\}/);
+  if (jsonMatch) return jsonMatch[0];
+
+  // 3. Generic: find the largest {...} block
+  const braceMatch = text.match(/\{[\s\S]*\}/);
+  if (braceMatch) return braceMatch[0];
+
+  return null;
 }
 
 /**

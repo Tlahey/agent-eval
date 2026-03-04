@@ -10,7 +10,11 @@
 
 import { execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import type { IEnvironmentPlugin, EnvironmentCommandResult } from "../../core/interfaces.js";
+import type {
+  IEnvironmentPlugin,
+  EnvironmentCommandResult,
+  EnvironmentExecOptions,
+} from "../../core/interfaces.js";
 
 export interface DockerEnvironmentOptions {
   /** Docker image to use (e.g., "node:22", "ubuntu:24.04") */
@@ -60,7 +64,11 @@ export class DockerEnvironment implements IEnvironmentPlugin {
   /**
    * Execute a command inside the running container via `docker exec`.
    */
-  execute(command: string, _cwd: string, options?: { timeout?: number }): EnvironmentCommandResult {
+  execute(
+    command: string,
+    _cwd: string,
+    options?: EnvironmentExecOptions,
+  ): EnvironmentCommandResult {
     if (!this.containerId) {
       return { stdout: "", stderr: "Container not started", exitCode: 1 };
     }

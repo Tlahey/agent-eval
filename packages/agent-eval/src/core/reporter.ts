@@ -57,6 +57,8 @@ export interface Reporter {
   onFileWrite(event: TestEvent, filePath: string): void;
   /** Called when a pipeline step starts or completes */
   onPipelineStep(event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void;
+  /** Called when live output is received during a pipeline step (agent execution, etc.) */
+  onPipelineOutput?(event: TestEvent, step: PipelineStep, data: string): void;
   /** Called when a test passes */
   onTestPass(event: TestResultEvent): void;
   /** Called when a test gets a warning (score between fail and warn thresholds) */
@@ -83,10 +85,86 @@ const STEP_ICON_DONE = "✓";
 const STEP_ICON_FAIL = "✗";
 const STEP_ICON_RUN = "●";
 
+// ─── Live Output Panel (TTY inline display) ───
+
+/**
+ * Renders a live-updating panel of the last N lines in the terminal.
+ * Uses ANSI escape codes to overwrite previous output in-place.
+ * Only active in TTY (interactive) terminals.
+ */
+export class LivePanel {
+  private lines: string[] = [];
+  private maxLines: number;
+  private renderedLines = 0;
+  private isTTY: boolean;
+
+  constructor(maxLines = 8) {
+    this.maxLines = maxLines;
+    this.isTTY = !!process.stdout.isTTY;
+  }
+
+  /** Feed new data into the panel. Splits by newline and keeps last N lines. */
+  write(data: string): void {
+    if (!this.isTTY) return;
+
+    const incoming = data.split("\n").filter((l) => l.trim().length > 0);
+    if (incoming.length === 0) return;
+
+    this.lines.push(...incoming);
+    if (this.lines.length > this.maxLines) {
+      this.lines = this.lines.slice(-this.maxLines);
+    }
+    this.render();
+  }
+
+  /** Erase the panel from the terminal. */
+  clear(): void {
+    if (!this.isTTY || this.renderedLines === 0) return;
+
+    // Move up and clear each rendered line
+    for (let i = 0; i < this.renderedLines; i++) {
+      process.stdout.write("\x1b[A\x1b[2K");
+    }
+    this.lines = [];
+    this.renderedLines = 0;
+  }
+
+  private render(): void {
+    // Erase previous render
+    if (this.renderedLines > 0) {
+      for (let i = 0; i < this.renderedLines; i++) {
+        process.stdout.write("\x1b[A\x1b[2K");
+      }
+    }
+
+    // Draw the box
+    const cols = Math.min(process.stdout.columns ?? 80, 100);
+    const innerWidth = cols - 10; // padding for "    │ " prefix and " │" suffix
+
+    process.stdout.write(pc.dim(`    ┌${"─".repeat(innerWidth + 2)}┐\n`));
+    for (const line of this.lines) {
+      const trimmed = line.length > innerWidth ? line.slice(0, innerWidth - 1) + "…" : line;
+      const padded = trimmed + " ".repeat(Math.max(0, innerWidth - stripAnsi(trimmed).length));
+      process.stdout.write(pc.dim("    │ ") + pc.dim(padded) + pc.dim(" │\n"));
+    }
+    process.stdout.write(pc.dim(`    └${"─".repeat(innerWidth + 2)}┘\n`));
+
+    // +2 for top/bottom border lines
+    this.renderedLines = this.lines.length + 2;
+  }
+}
+
+/** Strip ANSI escape codes for length calculation */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 // ─── Default Reporter (non-TUI, scrollback-safe with pipeline steps) ───
 
 export class DefaultReporter implements Reporter {
   private progress = { current: 0, total: 0 };
+  private livePanel = new LivePanel();
 
   onRunStart(totalTests: number, totalRunners: number): void {
     this.progress.total = totalTests * totalRunners;
@@ -118,10 +196,16 @@ export class DefaultReporter implements Reporter {
     if (status === "running") {
       console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
     } else if (status === "done") {
+      this.livePanel.clear();
       console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
     } else {
+      this.livePanel.clear();
       console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
+  }
+
+  onPipelineOutput(_event: TestEvent, _step: PipelineStep, data: string): void {
+    this.livePanel.write(data);
   }
 
   onTestPass(event: TestResultEvent): void {
@@ -177,6 +261,7 @@ export class SilentReporter implements Reporter {
 
 export class VerboseReporter implements Reporter {
   private progress = { current: 0, total: 0 };
+  private livePanel = new LivePanel();
 
   onRunStart(totalTests: number, totalRunners: number): void {
     this.progress.total = totalTests * totalRunners;
@@ -208,10 +293,16 @@ export class VerboseReporter implements Reporter {
     if (status === "running") {
       console.log(`    ${pc.cyan(STEP_ICON_RUN)} ${label}...${suffix}`);
     } else if (status === "done") {
+      this.livePanel.clear();
       console.log(`    ${pc.green(STEP_ICON_DONE)} ${label}${suffix}`);
     } else {
+      this.livePanel.clear();
       console.log(`    ${pc.red(STEP_ICON_FAIL)} ${label}${suffix}`);
     }
+  }
+
+  onPipelineOutput(_event: TestEvent, _step: PipelineStep, data: string): void {
+    this.livePanel.write(data);
   }
 
   onTestPass(event: TestResultEvent): void {

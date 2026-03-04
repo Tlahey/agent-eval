@@ -282,6 +282,15 @@ export interface IJudgePlugin {
 
 // ─── Environment Plugin ───
 
+/** Options for environment command execution */
+export interface EnvironmentExecOptions {
+  timeout?: number;
+  /** Optional callback for streaming stdout data in real-time */
+  onStdout?: (data: string) => void;
+  /** Optional callback for streaming stderr data in real-time */
+  onStderr?: (data: string) => void;
+}
+
 /** Result of executing a command in an environment */
 export interface EnvironmentCommandResult {
   stdout: string;
@@ -342,7 +351,7 @@ export interface IEnvironmentPlugin {
   execute(
     command: string,
     cwd: string,
-    options?: { timeout?: number },
+    options?: EnvironmentExecOptions,
   ): EnvironmentCommandResult | Promise<EnvironmentCommandResult>;
 
   /**

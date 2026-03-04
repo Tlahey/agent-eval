@@ -191,6 +191,7 @@ export {
   SilentReporter,
   VerboseReporter,
   CIReporter,
+  LivePanel,
   isCI,
 } from "./core/reporter.js";
 export type {
@@ -245,6 +246,7 @@ export type {
   IJudgePlugin,
   IEnvironmentPlugin,
   EnvironmentCommandResult,
+  EnvironmentExecOptions,
   RunnerStats,
   TestTreeNode,
 } from "./core/interfaces.js";
