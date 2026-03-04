@@ -3,6 +3,7 @@ import type {
   ILedgerPlugin,
   IJudgePlugin,
   IModelPlugin,
+  ModelSettings,
   ICliModel,
   CliOutputMetrics,
   RunnerStats,
@@ -142,6 +143,30 @@ describe("Plugin Interfaces", () => {
       };
       const result = await asyncModel.createModel();
       expect(result).toEqual({ type: "async-model" });
+    });
+
+    it("accepts optional settings (temperature, maxTokens, topP)", () => {
+      const settings: ModelSettings = {
+        temperature: 0.7,
+        maxTokens: 2048,
+        topP: 0.9,
+      };
+      const model: IModelPlugin = {
+        name: "openai",
+        modelId: "gpt-4o",
+        settings,
+        createModel: () => ({ type: "mock-model" }),
+      };
+      expect(model.settings).toEqual({ temperature: 0.7, maxTokens: 2048, topP: 0.9 });
+    });
+
+    it("settings is optional — undefined by default", () => {
+      const model: IModelPlugin = {
+        name: "openai",
+        modelId: "gpt-4o",
+        createModel: () => ({ type: "mock-model" }),
+      };
+      expect(model.settings).toBeUndefined();
     });
   });
 

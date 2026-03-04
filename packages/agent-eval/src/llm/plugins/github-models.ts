@@ -1,4 +1,4 @@
-import type { IModelPlugin } from "../../core/interfaces.js";
+import type { IModelPlugin, ModelSettings } from "../../core/interfaces.js";
 
 export interface GitHubModelsOptions {
   /**
@@ -19,6 +19,19 @@ export interface GitHubModelsOptions {
    * @default "https://models.github.ai/inference"
    */
   baseURL?: string;
+  /**
+   * Generation settings forwarded to `generateObject()` / `generateText()`.
+   * These are applied at call time (temperature, maxTokens, topP).
+   *
+   * @example
+   * ```ts
+   * new GitHubModelsModel({
+   *   model: "openai/gpt-5-mini",
+   *   settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+   * })
+   * ```
+   */
+  settings?: ModelSettings;
 }
 
 /**
@@ -41,10 +54,16 @@ export interface GitHubModelsOptions {
  *   // ...
  * });
  *
- * // Use as runner
+ * // Use with generation settings
  * defineConfig({
  *   runners: [
- *     { name: "gpt-5-mini", model: new GitHubModelsModel({ model: "openai/gpt-5-mini" }) },
+ *     {
+ *       name: "gpt-5-mini",
+ *       model: new GitHubModelsModel({
+ *         model: "openai/gpt-5-mini",
+ *         settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+ *       }),
+ *     },
  *   ],
  *   // ...
  * });
@@ -53,6 +72,7 @@ export interface GitHubModelsOptions {
 export class GitHubModelsModel implements IModelPlugin {
   readonly name = "github-models";
   readonly modelId: string;
+  readonly settings?: ModelSettings;
   private token?: string;
   private baseURL: string;
 
@@ -60,6 +80,7 @@ export class GitHubModelsModel implements IModelPlugin {
     this.modelId = options.model ?? "openai/gpt-4o";
     this.token = options.token;
     this.baseURL = options.baseURL ?? "https://models.github.ai/inference";
+    this.settings = options.settings;
   }
 
   private resolveToken(): string {
@@ -80,6 +101,7 @@ export class GitHubModelsModel implements IModelPlugin {
       baseURL: this.baseURL,
       apiKey: this.resolveToken(),
     });
-    return provider(this.modelId);
+    // Enable structuredOutputs for guaranteed JSON responses
+    return provider(this.modelId, { structuredOutputs: true });
   }
 }

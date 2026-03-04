@@ -196,6 +196,39 @@ describe("GitHubModelsModel", () => {
     );
   });
 
+  it("stores generation settings (temperature, maxTokens, topP)", () => {
+    const model = new GitHubModelsModel({
+      model: "openai/gpt-5-mini",
+      settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+    });
+    expect(model.settings).toEqual({
+      temperature: 1,
+      maxTokens: 4096,
+      topP: 1,
+    });
+  });
+
+  it("has undefined settings when not provided", () => {
+    const model = new GitHubModelsModel({ model: "openai/gpt-4o" });
+    expect(model.settings).toBeUndefined();
+  });
+
+  it("enables structuredOutputs for guaranteed JSON", async () => {
+    process.env.GH_COPILOT_TOKEN = "ghp_test";
+    const mockProvider = vi.fn((_model: string, _opts?: unknown) => ({
+      modelId: _model,
+      provider: "openai-mock",
+    }));
+    vi.mocked(createOpenAI).mockReturnValueOnce(
+      mockProvider as unknown as ReturnType<typeof createOpenAI>,
+    );
+
+    const model = new GitHubModelsModel({ model: "openai/gpt-5-mini" });
+    await model.createModel();
+
+    expect(mockProvider).toHaveBeenCalledWith("openai/gpt-5-mini", { structuredOutputs: true });
+  });
+
   // Restore env
   afterAll(() => {
     process.env = originalEnv;

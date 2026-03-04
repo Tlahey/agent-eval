@@ -85,6 +85,9 @@ async function executeRunner(
 
     const model = await runner.model.createModel();
 
+    // Collect model-level settings (temperature, maxTokens, topP)
+    const modelSettings = !isCliModel(runner.model) ? runner.model.settings : undefined;
+
     const FileOperationSchema = z.object({
       files: z
         .array(
@@ -96,7 +99,7 @@ async function executeRunner(
         .describe("Files to create or modify"),
     });
 
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: model as Parameters<typeof generateObject>[0]["model"],
       schema: FileOperationSchema,
       prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
@@ -104,6 +107,7 @@ async function executeRunner(
 Task: ${prompt}
 
 Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
+      ...modelSettings,
     });
 
     const response = object as { files: Array<{ path: string; content: string }> };
@@ -116,7 +120,16 @@ Respond with the list of files to create or modify. Each file must include the f
       filesWritten.push(file.path);
     }
 
-    return { filesWritten };
+    // Map token usage from the AI SDK response
+    const tokenUsage = usage
+      ? {
+          inputTokens: usage.promptTokens,
+          outputTokens: usage.completionTokens,
+          totalTokens: usage.totalTokens,
+        }
+      : undefined;
+
+    return { filesWritten, tokenUsage };
   }
 }
 
