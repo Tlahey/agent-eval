@@ -129,6 +129,7 @@ export default defineConfig({
     },
   ],
   judge: {
+    name: "claude-sonnet",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
