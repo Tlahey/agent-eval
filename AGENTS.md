@@ -166,14 +166,22 @@ git commit -m "<type>(<scope>): <description>"
 ```
 
 > ⚠️ **You MUST always work on a feature branch, never on `main`.**
-> Before starting any work, create a branch: `git checkout -b <type>/<scope>-<short-description>`
+> Before starting any work, **always checkout from an up-to-date `main`**:
+>
+> ```bash
+> git checkout main && git pull origin main
+> git checkout -b <type>/<scope>-<short-description>
+> ```
 
 ### 6. Push and open a Pull Request
 
 **Every change MUST go through a Pull Request (PR). The maintainer validates and merges — never merge yourself.**
 
 ```bash
-# 1. Create a feature branch BEFORE starting work
+# 1. Always start from an up-to-date main
+git checkout main && git pull origin main
+
+# 2. Create a feature branch from updated main
 git checkout -b feat/<scope>-<short-description>
 
 # 2. ... make your changes, commit (gates must pass) ...
@@ -299,6 +307,7 @@ git commit -m "docs(readme): add quick start guide"
 - **ALL 5 gates must pass before committing:** lint ✅ → format ✅ → test ✅ → build ✅ → typecheck ✅
 - **Husky enforces lint, test, and build automatically.** Typecheck (`pnpm --filter agent-eval typecheck && pnpm --filter eval-ui exec tsc --noEmit`) must be run manually before pushing.
 - **NEVER commit or push directly to `main`.** Always work on a feature branch and open a Pull Request.
+- **ALWAYS create feature branches from an up-to-date `main`.** Run `git checkout main && git pull origin main` before `git checkout -b <branch>`. Stale branches cause merge conflicts and duplicated work.
 - **NEVER merge your own PR.** The maintainer reviews and merges.
 - **NEVER leave working code uncommitted.** If it passes all gates, commit it.
 - **NEVER commit broken code.** Never use `--no-verify` to bypass the hook.
