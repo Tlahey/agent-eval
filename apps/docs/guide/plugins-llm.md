@@ -126,6 +126,44 @@ Local models lack the reasoning depth for reliable code evaluation. Use them onl
 | `deepseek-coder` | Strong code generation |
 | `mistral`        | Fast, general-purpose  |
 
+### GitHubModelsModel
+
+Uses the [GitHub Models](https://github.com/marketplace/models) inference API. **Recommended as judge** — natively supports `response_format: { type: "json_object" }` for guaranteed structured JSON output.
+
+Authentication uses your GitHub token (`GH_COPILOT_TOKEN` or `GITHUB_TOKEN`). Get one with `gh auth token`.
+
+```ts
+import { defineConfig } from "agent-eval";
+import { GitHubModelsModel, CliModel } from "agent-eval/llm";
+
+export default defineConfig({
+  runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
+  judge: {
+    name: "gpt-5-mini",
+    model: new GitHubModelsModel({ model: "openai/gpt-5-mini" }),
+  },
+});
+```
+
+| Option    | Type     | Default                                 | Description                      |
+| --------- | -------- | --------------------------------------- | -------------------------------- |
+| `model`   | `string` | `openai/gpt-4o`                         | Model from GitHub Models catalog |
+| `token`   | `string` | `GH_COPILOT_TOKEN` / `GITHUB_TOKEN` env | GitHub auth token                |
+| `baseURL` | `string` | `https://models.github.ai/inference`    | Custom inference endpoint        |
+
+::: tip Why use GitHub Models as judge?
+GitHub Models supports `response_format: { type: "json_object" }`, which guarantees valid JSON output — unlike raw CLI tools that often return markdown. This makes it the most reliable built-in option for judge evaluation.
+:::
+
+**Available models (via GitHub Models catalog):**
+
+| Model                | Best for                   |
+| -------------------- | -------------------------- |
+| `openai/gpt-5-mini`  | Fast, cost-effective judge |
+| `openai/gpt-4o`      | High capability (default)  |
+| `openai/gpt-5.1`     | Most capable OpenAI model  |
+| `meta/llama-4-scout` | Open-source alternative    |
+
 ## Creating a Custom Model Plugin
 
 Implement the `IModelPlugin` interface:

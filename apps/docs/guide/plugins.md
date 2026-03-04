@@ -22,6 +22,7 @@ flowchart TB
     MODEL --> AN["AnthropicModel"]
     MODEL --> OA["OpenAIModel"]
     MODEL --> OL["OllamaModel"]
+    MODEL --> GH["GitHubModelsModel"]
     MODEL --> CL["CliModel"]
     MODEL --> CM["Custom Model"]
 
@@ -41,6 +42,7 @@ flowchart TB
     style AN fill:#10b981,color:#fff
     style OA fill:#10b981,color:#fff
     style OL fill:#10b981,color:#fff
+    style GH fill:#10b981,color:#fff
     style CL fill:#10b981,color:#fff
     style SQ fill:#10b981,color:#fff
     style JS fill:#10b981,color:#fff
@@ -50,11 +52,11 @@ flowchart TB
 
 ## Plugin Categories
 
-| Plugin          | Interface            | Purpose                           | Built-in                                                   |
-| --------------- | -------------------- | --------------------------------- | ---------------------------------------------------------- |
-| **Model**       | `IModelPlugin`       | Wraps LLM providers (judge + API) | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `CliModel` |
-| **Ledger**      | `ILedgerPlugin`      | Result storage and querying       | `SqliteLedger`, `JsonLedger`                               |
-| **Environment** | `IEnvironmentPlugin` | Workspace setup, exec, diffs      | `LocalEnvironment`, `DockerEnvironment`                    |
+| Plugin          | Interface            | Purpose                           | Built-in                                                                        |
+| --------------- | -------------------- | --------------------------------- | ------------------------------------------------------------------------------- |
+| **Model**       | `IModelPlugin`       | Wraps LLM providers (judge + API) | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `GitHubModelsModel`, `CliModel` |
+| **Ledger**      | `ILedgerPlugin`      | Result storage and querying       | `SqliteLedger`, `JsonLedger`                                                    |
+| **Environment** | `IEnvironmentPlugin` | Workspace setup, exec, diffs      | `LocalEnvironment`, `DockerEnvironment`                                         |
 
 ::: tip Runners are not plugins
 Runners are plain config objects (`RunnerConfig`), not plugin instances. See the [Runners](./runners) page for details.
@@ -64,12 +66,12 @@ Runners are plain config objects (`RunnerConfig`), not plugin instances. See the
 
 Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each plugin category has its own barrel export:
 
-| Import                   | What you get                                                          |
-| ------------------------ | --------------------------------------------------------------------- |
-| `agent-eval`             | Core: `test`, `expect`, `describe`, `defineConfig`, types, interfaces |
-| `agent-eval/llm`         | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `CliModel`            |
-| `agent-eval/ledger`      | `SqliteLedger`, `JsonLedger`                                          |
-| `agent-eval/environment` | `LocalEnvironment`, `DockerEnvironment`                               |
+| Import                   | What you get                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `agent-eval`             | Core: `test`, `expect`, `describe`, `defineConfig`, types, interfaces           |
+| `agent-eval/llm`         | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `GitHubModelsModel`, `CliModel` |
+| `agent-eval/ledger`      | `SqliteLedger`, `JsonLedger`                                                    |
+| `agent-eval/environment` | `LocalEnvironment`, `DockerEnvironment`                                         |
 
 ::: tip Why separate entry points?
 Each plugin category dynamically imports its dependencies (`@ai-sdk/openai`, `@ai-sdk/anthropic`, `node:sqlite`, etc.). By isolating them in separate entry points, **only the plugins you actually use are loaded** — no unnecessary dependencies.
