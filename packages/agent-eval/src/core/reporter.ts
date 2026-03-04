@@ -23,7 +23,7 @@ export function isCI(): boolean {
 
 // ─── Pipeline Step Types ───
 
-export type PipelineStep = "setup" | "agent" | "diff" | "afterEach" | "task" | "judge";
+export type PipelineStep = "setup" | "agent" | "diff" | "task" | "judge";
 
 export type StepStatus = "running" | "done" | "error";
 
@@ -75,7 +75,6 @@ const STEP_LABELS: Record<PipelineStep, string> = {
   setup: "Environment setup",
   agent: "Agent execution",
   diff: "Diff capture",
-  afterEach: "Post-agent commands",
   task: "Task verification",
   judge: "Judge evaluation",
 };

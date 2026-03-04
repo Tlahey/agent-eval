@@ -107,7 +107,6 @@ export default defineConfig({
 | `timeout`     | `number`                         | `300000`                                 | Agent run timeout (ms)                                      |
 | `thresholds`  | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL            |
 | `beforeEach`  | `HookFn`                         | —                                        | Hook to register tasks via `ctx.addTask()` before each test |
-| `afterEach`   | `AfterEachCommand[]`             | —                                        | _(deprecated)_ Use `beforeEach` + `ctx.addTask()` instead   |
 | `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                             |
 | `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin — see [Plugins](/guide/plugins)        |
 | `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment — see [Plugins](/guide/plugins)       |
@@ -179,46 +178,6 @@ export default defineConfig({
 ```
 
 `beforeEach` can also be defined at file-level and describe-level in eval files. See [Writing Tests — beforeEach](/guide/writing-tests#beforeeach-3-levels-of-scoping) for the full scoping model.
-
-### afterEach _(deprecated)_
-
-::: warning Deprecated
-The `afterEach: AfterEachCommand[]` config option is deprecated. Use `beforeEach` with `ctx.addTask()` instead — it provides weighted scoring, structured criteria, and better integration with the judge.
-:::
-
-**Before (deprecated):**
-
-```ts
-export default defineConfig({
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
-});
-```
-
-**After (recommended):**
-
-```ts
-export default defineConfig({
-  beforeEach: ({ ctx }) => {
-    ctx.addTask({
-      name: "Tests",
-      action: () => ctx.exec("pnpm test"),
-      criteria: "All tests must pass",
-      weight: 3,
-    });
-    ctx.addTask({
-      name: "Build",
-      action: () => ctx.exec("pnpm build"),
-      criteria: "Build succeeds",
-      weight: 2,
-    });
-  },
-});
-```
-
-Tasks registered via `ctx.addTask()` are executed after the agent runs and their results (exit code, stdout, criteria) are included in the judge prompt with weighted scoring.
 
 ## Environment Variables
 

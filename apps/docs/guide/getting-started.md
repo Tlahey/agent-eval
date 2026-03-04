@@ -70,7 +70,7 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   // 1. Trigger the agent — storeDiff() runs automatically after this
   await agent.run("Add a Close button inside the banner component");
 
-  // 2. Judge the result — afterEach commands already ran
+  // 2. Judge the result
   await expect(ctx).toPassJudge({
     criteria: `
       - Uses a proper close button component
@@ -83,7 +83,7 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
 ```
 
 ::: tip No boilerplate needed
-`storeDiff()` is called **automatically** after `agent.run()`. Commands defined in `afterEach` (tests, builds, linters) also run automatically. Your test files only need the prompt and the criteria.
+`storeDiff()` is called **automatically** after `agent.run()`. Tasks registered via `beforeEach` + `ctx.addTask()` (tests, builds, linters) also run automatically. Your test files only need the prompt and the criteria.
 :::
 
 ### 3. Run the evaluation
@@ -130,7 +130,7 @@ sequenceDiagram
         Agent-->>AE: Files modified on disk
         AE->>Env: env.getDiff(cwd) (auto storeDiff)
         Env-->>AE: Diff captured
-        AE->>AE: Run afterEach commands
+        AE->>AE: Run tasks
         AE->>Judge: Evaluate (criteria + diff + outputs)
         Judge-->>AE: { score, pass, status, reason, improvement }
         AE->>DB: Append result
@@ -143,7 +143,7 @@ sequenceDiagram
 2. **Test files discovered** — Files matching `*.eval.ts` and `*.agent-eval.ts` are found
 3. **Environment setup** — The environment plugin resets the workspace (local git, Docker, etc.)
 4. **Agent executes** — Your configured agent runs the prompt
-5. **Context captured** — Diff is captured via the environment plugin, afterEach commands execute
+5. **Context captured** — Diff is captured via the environment plugin, tasks execute
 6. **Judge evaluates** — An LLM scores the agent's output (0.0–1.0) with three-level status (PASS/WARN/FAIL)
 7. **Ledger updated** — Results are stored in `.agenteval/ledger.sqlite` (SQLite)
 

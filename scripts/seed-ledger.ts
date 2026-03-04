@@ -865,16 +865,14 @@ function generateTiming(durationMs: number): {
   totalMs: number;
   setupMs: number;
   agentMs: number;
-  afterEachMs: number;
   tasksMs: number;
   judgeMs: number;
 } {
   const setupMs = randInt(200, 1000);
   const judgeMs = randInt(3000, 15000);
   const tasksMs = randInt(2000, 12000);
-  const afterEachMs = randInt(50, 500);
-  const agentMs = Math.max(1000, durationMs - setupMs - judgeMs - tasksMs - afterEachMs);
-  return { totalMs: durationMs, setupMs, agentMs, afterEachMs, tasksMs, judgeMs };
+  const agentMs = Math.max(1000, durationMs - setupMs - judgeMs - tasksMs);
+  return { totalMs: durationMs, setupMs, agentMs, tasksMs, judgeMs };
 }
 
 function generateTaskResults(

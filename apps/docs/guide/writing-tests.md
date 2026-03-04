@@ -13,13 +13,11 @@ flowchart TD
     B4 --> C{"Mode?"}
     C -- Declarative --> D1["🤖 agent.instruct(prompt)"]
     D1 --> D2["📸 Auto storeDiff()"]
-    D2 --> D3["⚙️ afterEach commands"]
-    D3 --> D4["✅ Execute tasks"]
+    D2 --> D4["✅ Execute tasks"]
     D4 --> D5["⚖️ Judge (toPassJudge criteria + optional tasks)"]
     C -- Imperative --> E1["🤖 agent.run(prompt)"]
     E1 --> E2["📸 Auto storeDiff()"]
-    E2 --> E3["⚙️ afterEach commands"]
-    E3 --> E4["⚖️ expect(ctx).toPassJudge()"]
+    E2 --> E4["⚖️ expect(ctx).toPassJudge()"]
     D5 --> F{"score ≥ threshold?"}
     E4 --> F
     F -- "≥ pass" --> G["✅ PASS → Ledger"]
@@ -77,7 +75,7 @@ test("Test title", async ({ agent, ctx }) => {
 ```
 
 ::: tip Automatic post-agent hooks
-`storeDiff()` is called **automatically** after `agent.run()`. You can also define global `afterEach` commands in your config to run tests, builds, or linters automatically — no need to call them manually in every eval file. See [Configuration](./configuration.md#automatic-post-agent-hooks).
+`storeDiff()` is called **automatically** after `agent.run()`. You can also register global tasks via `beforeEach` + `ctx.addTask()` in your config to run tests, builds, or linters automatically — no need to call them manually in every eval file. See [Configuration](./configuration.md#lifecycle-hooks).
 :::
 
 ## Grouping Tests with describe()
@@ -312,14 +310,14 @@ Captures the current `git diff` (staged + unstaged). **Called automatically** af
 
 ### `ctx.runCommand(name, command)`
 
-Runs a shell command and stores its result (stdout, stderr, exit code, duration). For commands that should run after every agent execution (tests, builds, linters), use the `afterEach` config option instead.
+Runs a shell command and stores its result (stdout, stderr, exit code, duration). For commands that should run after every agent execution (tests, builds, linters), use `beforeEach` with `ctx.addTask()` in your config instead.
 
 ```ts
 // Manual call (for one-off commands in specific tests)
 await ctx.runCommand("test", "pnpm test -- Banner");
 
-// Preferred: use afterEach in config for recurring commands
-// See Configuration > Automatic Post-Agent Hooks
+// Preferred: use beforeEach + ctx.addTask() in config for recurring commands
+// See Configuration > Lifecycle Hooks
 ```
 
 ::: info Command timeout

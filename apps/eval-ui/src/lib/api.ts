@@ -22,7 +22,6 @@ export interface TimingData {
   totalMs: number;
   setupMs?: number;
   agentMs?: number;
-  afterEachMs?: number;
   tasksMs?: number;
   judgeMs?: number;
 }

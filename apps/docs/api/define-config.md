@@ -43,7 +43,6 @@ interface AgentEvalConfig {
   runners: RunnerConfig[]; // Runner config objects
   judge: JudgeConfig; // LLM judge configuration
   beforeEach?: HookFn; // Config-level hook before each test
-  afterEach?: AfterEachCommand[]; // Auto commands after each agent run
   matrix?: { runners?: string[] }; // Filter which runners to execute
   outputDir?: string; // Ledger output dir (default: .agenteval)
   timeout?: number; // Agent run timeout ms (default: 300000)
@@ -77,11 +76,6 @@ interface IModelPlugin {
   readonly modelId: string;
   createModel(): unknown | Promise<unknown>;
 }
-
-interface AfterEachCommand {
-  name: string; // Label for the command
-  command: string; // Shell command to execute
-}
 ```
 
 ## Config Options
@@ -93,7 +87,6 @@ interface AfterEachCommand {
 | `runners`     | `RunnerConfig[]`         | _required_                               | Runner config objects (`{ name, model }`)                   |
 | `judge`       | `JudgeConfig`            | _required_                               | LLM judge configuration (`{ name, model }`)                 |
 | `beforeEach`  | `HookFn`                 | —                                        | Config-level hook before each test                          |
-| `afterEach`   | `AfterEachCommand[]`     | —                                        | Commands to run after each agent (auto storeDiff first)     |
 | `matrix`      | `{ runners?: string[] }` | —                                        | Filter which runners to execute                             |
 | `outputDir`   | `string`                 | `.agenteval`                             | Ledger output directory                                     |
 | `timeout`     | `number`                 | `300000`                                 | Agent run timeout (ms)                                      |

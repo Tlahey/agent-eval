@@ -7,17 +7,14 @@ The context object injected into every test function. Acts as a black box to sto
 ```mermaid
 flowchart LR
     A["agent.run()"] --> B["storeDiff()<br/>(automatic)"]
-    B --> C["afterEach commands<br/>(automatic)"]
-    C --> D["ctx ready for<br/>judge evaluation"]
+    B --> C["ctx ready for<br/>judge evaluation"]
 
     style B fill:#6366f1,color:#fff
-    style D fill:#10b981,color:#fff
+    style C fill:#10b981,color:#fff
 ```
 
 ::: tip Auto-capture
 `storeDiff()` is called **automatically** after `agent.run()`. You only need to call it manually if you want to capture a diff at a specific point outside the normal flow.
-
-`afterEach` commands defined in your config are also executed automatically — they appear in `ctx.commands` when the judge evaluates.
 :::
 
 ## Interface
@@ -78,7 +75,7 @@ interface CommandResult {
 ```
 
 ::: info
-For commands that should run after every agent execution, use the `afterEach` config option instead of calling `runCommand()` in every test file.
+For commands that should run after every agent execution, use `beforeEach` with `ctx.addTask()` in your config instead of calling `runCommand()` in every test file.
 :::
 
 ### `addTask(task)`
@@ -137,7 +134,7 @@ const result = await ctx.exec("pnpm build");
 | Property   | Type                        | Description                                |
 | ---------- | --------------------------- | ------------------------------------------ |
 | `diff`     | `string \| null`            | Captured git diff (auto-populated)         |
-| `commands` | `CommandResult[]`           | All command results (manual + afterEach)   |
+| `commands` | `CommandResult[]`           | All command results (manual + task)        |
 | `tasks`    | `readonly TaskDefinition[]` | Registered tasks (declarative mode)        |
 | `logs`     | `string`                    | Formatted log string (diff + all commands) |
 

@@ -73,7 +73,7 @@ Click any run to see the full details in a **7-tab panel**:
 - **Diff** — GitHub-style diff viewer with syntax highlighting
 - **Cmds** — Command outputs (test results, build logs, exit codes)
 - **Tasks** — Task results with pass/fail status per task
-- **Metrics** — Token usage breakdown (agent + judge tokens) and **TimingBar** visualization (stacked horizontal bar showing Setup → Agent → Tasks → AfterEach → Judge phases)
+- **Metrics** — Token usage breakdown (agent + judge tokens) and **TimingBar** visualization (stacked horizontal bar showing Setup → Agent → Tasks → Judge phases)
 - **History** — All score overrides (audit trail)
 
 Additional features:

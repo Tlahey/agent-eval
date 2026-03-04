@@ -222,7 +222,6 @@ function TimingBar({ timing }: { timing: LedgerRun["timing"] }) {
     { key: "setupMs", label: "Setup", color: "#6366f1", value: timing.setupMs },
     { key: "agentMs", label: "Agent", color: "#f59e0b", value: timing.agentMs },
     { key: "tasksMs", label: "Tasks", color: "#34d399", value: timing.tasksMs },
-    { key: "afterEachMs", label: "AfterEach", color: "#60a5fa", value: timing.afterEachMs },
     { key: "judgeMs", label: "Judge", color: "#a78bfa", value: timing.judgeMs },
   ].filter((p) => p.value && p.value > 0);
 

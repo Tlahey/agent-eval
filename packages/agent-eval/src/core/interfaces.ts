@@ -301,7 +301,7 @@ export interface EnvironmentCommandResult {
  *
  * Lifecycle per test iteration:
  * 1. `setup()` — Prepare workspace (git reset, docker create, etc.)
- * 2. `execute()` — Run commands in the environment (agent, afterEach)
+ * 2. `execute()` — Run commands in the environment (agent commands)
  * 3. `getDiff()` — Capture the code changes
  * 4. `teardown()` — Clean up resources (optional, for containers/VMs)
  *
