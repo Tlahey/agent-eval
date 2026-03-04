@@ -37,6 +37,7 @@ export default defineConfig({
     },
   ],
   judge: {
+    name: "claude-sonnet",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
@@ -65,7 +66,10 @@ export default defineConfig({
   ],
 
   // ── Judge ──────────────────────────────────────
-  judge: { model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }) },
+  judge: {
+    name: "claude-sonnet",
+    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
+  },
 
   // ── Lifecycle hooks ────────────────────────────
   beforeEach: ({ ctx }) => {
@@ -93,20 +97,20 @@ export default defineConfig({
 
 ## Options Reference
 
-| Option        | Type                             | Default                                  | Description                                           |
-| ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
-| `runners`     | `RunnerConfig[]`                 | _required_                               | Runner config objects (`{ name, model }`)             |
-| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration (`{ name, model }`)           |
-| `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                    |
-| `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                |
-| `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                               |
-| `timeout`     | `number`                         | `300000`                                 | Agent run timeout (ms)                                |
-| `thresholds`  | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL      |
-| `beforeEach`  | `HookFn`                         | —                                        | Config-level hook called before each test             |
-| `afterEach`   | `AfterEachCommand[]`             | —                                        | Commands to run after each agent execution            |
-| `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                       |
-| `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin — see [Plugins](/guide/plugins)  |
-| `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment — see [Plugins](/guide/plugins) |
+| Option        | Type                             | Default                                  | Description                                                 |
+| ------------- | -------------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
+| `runners`     | `RunnerConfig[]`                 | _required_                               | Runner config objects (`{ name, model }`)                   |
+| `judge`       | `JudgeConfig`                    | _required_                               | LLM judge configuration (`{ name, model }`)                 |
+| `testFiles`   | `string \| string[]`             | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
+| `rootDir`     | `string`                         | `process.cwd()`                          | Project root directory                                      |
+| `outputDir`   | `string`                         | `.agenteval`                             | Ledger output directory                                     |
+| `timeout`     | `number`                         | `300000`                                 | Agent run timeout (ms)                                      |
+| `thresholds`  | `{ warn: number; fail: number }` | `{ warn: 0.8, fail: 0.5 }`               | Global scoring thresholds for PASS / WARN / FAIL            |
+| `beforeEach`  | `HookFn`                         | —                                        | Hook to register tasks via `ctx.addTask()` before each test |
+| `afterEach`   | `AfterEachCommand[]`             | —                                        | _(deprecated)_ Use `beforeEach` + `ctx.addTask()` instead   |
+| `matrix`      | `{ runners?: string[] }`         | —                                        | Filter which runners to execute                             |
+| `ledger`      | `ILedgerPlugin`                  | Built-in SQLite                          | Custom ledger plugin — see [Plugins](/guide/plugins)        |
+| `environment` | `IEnvironmentPlugin`             | `LocalEnvironment`                       | Execution environment — see [Plugins](/guide/plugins)       |
 
 ## Plugins
 
@@ -128,7 +132,7 @@ export default defineConfig({
   ],
 
   // Judge uses an LLM model (API or CLI)
-  judge: { model: gpt4o },
+  judge: { name: "gpt-4o", model: gpt4o },
 
   // Pick one ledger plugin — or omit for SqliteLedger
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
@@ -176,21 +180,13 @@ export default defineConfig({
 
 `beforeEach` can also be defined at file-level and describe-level in eval files. See [Writing Tests — beforeEach](/guide/writing-tests#beforeeach-3-levels-of-scoping) for the full scoping model.
 
-### afterEach (Auto commands)
+### afterEach _(deprecated)_
 
-Commands run **automatically** after each agent execution, before the judge evaluates. `storeDiff()` always runs first.
+::: warning Deprecated
+The `afterEach: AfterEachCommand[]` config option is deprecated. Use `beforeEach` with `ctx.addTask()` instead — it provides weighted scoring, structured criteria, and better integration with the judge.
+:::
 
-```mermaid
-flowchart LR
-    A["agent.run(prompt)"] --> B["📸 storeDiff()<br/>(automatic)"]
-    B --> C["⚙️ afterEach[0]<br/>pnpm test"]
-    C --> D["⚙️ afterEach[1]<br/>pnpm build"]
-    D --> E["Ready for<br/>judge evaluation"]
-
-    style A fill:#f59e0b,color:#000
-    style B fill:#6366f1,color:#fff
-    style E fill:#10b981,color:#fff
-```
+**Before (deprecated):**
 
 ```ts
 export default defineConfig({
@@ -198,15 +194,31 @@ export default defineConfig({
     { name: "test", command: "pnpm test" },
     { name: "typecheck", command: "pnpm build" },
   ],
-  // ...
 });
 ```
 
-::: tip beforeEach vs afterEach
+**After (recommended):**
 
-- **`beforeEach`** is a function that receives `{ ctx }` — use it to register `ctx.addTask()` verification tasks for the declarative pipeline
-- **`afterEach`** is an array of shell commands that run automatically after the agent — their output is available to the judge
-  :::
+```ts
+export default defineConfig({
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "Build succeeds",
+      weight: 2,
+    });
+  },
+});
+```
+
+Tasks registered via `ctx.addTask()` are executed after the agent runs and their results (exit code, stdout, criteria) are included in the judge prompt with weighted scoring.
 
 ## Environment Variables
 
@@ -299,6 +311,7 @@ The judge evaluates agent output using an LLM. See the [Judges guide](/guide/jud
 import { AnthropicModel } from "agent-eval/llm";
 
 judge: {
+  name: "claude-sonnet",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   maxRetries: 2, // retry on invalid responses (default: 2)
 }

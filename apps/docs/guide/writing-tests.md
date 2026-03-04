@@ -161,7 +161,7 @@ import { CliModel, OpenAIModel } from "agent-eval/llm";
 
 export default defineConfig({
   runners: [{ name: "copilot", model: new CliModel({ command: 'gh copilot "{{prompt}}"' }) }],
-  judge: { model: new OpenAIModel({ model: "gpt-4o" }) },
+  judge: { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
 
   beforeEach: ({ ctx }) => {
     ctx.addTask({

@@ -38,13 +38,23 @@ export default defineConfig({
     },
   ],
   judge: {
+    name: "claude-sonnet",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
-  // Automatically run after each agent execution
-  afterEach: [
-    { name: "test", command: "pnpm test" },
-    { name: "typecheck", command: "pnpm build" },
-  ],
+  beforeEach: ({ ctx }) => {
+    ctx.addTask({
+      name: "Tests",
+      action: () => ctx.exec("pnpm test"),
+      criteria: "All tests must pass",
+      weight: 3,
+    });
+    ctx.addTask({
+      name: "Build",
+      action: () => ctx.exec("pnpm build"),
+      criteria: "Build succeeds with zero errors",
+      weight: 2,
+    });
+  },
 });
 ```
 

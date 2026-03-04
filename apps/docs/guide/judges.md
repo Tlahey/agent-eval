@@ -84,6 +84,7 @@ Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in constructor).
 import { OpenAIModel } from "agent-eval/llm";
 
 judge: {
+  name: "gpt-4o",
   model: new OpenAIModel({ model: "gpt-4o" }),
 }
 ```
@@ -102,6 +103,7 @@ Requires `OPENAI_API_KEY` environment variable (or `apiKey` in constructor).
 import { OllamaModel } from "agent-eval/llm";
 
 judge: {
+  name: "llama3",
   model: new OllamaModel({ model: "llama3" }),
 }
 ```
@@ -134,7 +136,8 @@ class CompanyModel implements IModelPlugin {
 
 // In config:
 judge: {
-  model: new CompanyModel();
+  name: "company-judge",
+  model: new CompanyModel(),
 }
 ```
 
@@ -148,6 +151,7 @@ You can also use a CLI-based model (e.g., `claude`, `gemini`) as the judge. The 
 import { CliModel } from "agent-eval/llm";
 
 judge: {
+  name: "claude-cli",
   model: new CliModel({
     command: 'claude -p "{{prompt}}" --output-format json',
   }),
@@ -187,6 +191,7 @@ The judge **must** return valid structured data (`{ pass, score, reason, improve
 
 ```ts
 judge: {
+  name: "claude-sonnet",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   maxRetries: 3, // default: 2
 }

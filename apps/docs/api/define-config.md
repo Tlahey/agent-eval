@@ -20,6 +20,7 @@ export default defineConfig({
     { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
   ],
   judge: {
+    name: "claude-sonnet",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
   beforeEach: ({ ctx }) => {

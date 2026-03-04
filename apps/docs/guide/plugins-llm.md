@@ -30,6 +30,7 @@ import { AnthropicModel, CliModel } from "agent-eval/llm";
 export default defineConfig({
   runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
   judge: {
+    name: "claude-sonnet",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
@@ -60,7 +61,7 @@ const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
   runners: [{ name: "gpt-4o", model: gpt4o }],
-  judge: { model: gpt4o },
+  judge: { name: "gpt-4o", model: gpt4o },
 });
 ```
 
@@ -103,7 +104,7 @@ const llama = new OllamaModel({ model: "llama3" });
 
 export default defineConfig({
   runners: [{ name: "llama3", model: llama }],
-  judge: { model: llama },
+  judge: { name: "llama3", model: llama },
 });
 ```
 
