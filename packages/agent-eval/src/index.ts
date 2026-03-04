@@ -8,17 +8,29 @@ import type {
 } from "./core/types.js";
 import { DEFAULT_THRESHOLDS } from "./core/types.js";
 
-// ─── Global test registry ───
+// ─── Global test registry (via globalThis for cross-instance singleton) ───
 
-const _tests: TestDefinition[] = [];
+const REGISTRY_KEY = Symbol.for("__agenteval_registry__");
 
-/** Current describe() scope stack */
-let _suiteStack: string[] = [];
+interface AgentEvalRegistry {
+  tests: TestDefinition[];
+  suiteStack: string[];
+  beforeEachHooks: HookDefinition[];
+  afterEachHooks: HookDefinition[];
+}
 
-// ─── Global hook registries ───
-
-const _beforeEachHooks: HookDefinition[] = [];
-const _afterEachHooks: HookDefinition[] = [];
+function getRegistry(): AgentEvalRegistry {
+  const g = globalThis as Record<symbol, AgentEvalRegistry | undefined>;
+  if (!g[REGISTRY_KEY]) {
+    g[REGISTRY_KEY] = {
+      tests: [],
+      suiteStack: [],
+      beforeEachHooks: [],
+      afterEachHooks: [],
+    };
+  }
+  return g[REGISTRY_KEY]!;
+}
 
 /**
  * Register a test. This is the primary DX API.
@@ -35,10 +47,11 @@ const _afterEachHooks: HookDefinition[] = [];
  * ```
  */
 export function test(title: string, fn: TestFn): void {
-  _tests.push({
+  const reg = getRegistry();
+  reg.tests.push({
     title,
     fn,
-    suitePath: _suiteStack.length > 0 ? [..._suiteStack] : undefined,
+    suitePath: reg.suiteStack.length > 0 ? [...reg.suiteStack] : undefined,
   });
 }
 
@@ -46,11 +59,12 @@ export function test(title: string, fn: TestFn): void {
  * Register a tagged test.
  */
 test.tagged = function (tags: string[], title: string, fn: TestFn): void {
-  _tests.push({
+  const reg = getRegistry();
+  reg.tests.push({
     title,
     fn,
     tags,
-    suitePath: _suiteStack.length > 0 ? [..._suiteStack] : undefined,
+    suitePath: reg.suiteStack.length > 0 ? [...reg.suiteStack] : undefined,
   });
 };
 
@@ -80,11 +94,12 @@ test.skip = function (_title: string, _fn: TestFn): void {
  * ```
  */
 export function describe(name: string, fn: () => void): void {
-  _suiteStack.push(name);
+  const reg = getRegistry();
+  reg.suiteStack.push(name);
   try {
     fn();
   } finally {
-    _suiteStack.pop();
+    reg.suiteStack.pop();
   }
 }
 
@@ -92,17 +107,18 @@ export function describe(name: string, fn: () => void): void {
  * Get all registered tests.
  */
 export function getRegisteredTests(): TestDefinition[] {
-  return [..._tests];
+  return [...getRegistry().tests];
 }
 
 /**
  * Clear all registered tests (used between file loads).
  */
 export function clearRegisteredTests(): void {
-  _tests.length = 0;
-  _suiteStack = [];
-  _beforeEachHooks.length = 0;
-  _afterEachHooks.length = 0;
+  const reg = getRegistry();
+  reg.tests.length = 0;
+  reg.suiteStack.length = 0;
+  reg.beforeEachHooks.length = 0;
+  reg.afterEachHooks.length = 0;
 }
 
 // ─── Lifecycle Hooks ───
@@ -131,7 +147,8 @@ export function clearRegisteredTests(): void {
  * ```
  */
 export function beforeEach(fn: HookFn): void {
-  _beforeEachHooks.push({ fn, suitePath: [..._suiteStack] });
+  const reg = getRegistry();
+  reg.beforeEachHooks.push({ fn, suitePath: [...reg.suiteStack] });
 }
 
 /**
@@ -145,7 +162,8 @@ export function beforeEach(fn: HookFn): void {
  * ```
  */
 export function afterEach(fn: HookFn): void {
-  _afterEachHooks.push({ fn, suitePath: [..._suiteStack] });
+  const reg = getRegistry();
+  reg.afterEachHooks.push({ fn, suitePath: [...reg.suiteStack] });
 }
 
 /**
@@ -164,14 +182,14 @@ export function getMatchingHooks(
  * Get all registered beforeEach hooks.
  */
 export function getRegisteredBeforeEachHooks(): HookDefinition[] {
-  return [..._beforeEachHooks];
+  return [...getRegistry().beforeEachHooks];
 }
 
 /**
  * Get all registered afterEach hooks.
  */
 export function getRegisteredAfterEachHooks(): HookDefinition[] {
-  return [..._afterEachHooks];
+  return [...getRegistry().afterEachHooks];
 }
 
 /**

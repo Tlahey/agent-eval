@@ -762,31 +762,43 @@ function buildImperativeEntry(
   };
 }
 
-// ─── Global judge store (set by expect().toPassJudge) ───
+// ─── Global judge store (via globalThis for cross-instance singleton) ───
 
-let _lastJudgeResult: JudgeResult | null = null;
-let _lastJudgeOptions: JudgeOptions | null = null;
+const JUDGE_STORE_KEY = Symbol.for("__agenteval_judge_store__");
+
+interface JudgeStore {
+  lastResult: JudgeResult | null;
+  lastOptions: JudgeOptions | null;
+}
+
+function getJudgeStore(): JudgeStore {
+  const g = globalThis as Record<symbol, JudgeStore | undefined>;
+  if (!g[JUDGE_STORE_KEY]) {
+    g[JUDGE_STORE_KEY] = { lastResult: null, lastOptions: null };
+  }
+  return g[JUDGE_STORE_KEY]!;
+}
 
 export function setLastJudgeResult(result: JudgeResult): void {
-  _lastJudgeResult = result;
+  getJudgeStore().lastResult = result;
 }
 
 export function getLastJudgeResult(): JudgeResult | null {
-  return _lastJudgeResult;
+  return getJudgeStore().lastResult;
 }
 
 export function clearLastJudgeResult(): void {
-  _lastJudgeResult = null;
+  getJudgeStore().lastResult = null;
 }
 
 export function setLastJudgeOptions(options: JudgeOptions): void {
-  _lastJudgeOptions = options;
+  getJudgeStore().lastOptions = options;
 }
 
 export function getLastJudgeOptions(): JudgeOptions | null {
-  return _lastJudgeOptions;
+  return getJudgeStore().lastOptions;
 }
 
 export function clearLastJudgeOptions(): void {
-  _lastJudgeOptions = null;
+  getJudgeStore().lastOptions = null;
 }
