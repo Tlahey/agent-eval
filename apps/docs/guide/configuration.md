@@ -141,11 +141,11 @@ export default defineConfig({
 });
 ```
 
-| Plugin Axis     | Built-in Options                                           | Default            |
-| --------------- | ---------------------------------------------------------- | ------------------ |
-| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `CliModel` | — (required)       |
-| **Ledger**      | `SqliteLedger`, `JsonLedger`                               | `SqliteLedger`     |
-| **Environment** | `LocalEnvironment`, `DockerEnvironment`                    | `LocalEnvironment` |
+| Plugin Axis     | Built-in Options                                                                | Default            |
+| --------------- | ------------------------------------------------------------------------------- | ------------------ |
+| **Model**       | `AnthropicModel`, `OpenAIModel`, `OllamaModel`, `GitHubModelsModel`, `CliModel` | — (required)       |
+| **Ledger**      | `SqliteLedger`, `JsonLedger`                                                    | `SqliteLedger`     |
+| **Environment** | `LocalEnvironment`, `DockerEnvironment`                                         | `LocalEnvironment` |
 
 ::: tip Learn more
 See the dedicated [Plugins guide](/guide/plugins) for interfaces, custom plugins, and detailed configuration for each.
@@ -183,14 +183,17 @@ export default defineConfig({
 
 AgentEval reads these environment variables automatically:
 
-| Variable            | Used by                | Description               |
-| ------------------- | ---------------------- | ------------------------- |
-| `ANTHROPIC_API_KEY` | Anthropic runner/judge | API key for Claude models |
-| `OPENAI_API_KEY`    | OpenAI runner/judge    | API key for GPT models    |
+| Variable            | Used by                   | Description                                |
+| ------------------- | ------------------------- | ------------------------------------------ |
+| `ANTHROPIC_API_KEY` | Anthropic runner/judge    | API key for Claude models                  |
+| `OPENAI_API_KEY`    | OpenAI runner/judge       | API key for GPT models                     |
+| `GH_COPILOT_TOKEN`  | GitHubModels runner/judge | GitHub token (preferred for GitHub Models) |
+| `GITHUB_TOKEN`      | GitHubModels runner/judge | GitHub token (fallback)                    |
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
+export GH_COPILOT_TOKEN=$(gh auth token)  # GitHub Models
 ```
 
 ::: tip

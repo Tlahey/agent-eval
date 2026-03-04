@@ -74,11 +74,36 @@ async function executeRunner(
       exitCode: result.exitCode,
     };
   } else {
-    // API execution: call LLM via generateObject, write files to disk
+    // Collect model-level settings (temperature, maxTokens, topP)
+    const { maxSteps: _maxSteps, ...modelSettings } = runner.model.settings ?? {};
+    const model = await runner.model.createModel();
+
+    // ─── Agentic mode: tools present → generateText() with multi-step ───
+    if (runner.model.tools && Object.keys(runner.model.tools).length > 0) {
+      const { generateText } = await import("ai");
+
+      const { text, usage } = await generateText({
+        model: model as Parameters<typeof generateText>[0]["model"],
+        tools: runner.model.tools as Parameters<typeof generateText>[0]["tools"],
+        maxSteps: _maxSteps ?? 10,
+        prompt,
+        ...modelSettings,
+      });
+
+      const tokenUsage = usage
+        ? {
+            inputTokens: usage.promptTokens,
+            outputTokens: usage.completionTokens,
+            totalTokens: usage.totalTokens,
+          }
+        : undefined;
+
+      return { tokenUsage, output: text };
+    }
+
+    // ─── Standard mode: no tools → generateObject() for file operations ───
     const { generateObject } = await import("ai");
     const { z } = await import("zod");
-
-    const model = await runner.model.createModel();
 
     const FileOperationSchema = z.object({
       files: z
@@ -91,7 +116,7 @@ async function executeRunner(
         .describe("Files to create or modify"),
     });
 
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: model as Parameters<typeof generateObject>[0]["model"],
       schema: FileOperationSchema,
       prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
@@ -99,6 +124,7 @@ async function executeRunner(
 Task: ${prompt}
 
 Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
+      ...modelSettings,
     });
 
     const response = object as { files: Array<{ path: string; content: string }> };
@@ -111,7 +137,15 @@ Respond with the list of files to create or modify. Each file must include the f
       filesWritten.push(file.path);
     }
 
-    return { filesWritten };
+    const tokenUsage = usage
+      ? {
+          inputTokens: usage.promptTokens,
+          outputTokens: usage.completionTokens,
+          totalTokens: usage.totalTokens,
+        }
+      : undefined;
+
+    return { filesWritten, tokenUsage };
   }
 }
 

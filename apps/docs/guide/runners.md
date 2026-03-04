@@ -264,6 +264,57 @@ import { OllamaModel } from "agent-eval/llm";
 Start Ollama before running: `ollama serve`. Pull models with `ollama pull llama3`.
 :::
 
+#### GitHubModelsModel
+
+Uses the GitHub Models inference API — great for free-tier access with a GitHub token:
+
+```ts
+import { GitHubModelsModel } from "agent-eval/llm";
+
+{
+  name: "gpt-5-mini",
+  model: new GitHubModelsModel({
+    model: "openai/gpt-5-mini",
+    settings: { temperature: 1, maxTokens: 4096, topP: 1 },
+  }),
+}
+```
+
+Auth: set `GH_COPILOT_TOKEN` or `GITHUB_TOKEN` (or `gh auth token`).
+
+#### GitHubModelsModel with Tools (Agentic)
+
+Pass [AI SDK tools](https://ai-sdk.dev/docs/foundations/tools) for multi-step agentic execution:
+
+```ts
+import { GitHubModelsModel } from "agent-eval/llm";
+import { tool } from "ai";
+import { z } from "zod";
+import { readFileSync, writeFileSync } from "fs";
+
+{
+  name: "gpt-5-mini-agent",
+  model: new GitHubModelsModel({
+    model: "openai/gpt-5-mini",
+    settings: { maxSteps: 15 },
+    tools: {
+      readFile: tool({
+        description: "Read a file",
+        parameters: z.object({ path: z.string() }),
+        execute: async ({ path }) => readFileSync(path, "utf-8"),
+      }),
+      writeFile: tool({
+        description: "Write a file",
+        parameters: z.object({ path: z.string(), content: z.string() }),
+        execute: async ({ path, content }) => { writeFileSync(path, content); return "ok"; },
+      }),
+    },
+  }),
+}
+```
+
+With tools, the runner uses `generateText()` + multi-step tool calling instead of `generateObject()`. The model calls your tools autonomously. `storeDiff()` captures changes via git.
+
 #### Custom Model Provider
 
 Any OpenAI-compatible API can be used via `OpenAIModel` with a custom `baseURL`:
@@ -297,20 +348,28 @@ sequenceDiagram
 
     AE->>MP: createModel()
     MP-->>AE: LanguageModel
-    AE->>LLM: generateObject(prompt, Zod schema)
-    LLM-->>AE: { files: [{ path, content }] }
-    loop For each file
-        AE->>FS: writeFileSync(path, content)
+    alt No tools
+        AE->>LLM: generateObject(prompt, Zod schema)
+        LLM-->>AE: { files: [{ path, content }] }
+        loop For each file
+            AE->>FS: writeFileSync(path, content)
+        end
+    else With tools
+        AE->>LLM: generateText(prompt, tools, maxSteps)
+        loop Multi-step tool calling
+            LLM-->>AE: toolCall(readFile, writeFile, ...)
+            AE->>FS: execute tool
+            AE-->>LLM: tool result
+        end
+        LLM-->>AE: final text response
     end
     AE->>Git: storeDiff() [automatic]
     Git-->>AE: diff captured
 ```
 
-1. AgentEval calls the model plugin's `createModel()` to get a LanguageModel
-2. Sends the test prompt via `generateObject()` with a Zod schema
-3. The model returns structured output: `{ files: [{ path, content }] }`
-4. AgentEval writes each file to disk in the project directory
-5. `storeDiff()` is called automatically, followed by any registered tasks
+**Without tools:** `generateObject()` → structured `{ files: [{ path, content }] }` → framework writes files to disk.
+
+**With tools:** `generateText()` + multi-step → model calls your tools (readFile, writeFile, etc.) → tools handle I/O → `storeDiff()` captures changes via git.
 
 ---
 
@@ -324,9 +383,13 @@ flowchart LR
     end
 
     subgraph API["API Runner (IModelPlugin)"]
-        D["model.createModel()"] --> E["generateObject(prompt)"]
-        E --> F["Write files to disk"]
-        F --> G["storeDiff()"]
+        D["model.createModel()"] --> E{"tools?"}
+        E -->|No| F["generateObject(prompt)"]
+        F --> G["Write files to disk"]
+        E -->|Yes| H["generateText(prompt, tools)"]
+        H --> I["Multi-step tool calls"]
+        G --> J["storeDiff()"]
+        I --> J
     end
 
     style CLI fill:#f0f4ff
