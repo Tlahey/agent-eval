@@ -180,9 +180,6 @@ async function executeRun(opts: RunOptions): Promise<void> {
           if (plan.beforeEachHooks > 0) {
             console.log(`    beforeEach hooks: ${plan.beforeEachHooks}`);
           }
-          if (plan.afterEachCommands.length > 0) {
-            console.log(`    afterEach commands: ${plan.afterEachCommands.join(", ")}`);
-          }
           if (plan.afterEachHooks > 0) {
             console.log(`    afterEach hooks: ${plan.afterEachHooks}`);
           }

@@ -451,7 +451,7 @@ describe("runner - createAgent via runTest", () => {
   });
 });
 
-describe("runner - auto storeDiff and afterEach", () => {
+describe("runner - auto storeDiff", () => {
   beforeEach(() => {
     clearLastJudgeResult();
     clearLastJudgeOptions();
@@ -482,33 +482,7 @@ describe("runner - auto storeDiff and afterEach", () => {
     expect(results[0].entries[0].diff).toBe("mock diff content");
   });
 
-  it("runs afterEach commands from config after agent.run()", async () => {
-    const config: AgentEvalConfig = {
-      rootDir: "/tmp/test",
-      outputDir: "/tmp/test/.agenteval",
-      runners: [createMockRunner("cli")],
-      judge: {},
-      afterEach: [
-        { name: "test", command: "pnpm test" },
-        { name: "build", command: "pnpm build" },
-      ],
-    };
-
-    const testDef: TestDefinition = {
-      title: "test-after-each",
-      fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
-        await agent.run("task");
-        // afterEach commands should have run
-        expect(ctx.commands).toHaveLength(2);
-        expect(ctx.commands[0].name).toBe("test");
-        expect(ctx.commands[1].name).toBe("build");
-      }),
-    };
-
-    await runTest(testDef, config);
-  });
-
-  it("does not run afterEach commands when not configured", async () => {
+  it("does not run commands when not configured", async () => {
     const config: AgentEvalConfig = {
       rootDir: "/tmp/test",
       outputDir: "/tmp/test/.agenteval",
@@ -517,7 +491,7 @@ describe("runner - auto storeDiff and afterEach", () => {
     };
 
     const testDef: TestDefinition = {
-      title: "test-no-after-each",
+      title: "test-no-commands",
       fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
         await agent.run("task");
         expect(ctx.commands).toHaveLength(0);
@@ -534,19 +508,16 @@ describe("runner - auto storeDiff and afterEach", () => {
       outputDir: "/tmp/test/.agenteval",
       runners: [createMockRunner("cli")],
       judge: {},
-      afterEach: [{ name: "build", command: "pnpm build" }],
     };
 
     const testDef: TestDefinition = {
       title: "test-manual-plus-auto",
       fn: vi.fn().mockImplementation(async ({ agent, ctx }) => {
         await agent.run("task");
-        // Auto: storeDiff + build already ran
         // Manual additional command
         await ctx.runCommand("lint", "pnpm lint");
-        expect(ctx.commands).toHaveLength(2); // build (auto) + lint (manual)
-        expect(ctx.commands[0].name).toBe("build");
-        expect(ctx.commands[1].name).toBe("lint");
+        expect(ctx.commands).toHaveLength(1); // lint (manual)
+        expect(ctx.commands[0].name).toBe("lint");
       }),
     };
 
@@ -692,17 +663,12 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
     expect(runJudge).toHaveBeenCalled();
   });
 
-  it("runs config afterEach commands in declarative mode", async () => {
-    const config: AgentEvalConfig = {
-      ...baseConfig,
-      afterEach: [{ name: "lint", command: "pnpm lint" }],
-    };
-
+  it("runs tasks in declarative mode", async () => {
     const testDef: TestDefinition = {
-      title: "test-declarative-after-each",
+      title: "test-declarative-tasks",
       fn: ({ agent, ctx }) => {
         agent.instruct("task");
-        setLastJudgeOptions({ criteria: "Task and lint command both execute successfully" });
+        setLastJudgeOptions({ criteria: "Task executes successfully" });
         ctx.addTask({
           name: "build",
           action: () =>
@@ -719,10 +685,10 @@ describe("runner - declarative pipeline (agent.instruct)", () => {
       },
     };
 
-    await runTest(testDef, config);
-    // env.execute should have been called for: agent instruction + afterEach lint command
+    await runTest(testDef, baseConfig);
+    // env.execute should have been called for: agent instruction
     const executeCalls = mockEnvInstance.execute.mock.calls;
-    expect(executeCalls.length).toBeGreaterThanOrEqual(2); // agent + lint
+    expect(executeCalls.length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -926,7 +892,6 @@ describe("runner - dryRunTest", () => {
       },
     ],
     judge: {},
-    afterEach: [{ name: "test", command: "pnpm test" }],
   };
 
   it("returns plan for declarative test", async () => {
@@ -959,7 +924,6 @@ describe("runner - dryRunTest", () => {
     expect(plan.tasks[0].name).toBe("Build");
     expect(plan.tasks[0].weight).toBe(2);
     expect(plan.runners).toHaveLength(2);
-    expect(plan.afterEachCommands).toEqual(["pnpm test"]);
   });
 
   it("returns plan for imperative test", async () => {

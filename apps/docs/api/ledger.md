@@ -63,7 +63,6 @@ Each ledger entry captures the complete lifecycle of a test run — **execution 
     "totalMs": 45000,
     "setupMs": 200,
     "agentMs": 40000,
-    "afterEachMs": 3000,
     "tasksMs": 1500,
     "judgeMs": 3200
   },

@@ -356,7 +356,7 @@ class MyReporter implements Reporter {
     /* ... */
   }
   onPipelineStep(event: TestEvent, step: PipelineStep, status: StepStatus, detail?: string): void {
-    // step: 'setup' | 'agent' | 'diff' | 'afterEach' | 'task' | 'judge'
+    // step: 'setup' | 'agent' | 'diff' | 'task' | 'judge'
     // status: 'running' | 'done' | 'error'
   }
   onTestPass(event: TestResultEvent): void {

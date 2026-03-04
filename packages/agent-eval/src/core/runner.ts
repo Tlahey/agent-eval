@@ -233,13 +233,6 @@ function createAgent(
 
       // Auto storeDiff after agent execution (async for env plugins)
       await ctx.storeDiffAsync();
-
-      // Run afterEach commands from config
-      if (config.afterEach) {
-        for (const cmd of config.afterEach) {
-          await ctx.runCommand(cmd.name, cmd.command);
-        }
-      }
     },
   };
 
@@ -247,7 +240,7 @@ function createAgent(
 }
 
 /**
- * Execute the raw agent instruction (without storeDiff/afterEach wrapping).
+ * Execute the raw agent instruction (without storeDiff wrapping).
  * Used by the declarative pipeline where the runner controls the full lifecycle.
  */
 async function executeRawAgent(
@@ -285,7 +278,6 @@ export interface DryRunPlan {
   tasks: Array<{ name: string; criteria: string; weight: number }>;
   beforeEachHooks: number;
   afterEachHooks: number;
-  afterEachCommands: string[];
 }
 
 /**
@@ -386,7 +378,6 @@ export async function dryRunTest(
     tasks,
     beforeEachHooks: beforeEachHooks.length,
     afterEachHooks: afterEachHooks.length,
-    afterEachCommands: (config.afterEach ?? []).map((c) => c.command),
   };
 }
 
@@ -581,9 +572,8 @@ export async function runTest(
  * Execute the declarative pipeline:
  * 1. Run the agent instruction
  * 2. Auto storeDiff
- * 3. Run config afterEach commands
- * 4. Execute registered tasks
- * 5. Judge evaluation using required expect(ctx).toPassJudge() criteria
+ * 3. Execute registered tasks
+ * 4. Judge evaluation using required expect(ctx).toPassJudge() criteria
  *
  * Tracks per-phase timing and builds a complete LedgerEntry with all execution + judgment data.
  */
@@ -623,19 +613,7 @@ async function executeDeclarativePipeline(
   await ctx.storeDiffAsync();
   reporter.onPipelineStep(event, "diff", "done");
 
-  // 3. Run config afterEach commands
-  let afterEachMs: number | undefined;
-  if (config.afterEach) {
-    const afterEachStart = Date.now();
-    reporter.onPipelineStep(event, "afterEach", "running");
-    for (const cmd of config.afterEach) {
-      await ctx.runCommand(cmd.name, cmd.command);
-    }
-    reporter.onPipelineStep(event, "afterEach", "done");
-    afterEachMs = Date.now() - afterEachStart;
-  }
-
-  // 4. Execute registered tasks and collect results
+  // 3. Execute registered tasks and collect results
   const tasksStart = Date.now();
   const taskResults: TaskResult[] = [];
   for (const task of ctx.tasks) {
@@ -655,17 +633,16 @@ async function executeDeclarativePipeline(
   }
   const tasksMs = taskResults.length > 0 ? Date.now() - tasksStart : undefined;
 
-  // 5. Build execution data
+  // 4. Build execution data
   const timing: TimingData = {
     totalMs: Date.now() - start,
     setupMs,
     agentMs,
-    afterEachMs,
     tasksMs,
   };
   const executionData = ctx.buildExecutionData(taskResults, timing);
 
-  // 6. Judge evaluation
+  // 5. Judge evaluation
   const judgeStart = Date.now();
   reporter.onPipelineStep(event, "judge", "running");
   const prompt = buildJudgePrompt({

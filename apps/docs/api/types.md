@@ -50,7 +50,7 @@ interface ExecutionData {
   runner: { name: string; model: string }; // Runner metadata
   diff: string | null; // Git diff after execution
   changedFiles: string[]; // Files changed (extracted from diff)
-  commands: CommandResult[]; // All command results (afterEach + manual)
+  commands: CommandResult[]; // All command results (manual + task)
   taskResults: TaskResult[]; // Task definitions + their results
   tokenUsage?: TokenUsage; // Agent's LLM token usage (API runners only)
   timing: TimingData; // Per-phase timing breakdown
@@ -99,7 +99,6 @@ interface TimingData {
   totalMs: number; // Total wall-clock time (ms)
   setupMs?: number; // Environment setup (git reset, docker create)
   agentMs?: number; // Agent execution time
-  afterEachMs?: number; // Post-execution commands time
   tasksMs?: number; // Task execution time
   judgeMs?: number; // Judge evaluation time
 }
@@ -107,7 +106,7 @@ interface TimingData {
 
 ```mermaid
 flowchart LR
-    S["setupMs"] --> A["agentMs"] --> AE["afterEachMs"] --> T["tasksMs"] --> J["judgeMs"]
+    S["setupMs"] --> A["agentMs"] --> T["tasksMs"] --> J["judgeMs"]
     S -.-> TOTAL["totalMs"]
     J -.-> TOTAL
 

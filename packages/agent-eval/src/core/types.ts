@@ -134,12 +134,6 @@ export interface AgentEvalConfig {
   /** Timeout in ms for each agent run (defaults to 300_000 = 5 min) */
   timeout?: number;
   /**
-   * Commands to run automatically after each agent execution.
-   * These run before the expect/judge phase, after storeDiff.
-   * Example: [{ name: "test", command: "pnpm test" }, { name: "typecheck", command: "pnpm build" }]
-   */
-  afterEach?: AfterEachCommand[];
-  /**
    * Hook function called before each test iteration.
    * Use this to register common verification tasks via `ctx.addTask()`.
    * Config-level beforeEach runs before any DSL-level beforeEach hooks.
@@ -196,13 +190,6 @@ export interface AgentEvalConfig {
   environment?: import("./interfaces.js").IEnvironmentPlugin;
 }
 
-export interface AfterEachCommand {
-  /** Human-readable name for the command (used in logs and judge prompt) */
-  name: string;
-  /** Shell command to execute */
-  command: string;
-}
-
 // ─── Token Usage ───
 
 /** Token usage from an LLM call (agent or judge) */
@@ -233,8 +220,6 @@ export interface TimingData {
   setupMs?: number;
   /** Time spent executing the agent instruction (ms) */
   agentMs?: number;
-  /** Time spent running afterEach commands (ms) */
-  afterEachMs?: number;
   /** Time spent executing registered tasks (ms) */
   tasksMs?: number;
   /** Time spent on judge evaluation (ms) */
@@ -254,7 +239,7 @@ export interface ExecutionData {
   diff: string | null;
   /** Files changed (extracted from diff) */
   changedFiles: string[];
-  /** All command results (afterEach + runCommand + task actions) */
+  /** All command results (runCommand + task actions) */
   commands: CommandResult[];
   /** Task definitions paired with their execution results */
   taskResults: TaskResult[];

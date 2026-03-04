@@ -310,7 +310,7 @@ sequenceDiagram
 2. Sends the test prompt via `generateObject()` with a Zod schema
 3. The model returns structured output: `{ files: [{ path, content }] }`
 4. AgentEval writes each file to disk in the project directory
-5. `storeDiff()` is called automatically, followed by any `afterEach` commands
+5. `storeDiff()` is called automatically, followed by any registered tasks
 
 ---
 

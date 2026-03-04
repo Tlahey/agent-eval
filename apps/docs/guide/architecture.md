@@ -155,7 +155,7 @@ flowchart TB
     F --> F2["📋 Lifecycle Hooks<br/>config.beforeEach + DSL beforeEach"]
     F2 --> G["🤖 Agent Execution<br/>agent.run/instruct(prompt)"]
     G --> H["📸 Auto storeDiff()<br/>captures changes via env plugin"]
-    H --> I["⚙️ afterEach Commands<br/>from config + tasks"]
+    H --> I["⚙️ Execute Tasks<br/>from beforeEach + test"]
     I --> J["⚖️ Judge Evaluation<br/>auto-judge or manual expect"]
     J --> K["💾 Append to Ledger<br/>score, reason, diff, commands"]
     K --> K2["📋 afterEach Hooks<br/>DSL afterEach"]
@@ -207,12 +207,7 @@ sequenceDiagram
         Ctx->>Git: env.getDiff(cwd)
         Git-->>Ctx: diff string stored
 
-        loop afterEach commands (from config)
-            Runner->>Ctx: runCommand(name, cmd)
-            Ctx-->>Runner: { stdout, stderr, exitCode }
-        end
-
-        loop Tasks (declarative only)
+        loop Tasks
             Runner->>Ctx: task.action()
             Ctx-->>Runner: CommandResult
         end

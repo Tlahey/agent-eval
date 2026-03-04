@@ -426,7 +426,6 @@ describe("ledger (SQLite)", () => {
       totalMs: 45000,
       setupMs: 500,
       agentMs: 30000,
-      afterEachMs: 200,
       tasksMs: 7000,
       judgeMs: 7300,
     };

@@ -29,7 +29,7 @@ const _afterEachHooks: HookDefinition[] = [];
  *
  * test("Add a Close button to the Banner", async ({ agent, ctx }) => {
  *   await agent.run("Add a Close button inside the banner");
- *   // storeDiff() + afterEach commands run automatically after agent.run()
+ *   // storeDiff() runs automatically after agent.run()
  *   await expect(ctx).toPassJudge({ criteria: "..." });
  * });
  * ```
@@ -202,7 +202,6 @@ export type {
 } from "./core/reporter.js";
 export type {
   AgentEvalConfig,
-  AfterEachCommand,
   JudgeConfig,
   JudgeOptions,
   JudgeResult,

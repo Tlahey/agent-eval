@@ -188,7 +188,7 @@ sequenceDiagram
         AE->>AGENT: Execute prompt
         AGENT-->>AE: Code changes on disk
         AE->>AE: Capture git diff
-        AE->>AE: Run afterEach (tests, build…)
+        AE->>AE: Run tasks (tests, build…)
         AE->>JUDGE: Evaluate (diff + outputs + criteria)
         JUDGE-->>AE: { score, status, reason, improvement }
         AE->>DB: Store result
@@ -202,7 +202,7 @@ sequenceDiagram
 3. **Sequential execution** — Each test × runner pair runs one at a time (no parallelism — agents mutate the filesystem)
 4. **Environment reset** — Git workspace is cleaned before each run
 5. **Agent executes** — The runner (CLI or API) processes the prompt
-6. **Context captured** — Git diff is stored, afterEach commands (tests, build) run automatically
+6. **Context captured** — Git diff is stored, tasks (tests, build) run automatically
 7. **Judge evaluates** — An LLM scores the result with structured output
 8. **Ledger updated** — Everything is persisted to SQLite
 

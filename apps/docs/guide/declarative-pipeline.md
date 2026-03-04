@@ -163,7 +163,6 @@ sequenceDiagram
   R->>R: Parse test fn (sync)
   R->>A: Execute agent instruction
   R->>E: env.getDiff(cwd) — capture changes
-  R->>E: Run afterEach commands
   loop Each task
     R->>T: Execute task action
     T-->>R: CommandResult
@@ -316,7 +315,6 @@ Output:
   Tasks:
     1. Build (weight: 2) — TypeScript build must succeed
     2. Tests (weight: 3) — All tests must pass
-  After-each:  pnpm lint
   Hooks:       1 beforeEach, 1 afterEach
 ```
 
@@ -328,7 +326,7 @@ The imperative API (`agent.run()` + `expect().toPassJudge()`) continues to work 
 // Imperative test
 test("imperative style", async ({ agent, ctx }) => {
   await agent.run("do something");
-  // storeDiff + afterEach commands run automatically
+  // storeDiff runs automatically
   await expect(ctx).toPassJudge({ criteria: "it works" });
 });
 
