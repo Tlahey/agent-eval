@@ -60,7 +60,7 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
       />
 
       {/* Panel */}
-      <div className="fixed right-4 top-4 bottom-4 z-50 flex h-[calc(100vh-32px)] w-[var(--panel-width)] max-w-[95vw] flex-col overflow-hidden rounded-3xl border bg-surface-1 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-slide-in">
+      <div className="fixed right-4 top-4 bottom-4 z-50 flex h-[calc(100vh-32px)] w-[var(--panel-width)] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-3xl border bg-surface-1 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-slide-in">
         {/* Modern Header */}
         <div className="relative overflow-hidden border-b border bg-surface-2/50 px-8 py-8 backdrop-blur-xl">
           {/* Background Accent */}
@@ -156,7 +156,9 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
         <div
           className={`flex-1 overflow-auto bg-transparent custom-scrollbar ${tab !== "diff" ? "p-8" : ""}`}
         >
-          <div className={`mx-auto animate-fade-in ${tab !== "diff" ? "max-w-4xl" : "h-full"}`}>
+          <div
+            className={`mx-auto animate-fade-in ${tab !== "diff" ? "max-w-4xl" : "max-w-none h-full"}`}
+          >
             {tab === "summary" && <SummaryView run={run} />}
             {tab === "diff" && <DiffViewer diff={run.diff} />}
             {tab === "tasks" && <TasksViewer run={run} />}
@@ -439,7 +441,7 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
                     }}
                     contentStyle={{
                       backgroundColor: "hsl(var(--color-surface-2))",
-                      border: "1px solid hsl(hsl(var(--color-line)) / 0.12)",
+                      border: "1px solid hsl(var(--color-line) / 0.12)",
                       borderRadius: "8px",
                       fontSize: 11,
                     }}

@@ -239,6 +239,7 @@ export function EvalDetail() {
                       borderRadius: "12px",
                       fontSize: 12,
                     }}
+                    itemStyle={{ color: "hsl(var(--color-txt-base))" }}
                     labelStyle={{
                       color: "hsl(var(--color-txt-base))",
                       fontWeight: 700,
@@ -294,6 +295,13 @@ export function EvalDetail() {
                         backgroundColor: "hsl(var(--color-surface-2))",
                         border: "1px solid hsl(var(--color-line) / 0.2)",
                         borderRadius: "12px",
+                        fontSize: 12,
+                      }}
+                      itemStyle={{ color: "hsl(var(--color-txt-base))" }}
+                      labelStyle={{
+                        color: "hsl(var(--color-txt-base))",
+                        fontWeight: 700,
+                        marginBottom: 8,
                       }}
                     />
                   </RadarChart>
@@ -332,6 +340,12 @@ export function EvalDetail() {
                         backgroundColor: "hsl(var(--color-surface-2))",
                         border: "1px solid hsl(var(--color-line) / 0.2)",
                         borderRadius: "12px",
+                      }}
+                      itemStyle={{ color: "hsl(var(--color-txt-base))" }}
+                      labelStyle={{
+                        color: "hsl(var(--color-txt-base))",
+                        fontWeight: 700,
+                        marginBottom: 8,
                       }}
                     />
                     <Bar dataKey="count" barSize={40}>

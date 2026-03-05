@@ -239,7 +239,7 @@ export function Overview() {
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
                         fontSize: 12,
                       }}
-                      itemStyle={{ padding: "2px 0" }}
+                      itemStyle={{ color: "hsl(var(--color-txt-base))" }}
                       labelStyle={{
                         color: "hsl(var(--color-txt-base))",
                         fontWeight: 700,
@@ -340,7 +340,11 @@ export function Overview() {
                       tickFormatter={(v) => formatTokens(v)}
                     />
                     <Tooltip
-                      cursor={{ stroke: "hsl(var(--color-primary))", strokeWidth: 1 }}
+                      cursor={{
+                        stroke: "hsl(var(--color-primary))",
+                        strokeWidth: 1,
+                        strokeDasharray: "4 4",
+                      }}
                       contentStyle={{
                         backgroundColor: "hsl(var(--color-surface-2))",
                         border: "1px solid hsl(var(--color-line) / 0.2)",
@@ -348,6 +352,7 @@ export function Overview() {
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
                         fontSize: 12,
                       }}
+                      itemStyle={{ color: "hsl(var(--color-txt-base))" }}
                       labelStyle={{
                         color: "hsl(var(--color-txt-base))",
                         fontWeight: 700,

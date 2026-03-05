@@ -21,6 +21,7 @@
   --color-txt-muted: 225 15% 55%;
   --color-line: 230 45% 18%;
   --color-scheme: dark;
+  --panel-width: 95vw;
 }
 
 [data-theme="nord"] {
