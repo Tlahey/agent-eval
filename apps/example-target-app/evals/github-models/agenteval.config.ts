@@ -40,14 +40,14 @@ export default defineConfig({
   beforeEach: ({ ctx }) => {
     ctx.addTask({
       name: "Tests",
-      action: () => ctx.exec("pnpm test"),
+      action: ({ exec }) => exec("pnpm test"),
       criteria: "All existing and new tests must pass",
       weight: 3,
     });
 
     ctx.addTask({
       name: "Build",
-      action: () => ctx.exec("pnpm build"),
+      action: ({ exec }) => exec("pnpm build"),
       criteria: "TypeScript compilation must succeed with zero errors",
       weight: 2,
     });

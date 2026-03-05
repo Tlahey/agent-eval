@@ -563,37 +563,90 @@ export async function runTest(
       }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      rep.onTestError(event, errorMsg);
-
+      const judgeResult = getLastJudgeResult();
+      const judgeOptions = getLastJudgeOptions();
       const durationMs = Date.now() - start;
-      const entry: LedgerEntry = {
-        testId: testDef.title,
-        suitePath: testDef.suitePath ?? [],
-        timestamp: new Date().toISOString(),
-        // Execution data
-        agentRunner: runner.name,
-        instruction: ctx.instruction || undefined,
-        diff: ctx.diff,
-        changedFiles: [],
-        commands: ctx.commands,
-        taskResults: [],
-        agentTokenUsage: ctx.agentTokenUsage,
-        timing: { totalMs: durationMs, setupMs },
-        agentOutput: ctx.agentOutput,
-        logs: ctx.logs,
-        // Judgment data (error case)
-        judgeModel: resolveModelId(config.judge.model),
-        score: 0,
-        pass: false,
-        status: "FAIL",
-        reason: `Execution error: ${errorMsg}`,
-        improvement: "",
-        criteria: "",
-        thresholds,
-        durationMs,
-      };
+
+      let entry: LedgerEntry;
+
+      if (judgeResult) {
+        // The test "failed" because the judge gave it a low score (JudgeFailure)
+        // or something else threw AFTER the judge was already run.
+        // We use the judge result we already have.
+        const effectiveThresholds = judgeOptions?.thresholds ?? thresholds;
+        const timing: TimingData = { totalMs: durationMs, setupMs };
+        const executionData = ctx.buildExecutionData([], timing);
+
+        entry = {
+          testId: testDef.title,
+          suitePath: testDef.suitePath ?? [],
+          timestamp: new Date().toISOString(),
+          agentRunner: runner.name,
+          instruction: ctx.instruction || undefined,
+          diff: ctx.diff,
+          changedFiles: executionData.changedFiles,
+          commands: ctx.commands,
+          taskResults: [],
+          agentTokenUsage: ctx.agentTokenUsage,
+          timing,
+          agentOutput: ctx.agentOutput,
+          logs: ctx.logs,
+          judgeModel: resolveModelId(config.judge.model),
+          score: judgeResult.score,
+          pass: judgeResult.pass,
+          status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
+          reason: judgeResult.reason,
+          improvement: judgeResult.improvement,
+          criteria: judgeOptions?.criteria ?? "",
+          thresholds: effectiveThresholds,
+          durationMs,
+        };
+
+        // Signal judge failure to reporter (instead of generic error)
+        if (entry.status === "WARN") {
+          rep.onTestWarn({ ...event, entry, durationMs });
+        } else {
+          rep.onTestFail({ ...event, entry, durationMs });
+        }
+      } else {
+        // Real execution error (crash) before judge was even run
+        rep.onTestError(event, errorMsg);
+
+        entry = {
+          testId: testDef.title,
+          suitePath: testDef.suitePath ?? [],
+          timestamp: new Date().toISOString(),
+          agentRunner: runner.name,
+          instruction: ctx.instruction || undefined,
+          diff: ctx.diff,
+          changedFiles: [],
+          commands: ctx.commands,
+          taskResults: [],
+          agentTokenUsage: ctx.agentTokenUsage,
+          timing: { totalMs: durationMs, setupMs },
+          agentOutput: ctx.agentOutput,
+          logs: ctx.logs,
+          judgeModel: resolveModelId(config.judge.model),
+          score: 0,
+          pass: false,
+          status: "FAIL",
+          reason: `Execution error: ${errorMsg}`,
+          improvement: "",
+          criteria: "",
+          thresholds,
+          durationMs,
+        };
+        rep.onTestFail({ ...event, entry, durationMs });
+      }
 
       await record(entry);
+      allEvents.push({ ...event, entry, durationMs });
+      results.push({
+        testId: testDef.title,
+        runner: runner.name,
+        entries: [entry],
+        passed: entry.pass,
+      });
 
       // Run afterEach hooks even on error
       for (const hook of afterEachHooks) {
@@ -603,14 +656,6 @@ export async function runTest(
           // Swallow hook errors during error handling
         }
       }
-
-      allEvents.push({ ...event, entry, durationMs });
-      results.push({
-        testId: testDef.title,
-        runner: runner.name,
-        entries: [entry],
-        passed: false,
-      });
     } finally {
       clearJudgeReporterContext();
       // Teardown environment (no-op for local, removes container for Docker)
@@ -667,13 +712,22 @@ async function executeDeclarativePipeline(
   reporter.onPipelineStep(event, "diff", "running");
   await ctx.storeDiffAsync();
   reporter.onPipelineStep(event, "diff", "done");
-
   // 3. Execute registered tasks and collect results
   const tasksStart = Date.now();
   const taskResults: TaskResult[] = [];
   for (const task of ctx.tasks) {
     reporter.onPipelineStep(event, "task", "running", task.name);
-    const actionResult = await task.action();
+
+    // Pass utils to task action (shorthand for context methods)
+    const utils: import("./types.js").TaskUtils = {
+      exec: (command: string) => {
+        const shortName = command.split(/\s+/)[0];
+        return ctx.runCommand(shortName, command);
+      },
+    };
+
+    const actionResult = await task.action(utils);
+
     // Enrich partial action result into a full CommandResult
     const result: CommandResult = {
       name: actionResult.name ?? task.name,

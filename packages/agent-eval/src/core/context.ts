@@ -1,5 +1,5 @@
 import type { IEnvironmentPlugin } from "./interfaces.js";
-import { extractChangedFiles } from "../judge/judge.js";
+import { extractChangedFiles, filterDiff } from "../judge/judge.js";
 import type {
   CommandResult,
   ExecutionData,
@@ -54,6 +54,10 @@ export class EvalContext implements TestContext {
     return this._agentTokenUsage;
   }
 
+  get cwd(): string {
+    return this._cwd;
+  }
+
   get instruction(): string {
     return this._instruction;
   }
@@ -78,6 +82,10 @@ export class EvalContext implements TestContext {
     this._diff = await this._env.getDiff(this._cwd);
   }
 
+  /**
+   * Internal helper to run a command and record it in the context.
+   * Not exposed via the public TestContext interface to encourage addTask().
+   */
   async runCommand(name: string, command: string): Promise<CommandResult> {
     const start = Date.now();
     const result = await this._env.execute(command, this._cwd, { timeout: 120_000 });
@@ -111,11 +119,6 @@ export class EvalContext implements TestContext {
     this._tasks.push(task);
   }
 
-  async exec(command: string): Promise<CommandResult> {
-    const shortName = command.split(/\s+/)[0];
-    return this.runCommand(shortName, command);
-  }
-
   get diff(): string | null {
     return this._diff;
   }
@@ -132,7 +135,10 @@ export class EvalContext implements TestContext {
     const parts: string[] = [];
 
     if (this._diff) {
-      parts.push(`── Git Diff ──\n${this._diff}`);
+      const filtered = filterDiff(this._diff);
+      if (filtered) {
+        parts.push(`── Git Diff ──\n${filtered}`);
+      }
     }
 
     for (const cmd of this._commands) {

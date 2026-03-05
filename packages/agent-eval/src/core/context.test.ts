@@ -50,7 +50,7 @@ describe("EvalContext", () => {
     expect(ctx.diff).toBe("");
   });
 
-  it("runCommand captures stdout for successful commands", async () => {
+  it("runCommand (internal) captures stdout for successful commands", async () => {
     const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     const result = await ctx.runCommand("echo", "echo hello world");
 
@@ -61,7 +61,7 @@ describe("EvalContext", () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("runCommand captures stderr and exit code for failing commands", async () => {
+  it("runCommand (internal) captures stderr and exit code for failing commands", async () => {
     const ctx = new EvalContext(tmpDir, new LocalEnvironment());
     const result = await ctx.runCommand(
       "fail",
@@ -125,7 +125,7 @@ describe("EvalContext", () => {
   });
 });
 
-describe("EvalContext - addTask and exec", () => {
+describe("EvalContext - addTask", () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -209,12 +209,8 @@ describe("EvalContext - addTask and exec", () => {
       ctx.addTask({
         name: "",
         action: async () => ({
-          name: "",
-          command: "",
           stdout: "",
-          stderr: "",
           exitCode: 0,
-          durationMs: 0,
         }),
         criteria: "test",
       }),
@@ -238,12 +234,8 @@ describe("EvalContext - addTask and exec", () => {
       ctx.addTask({
         name: "test",
         action: async () => ({
-          name: "",
-          command: "",
           stdout: "",
-          stderr: "",
           exitCode: 0,
-          durationMs: 0,
         }),
         criteria: "",
       }),
@@ -256,32 +248,13 @@ describe("EvalContext - addTask and exec", () => {
       ctx.addTask({
         name: "test",
         action: async () => ({
-          name: "",
-          command: "",
           stdout: "",
-          stderr: "",
           exitCode: 0,
-          durationMs: 0,
         }),
         criteria: "test",
         weight: -1,
       }),
     ).toThrow("non-negative number");
-  });
-
-  it("exec runs a command and returns result", async () => {
-    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
-    const result = await ctx.exec("echo hello world");
-    expect(result.stdout.trim()).toBe("hello world");
-    expect(result.exitCode).toBe(0);
-    expect(result.name).toBe("echo");
-  });
-
-  it("exec stores the command in commands list", async () => {
-    const ctx = new EvalContext(tmpDir, new LocalEnvironment());
-    await ctx.exec("echo test");
-    expect(ctx.commands).toHaveLength(1);
-    expect(ctx.commands[0].command).toBe("echo test");
   });
 });
 

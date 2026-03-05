@@ -144,7 +144,7 @@ export interface AgentEvalConfig {
    *   beforeEach: ({ ctx }) => {
    *     ctx.addTask({
    *       name: "Tests",
-   *       action: () => ctx.exec("pnpm test"),
+   *       action: ({ exec }) => exec("pnpm test"),
    *       criteria: "All tests must pass",
    *       weight: 3,
    *     });
@@ -251,6 +251,10 @@ export interface ExecutionData {
   agentOutput?: string;
   /** Formatted logs (diff + command outputs as readable text) */
   logs: string;
+  /** Optional file tree or file list of the project */
+  projectStructure?: string;
+  /** Optional content of project-level instructions (e.g. AGENTS.md) */
+  projectInstructions?: string;
 }
 
 // ─── Judgment Data (how the judge evaluated) ───
@@ -322,6 +326,16 @@ export interface TaskActionResult {
 }
 
 /**
+ * Utility passed to task actions to execute shell commands.
+ */
+export interface TaskUtils {
+  /**
+   * Execute a shell command and return the result.
+   */
+  exec(command: string): Promise<CommandResult>;
+}
+
+/**
  * A task registered via `ctx.addTask()` in declarative pipeline mode.
  * Tasks execute after the agent instruction and are evaluated by the judge.
  */
@@ -329,7 +343,7 @@ export interface TaskDefinition {
   /** Human-readable name for the task (used in logs and judge prompt) */
   name: string;
   /** Action to execute after the agent runs. Returns a result for the judge. */
-  action: () => TaskActionResult | Promise<TaskActionResult>;
+  action: (utils: TaskUtils) => TaskActionResult | Promise<TaskActionResult>;
   /** Evaluation criteria for the judge to assess this task's outcome */
   criteria: string;
   /** Weight for scoring (default: 1). Higher weight = more impact on final score. */
@@ -339,28 +353,12 @@ export interface TaskDefinition {
 export interface TestContext {
   /** Store the current git diff into context */
   storeDiff(): void;
-  /** Run a shell command and store its output in context */
-  runCommand(name: string, command: string): Promise<CommandResult>;
   /**
    * Register a task for post-agent execution (declarative pipeline).
    * Tasks are executed by the runner after the agent instruction completes.
    * Each task's criteria and result are sent to the judge for evaluation.
    */
   addTask(task: TaskDefinition): void;
-  /**
-   * Execute a shell command and return the result.
-   * Convenience wrapper for use inside task actions.
-   *
-   * @example
-   * ```ts
-   * ctx.addTask({
-   *   name: "Build",
-   *   action: () => ctx.exec("pnpm run build"),
-   *   criteria: "the build must succeed",
-   * });
-   * ```
-   */
-  exec(command: string): Promise<CommandResult>;
   /** Get the stored git diff */
   readonly diff: string | null;
   /** Get all stored command results */

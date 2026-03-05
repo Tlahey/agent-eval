@@ -10,7 +10,7 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
 
   ctx.addTask({
     name: "Close button renders",
-    action: () => ctx.exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
+    action: ({ exec }) => exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
     criteria:
       'A close button with aria-label="Close" is rendered when onClose is provided and calls onClose when clicked',
     weight: 2,
