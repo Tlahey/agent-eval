@@ -618,10 +618,10 @@ function TokenCard({
 
 function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
   const phases = [
-    { key: "setup", label: "Initialization", color: "var(--color-primary)", value: timing.setupMs },
+    { key: "setup", label: "Initialization", color: "#a855f7", value: timing.setupMs },
     { key: "agent", label: "Agent Reasoning", color: "#f59e0b", value: timing.agentMs },
     { key: "tasks", label: "Verification", color: "#10b981", value: timing.tasksMs },
-    { key: "judge", label: "Judgment", color: "var(--color-accent)", value: timing.judgeMs },
+    { key: "judge", label: "Judgment", color: "#f43f5e", value: timing.judgeMs },
   ].filter((p) => p.value && p.value > 0);
 
   const total = timing.totalMs || 1;
