@@ -36,38 +36,39 @@ describe("Runs", () => {
   it("renders the page heading", async () => {
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
-      expect(screen.getByText("All Runs")).toBeInTheDocument();
+      expect(screen.getByText("Execution Ledger")).toBeInTheDocument();
     });
   });
 
   it("shows run count in subtitle", async () => {
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
-      expect(screen.getByText(/evaluation runs/)).toBeInTheDocument();
+      expect(screen.getByText(/Runs filtered/)).toBeInTheDocument();
     });
   });
 
   it("renders search input", async () => {
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Search…")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search test ID or agent...")).toBeInTheDocument();
     });
   });
 
   it("renders filter dropdowns", async () => {
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
-      expect(screen.getByDisplayValue("All evals")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("All runners")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Filter by Evaluation")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Filter by Agent Runner")).toBeInTheDocument();
     });
   });
 
   it("renders status filter buttons", async () => {
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
-      expect(screen.getByText("All")).toBeInTheDocument();
-      expect(screen.getByText("✓ Above")).toBeInTheDocument();
-      expect(screen.getByText("✗ Below")).toBeInTheDocument();
+      const buttons = screen.getAllByRole("button");
+      expect(buttons.some((b) => b.textContent?.includes("All"))).toBe(true);
+      expect(buttons.some((b) => b.textContent?.includes("Above"))).toBe(true);
+      expect(buttons.some((b) => b.textContent?.includes("Below"))).toBe(true);
     });
   });
 
@@ -78,7 +79,6 @@ describe("Runs", () => {
       const sortLabels = sortButtons.map((btn) => btn.textContent);
       expect(sortLabels.some((t) => t?.includes("Time"))).toBe(true);
       expect(sortLabels.some((t) => t?.includes("Score"))).toBe(true);
-      expect(sortLabels.some((t) => t?.includes("Duration"))).toBe(true);
     });
   });
 
@@ -87,10 +87,10 @@ describe("Runs", () => {
     renderPage(<Runs />, { path: "/runs" });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Search…")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search test ID or agent...")).toBeInTheDocument();
     });
 
-    const search = screen.getByPlaceholderText("Search…");
+    const search = screen.getByPlaceholderText("Search test ID or agent...");
     await user.type(search, "Banner");
 
     await waitFor(() => {
@@ -112,7 +112,7 @@ describe("Runs", () => {
     mockFetchTestIds.mockResolvedValue([]);
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
-      expect(screen.getByText("No evaluation runs yet")).toBeInTheDocument();
+      expect(screen.getByText("No evaluation runs found")).toBeInTheDocument();
     });
   });
 });

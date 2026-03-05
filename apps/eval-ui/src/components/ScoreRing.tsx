@@ -10,18 +10,15 @@ export function ScoreRing({ value, size = 64, strokeWidth = 5, className = "", l
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - value * circumference;
-  const color =
+
+  // Reconstruct hsl() strings from the raw CSS variables
+  const strokeColor = value >= 0.8 ? "#10b981" : value >= 0.6 ? "#f59e0b" : "#ef4444";
+  const dimColor =
     value >= 0.8
-      ? "var(--color-success)"
+      ? "rgba(16, 185, 129, 0.15)"
       : value >= 0.6
-        ? "var(--color-warning)"
-        : "var(--color-danger)";
-  const bgColor =
-    value >= 0.8
-      ? "var(--color-success-dim)"
-      : value >= 0.6
-        ? "var(--color-warning-dim)"
-        : "var(--color-danger-dim)";
+        ? "rgba(245, 158, 11, 0.15)"
+        : "rgba(239, 68, 68, 0.15)";
 
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`}>
@@ -31,7 +28,7 @@ export function ScoreRing({ value, size = 64, strokeWidth = 5, className = "", l
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={bgColor}
+          stroke={dimColor}
           strokeWidth={strokeWidth}
         />
         <circle
@@ -39,7 +36,7 @@ export function ScoreRing({ value, size = 64, strokeWidth = 5, className = "", l
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={color}
+          stroke={strokeColor}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={offset}

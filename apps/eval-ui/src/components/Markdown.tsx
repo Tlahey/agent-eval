@@ -17,7 +17,7 @@ export function Markdown({ content, className = "" }: Props) {
             <h1 className="mb-4 text-lg font-bold text-txt-base">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mb-3 mt-6 text-md font-bold text-txt-base border-b border-border pb-1">
+            <h2 className="mb-3 mt-6 text-md font-bold text-txt-base border-b border-slate-800 pb-1">
               {children}
             </h2>
           ),
@@ -65,11 +65,11 @@ export function Markdown({ content, className = "" }: Props) {
             </div>
           ),
           th: ({ children }) => (
-            <th className="border border-border bg-surface-3 px-3 py-2 text-left font-bold">
+            <th className="border border-slate-800 bg-surface-3 px-3 py-2 text-left font-bold">
               {children}
             </th>
           ),
-          td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
+          td: ({ children }) => <td className="border border-slate-800 px-3 py-2">{children}</td>,
         }}
       >
         {content}

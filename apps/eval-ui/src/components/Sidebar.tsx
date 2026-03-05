@@ -17,55 +17,65 @@ const NAV = [
 
 export function Sidebar() {
   return (
-    <aside className="flex h-full w-[var(--sidebar-width)] flex-col border-r border-border bg-surface-1">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20">
-          <Beaker size={18} className="text-primary" />
+    <aside className="relative flex h-full w-[var(--sidebar-width)] flex-col bg-surface-0 p-4">
+      <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-surface-1/50 backdrop-blur-xl shadow-2xl shadow-black/20">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-6 py-8">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent p-[1px] shadow-lg shadow-primary/20">
+            <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-surface-1">
+              <Beaker size={20} className="text-primary" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-txt-base tracking-tight">AgentEval</h1>
+            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-txt-muted">
+              Framework
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-sm font-bold text-txt-base tracking-tight">AgentEval</h1>
-          <p className="text-[10px] text-txt-muted">Dashboard</p>
+
+        {/* Main Nav */}
+        <nav className="flex flex-col gap-1 px-3">
+          <span className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-txt-muted/60">
+            Main
+          </span>
+          {NAV.map(({ to, icon: Icon, label, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `group relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-300 ${
+                  isActive
+                    ? "bg-primary text-white shadow-lg shadow-primary/20"
+                    : "text-txt-secondary hover:bg-surface-2 hover:text-txt-base"
+                }`
+              }
+            >
+              <Icon size={18} className="transition-transform group-hover:scale-110" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Evals section */}
+        <div className="mt-8 flex flex-1 flex-col overflow-hidden px-3">
+          <span className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-txt-muted/60">
+            Evaluations
+          </span>
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
+            <EvalTree currentPath={location.pathname} />
+          </div>
         </div>
-      </div>
 
-      {/* Main Nav */}
-      <nav className="mt-2 flex flex-col gap-0.5 px-3">
-        <span className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-txt-muted">
-          Navigation
-        </span>
-        {NAV.map(({ to, icon: Icon, label, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-txt-secondary hover:bg-surface-3 hover:text-txt-base"
-              }`
-            }
-          >
-            <Icon size={16} />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* Evals section — populated dynamically */}
-      <div className="mt-6 flex flex-1 flex-col overflow-hidden px-3">
-        <span className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-txt-muted">
-          Evaluations
-        </span>
-        <div className="flex-1 overflow-y-auto">
-          <EvalTree currentPath={location.pathname} />
+        {/* Footer */}
+        <div className="mt-auto border-t border-slate-800/50 px-6 py-6 bg-surface-2/30">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-txt-muted tracking-wider uppercase">
+              v0.1.0
+            </span>
+          </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-border px-5 py-3">
-        <p className="text-[10px] text-txt-muted">v0.1.0</p>
       </div>
     </aside>
   );

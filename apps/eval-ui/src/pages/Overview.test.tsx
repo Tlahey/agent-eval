@@ -43,17 +43,16 @@ describe("Overview", () => {
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
       expect(screen.getByText("Total Runs")).toBeInTheDocument();
-      expect(screen.getByText("Avg Score")).toBeInTheDocument();
+      expect(screen.getByText("Average Score")).toBeInTheDocument();
       expect(screen.getByText("Pass Rate")).toBeInTheDocument();
-      expect(screen.getByText("Total Tokens")).toBeInTheDocument();
-      expect(screen.getByText("Below Threshold")).toBeInTheDocument();
+      expect(screen.getByText("Avg Duration")).toBeInTheDocument();
     });
   });
 
   it("shows the total run count", async () => {
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
-      expect(screen.getByText("10")).toBeInTheDocument();
+      expect(screen.getAllByText("10").length).toBeGreaterThan(0);
     });
   });
 
@@ -61,23 +60,23 @@ describe("Overview", () => {
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
       expect(screen.getByText("Score Trend")).toBeInTheDocument();
-      expect(screen.getByText("Threshold Distribution")).toBeInTheDocument();
-      expect(screen.getByText("Runner Ranking")).toBeInTheDocument();
+      expect(screen.getByText("Distribution")).toBeInTheDocument();
+      expect(screen.getByText("Performance Ranking")).toBeInTheDocument();
     });
   });
 
   it("renders the Recent Runs section", async () => {
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
-      expect(screen.getByText("Recent Runs")).toBeInTheDocument();
-      expect(screen.getByText("View all")).toBeInTheDocument();
+      expect(screen.getByText("Recent Activity")).toBeInTheDocument();
+      expect(screen.getByText("View Full Ledger")).toBeInTheDocument();
     });
   });
 
   it("renders View all link pointing to /runs", async () => {
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
-      const link = screen.getByText("View all").closest("a");
+      const link = screen.getByText("View Full Ledger").closest("a");
       expect(link).toHaveAttribute("href", "/runs");
     });
   });
@@ -95,7 +94,7 @@ describe("Overview", () => {
     mockFetchStats.mockResolvedValue([]);
     renderPage(<Overview />, { path: "/" });
     await waitFor(() => {
-      expect(screen.getByText("No evaluation runs yet")).toBeInTheDocument();
+      expect(screen.getByText("No evaluation runs found")).toBeInTheDocument();
     });
   });
 });

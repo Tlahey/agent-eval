@@ -4,33 +4,31 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          DEFAULT: "var(--color-primary)",
-          hover: "var(--color-primary-hover)",
-          dim: "var(--color-primary-dim)",
-        },
-        accent: "var(--color-accent)",
+        primary: "hsl(var(--color-primary) / <alpha-value>)",
+        accent: "hsl(var(--color-accent) / <alpha-value>)",
         surface: {
-          0: "var(--color-surface-0)",
-          1: "var(--color-surface-1)",
-          2: "var(--color-surface-2)",
-          3: "var(--color-surface-3)",
-          4: "var(--color-surface-4)",
+          0: "hsl(var(--color-surface-0) / <alpha-value>)",
+          1: "hsl(var(--color-surface-1) / <alpha-value>)",
+          2: "hsl(var(--color-surface-2) / <alpha-value>)",
+          3: "hsl(var(--color-surface-3) / <alpha-value>)",
+          4: "hsl(var(--color-surface-4) / <alpha-value>)",
         },
         border: {
-          DEFAULT: "var(--color-border)",
-          hover: "var(--color-border-hover)",
+          DEFAULT: "#1e293b", // slate-800
+          hover: "#334155", // slate-700
         },
         txt: {
-          base: "var(--color-text-base)",
-          secondary: "var(--color-text-secondary)",
-          muted: "var(--color-text-muted)",
-          inverse: "var(--color-text-inverse)",
+          base: "hsl(var(--color-txt-base) / <alpha-value>)",
+          secondary: "hsl(var(--color-txt-secondary) / <alpha-value>)",
+          muted: "hsl(var(--color-txt-muted) / <alpha-value>)",
         },
-        ok: { DEFAULT: "var(--color-success)", dim: "var(--color-success-dim)" },
-        err: { DEFAULT: "var(--color-danger)", dim: "var(--color-danger-dim)" },
-        warn: { DEFAULT: "var(--color-warning)", dim: "var(--color-warning-dim)" },
-        info: { DEFAULT: "var(--color-info)", dim: "var(--color-info-dim)" },
+        ok: "hsl(var(--color-ok) / <alpha-value>)",
+        err: "hsl(var(--color-err) / <alpha-value>)",
+        warn: "hsl(var(--color-warn) / <alpha-value>)",
+        info: "hsl(var(--color-info) / <alpha-value>)",
+      },
+      borderColor: {
+        DEFAULT: "#1e293b",
       },
       fontFamily: {
         mono: ["SF Mono", "Fira Code", "Cascadia Code", "monospace"],

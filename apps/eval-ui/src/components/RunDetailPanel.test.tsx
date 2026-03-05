@@ -40,39 +40,40 @@ describe("RunDetailPanel", () => {
   it("shows PASS badge for passing runs", () => {
     const run = createMockRun({ pass: true });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
-    expect(screen.getByText("PASS")).toBeInTheDocument();
+    expect(screen.getByText("Above Threshold")).toBeInTheDocument();
   });
 
   it("shows FAIL badge for failing runs", () => {
     const run = createMockRun({ score: 0.3 });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
-    expect(screen.getByText("FAIL")).toBeInTheDocument();
+    expect(screen.getByText("Below Threshold")).toBeInTheDocument();
   });
 
   it("renders the active tabs", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-    expect(screen.getByText("Summary")).toBeInTheDocument();
-    expect(screen.getByText("Diff")).toBeInTheDocument();
-    expect(screen.getByText("Tasks")).toBeInTheDocument();
-    expect(screen.getByText("Metrics")).toBeInTheDocument();
+    expect(screen.getByText("Analysis")).toBeInTheDocument();
+    expect(screen.getByText("Modifications")).toBeInTheDocument();
+    expect(screen.getByText("Verifications")).toBeInTheDocument();
+    expect(screen.getByText("Telemetry")).toBeInTheDocument();
   });
 
-  it("defaults to showing the Summary tab content", () => {
+  it("defaults to showing the Analysis tab content", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-    // Summary tab is active by default
-    expect(screen.getByText("Score Reason")).toBeInTheDocument();
-    expect(screen.getByText("How to Improve")).toBeInTheDocument();
+    // Analysis tab is active by default
+    expect(screen.getByText("Judgment Analysis")).toBeInTheDocument();
+    expect(screen.getByText("Strategic Feedback")).toBeInTheDocument();
   });
 
-  it("switches to Diff tab on click", async () => {
+  it("switches to Modifications tab on click", async () => {
     const user = userEvent.setup();
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
 
-    await user.click(screen.getByText("Diff"));
-    expect(screen.getByText(/changed file/)).toBeInTheDocument();
+    await user.click(screen.getByText("Modifications"));
+    // Look for the filename in the DiffViewer header
+    expect(screen.getByText(defaultRun.changedFiles[0])).toBeInTheDocument();
   });
 
-  it("shows improvement content in summary tab", () => {
+  it("shows improvement content in analysis tab", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
     expect(screen.getByText(defaultRun.improvement)).toBeInTheDocument();
   });
@@ -80,14 +81,16 @@ describe("RunDetailPanel", () => {
   it("shows placeholder when no improvement available", () => {
     const run = createMockRun({ improvement: "", score: 1.0 });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
-    expect(screen.getByText("Perfect score! No improvements needed.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Optimal solution achieved. No enhancements required."),
+    ).toBeInTheDocument();
   });
 
-  it("shows task count badge on Tasks tab", () => {
+  it("shows task count badge on Verifications tab", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
     const tasksBtn = screen
       .getAllByRole("button")
-      .find((btn) => btn.textContent?.includes("Tasks"));
+      .find((btn) => btn.textContent?.includes("Verifications"));
     expect(tasksBtn?.textContent).toContain("1");
   });
 

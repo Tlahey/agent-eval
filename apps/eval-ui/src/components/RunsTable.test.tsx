@@ -5,21 +5,21 @@ import { RunsTable, RunnerDot } from "./RunsTable";
 import { createMockRun, createMockRuns } from "../test/fixtures";
 
 describe("RunsTable", () => {
-  it("shows empty state when no runs", () => {
+  it("renders empty state correctly", () => {
     render(<RunsTable runs={[]} onSelect={vi.fn()} />);
-    expect(screen.getByText("No evaluation runs yet")).toBeInTheDocument();
+    expect(screen.getByText("No evaluation runs found")).toBeInTheDocument();
     expect(screen.getByText("agenteval run")).toBeInTheDocument();
   });
 
-  it("renders table headers", () => {
+  it("renders table headers correctly", () => {
     const runs = createMockRuns(2);
     render(<RunsTable runs={runs} onSelect={vi.fn()} />);
-    expect(screen.getByText("Eval")).toBeInTheDocument();
+    expect(screen.getByText("Evaluation")).toBeInTheDocument();
     expect(screen.getByText("Agent")).toBeInTheDocument();
     expect(screen.getByText("Score")).toBeInTheDocument();
     expect(screen.getByText("Status")).toBeInTheDocument();
-    expect(screen.getByText("Duration")).toBeInTheDocument();
-    expect(screen.getByText("When")).toBeInTheDocument();
+    expect(screen.getByText("Metrics")).toBeInTheDocument();
+    expect(screen.getByText("Time")).toBeInTheDocument();
   });
 
   it("renders a row for each run", () => {
@@ -76,16 +76,16 @@ describe("RunsTable", () => {
     expect(onSelect).toHaveBeenCalledWith(run);
   });
 
-  it("hides Eval column in compact mode", () => {
+  it("hides Evaluation column in compact mode", () => {
     const runs = createMockRuns(2);
     render(<RunsTable runs={runs} onSelect={vi.fn()} compact />);
-    expect(screen.queryByText("Eval")).not.toBeInTheDocument();
+    expect(screen.queryByText("Evaluation")).not.toBeInTheDocument();
   });
 
-  it("shows Eval column when not compact", () => {
+  it("shows Evaluation column when not compact", () => {
     const runs = createMockRuns(2);
     render(<RunsTable runs={runs} onSelect={vi.fn()} />);
-    expect(screen.getByText("Eval")).toBeInTheDocument();
+    expect(screen.getByText("Evaluation")).toBeInTheDocument();
   });
 
   it("shows Adjusted badge for overridden runs", () => {
@@ -122,7 +122,7 @@ describe("RunnerDot", () => {
   it("renders a colored dot", () => {
     const { container } = render(<RunnerDot runner="copilot" />);
     const dot = container.firstElementChild as HTMLElement;
-    expect(dot.style.backgroundColor).toBe("rgb(99, 102, 241)"); // #6366f1
+    expect(dot.style.backgroundColor).toBe("rgb(167, 110, 247)"); // hsl(265, 90%, 70%)
   });
 
   it("uses a fallback color for unknown runners", () => {

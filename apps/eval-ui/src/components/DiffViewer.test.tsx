@@ -42,19 +42,21 @@ index ccc..ddd 100644
 describe("DiffViewer", () => {
   it("shows a placeholder when diff is null", () => {
     render(<DiffViewer diff={null} />);
-    expect(screen.getByText("No diff captured for this run")).toBeInTheDocument();
+    expect(screen.getByText("No changes captured")).toBeInTheDocument();
   });
 
   it("shows a placeholder when diff is empty string", () => {
     render(<DiffViewer diff="" />);
     // Empty string is falsy, shows the same placeholder
-    expect(screen.getByText("No diff captured for this run")).toBeInTheDocument();
+    expect(screen.getByText("No changes captured")).toBeInTheDocument();
   });
 
   it("renders file count summary", () => {
     render(<DiffViewer diff={SAMPLE_DIFF} />);
-    expect(screen.getByText(/changed file/)).toBeInTheDocument();
-    expect(screen.getByText(/Showing/)).toBeInTheDocument();
+    expect(screen.getByText("Files")).toBeInTheDocument();
+    // The count is in a span, while line numbers are in tds
+    const fileCount = screen.getAllByText("1").find((el) => el.tagName === "SPAN");
+    expect(fileCount).toBeInTheDocument();
   });
 
   it("renders the filename from the diff header", () => {
@@ -90,7 +92,8 @@ describe("DiffViewer", () => {
     render(<DiffViewer diff={MULTI_FILE_DIFF} />);
     expect(screen.getByText("src/utils.ts")).toBeInTheDocument();
     expect(screen.getByText("src/index.ts")).toBeInTheDocument();
-    expect(screen.getByText(/changed files/)).toBeInTheDocument();
+    const fileCount = screen.getAllByText("2").find((el) => el.tagName === "SPAN");
+    expect(fileCount).toBeInTheDocument();
   });
 
   it("can collapse a file section by clicking the header", async () => {

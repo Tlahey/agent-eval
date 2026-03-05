@@ -59,28 +59,27 @@ describe("EvalDetail", () => {
   it("shows run and runner counts", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText("12")).toBeInTheDocument(); // 12 runs
-      expect(screen.getByText(/runners/)).toBeInTheDocument();
+      expect(screen.getByText(/12 Total executions/i)).toBeInTheDocument();
+      // Use getAllByText and check length since "Runners" appears in heading and filter dropdown
+      expect(screen.getAllByText(/Runners/i).length).toBeGreaterThan(0);
     });
   });
 
   it("renders KPI cards", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText("Runs")).toBeInTheDocument();
-      expect(screen.getByText("Above Threshold")).toBeInTheDocument();
-      expect(screen.getByText("Below Threshold")).toBeInTheDocument();
-      expect(screen.getByText("Avg Duration")).toBeInTheDocument();
+      expect(screen.getByText("Avg Score")).toBeInTheDocument();
+      expect(screen.getByText("Pass Rate")).toBeInTheDocument();
     });
   });
 
   it("renders chart sections", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText("Score Trend per Runner")).toBeInTheDocument();
-      expect(screen.getByText("Runner Comparison")).toBeInTheDocument();
+      expect(screen.getByText("Historical Performance")).toBeInTheDocument();
+      expect(screen.getByText("Capabilities Matrix")).toBeInTheDocument();
       expect(screen.getByText("Score Distribution")).toBeInTheDocument();
-      expect(screen.getByText("Per-Runner Breakdown")).toBeInTheDocument();
+      expect(screen.getByText("Runner Breakdown")).toBeInTheDocument();
     });
   });
 
@@ -98,15 +97,15 @@ describe("EvalDetail", () => {
   it("renders best/worst run cards", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText("Best Run")).toBeInTheDocument();
-      expect(screen.getByText("Worst Run")).toBeInTheDocument();
+      expect(screen.getByText("Optimal Performance")).toBeInTheDocument();
+      expect(screen.getByText("Critical Failure")).toBeInTheDocument();
     });
   });
 
   it("renders the All Runs table", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText("All Runs")).toBeInTheDocument();
+      expect(screen.getByText("Execution History")).toBeInTheDocument();
     });
   });
 

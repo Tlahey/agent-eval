@@ -22,12 +22,12 @@ describe("Sidebar", () => {
   it("renders the AgentEval branding", () => {
     renderWithRouter(<Sidebar />);
     expect(screen.getByText("AgentEval")).toBeInTheDocument();
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Overview")).toBeInTheDocument();
   });
 
   it("renders the navigation section", () => {
     renderWithRouter(<Sidebar />);
-    expect(screen.getByText("Navigation")).toBeInTheDocument();
+    expect(screen.getByText("Main")).toBeInTheDocument();
     expect(screen.getByText("Overview")).toBeInTheDocument();
     expect(screen.getByText("All Runs")).toBeInTheDocument();
   });
