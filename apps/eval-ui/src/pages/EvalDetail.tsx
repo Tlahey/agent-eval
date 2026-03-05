@@ -72,7 +72,7 @@ export function EvalDetail() {
   // Aggregates
   const totalRuns = runs.length;
   const passCount = runs.filter((r) => r.pass).length;
-  const failCount = totalRuns - passCount;
+  const lowScoreCount = totalRuns - passCount;
   const avgScore = totalRuns > 0 ? runs.reduce((s, r) => s + r.score, 0) / totalRuns : 0;
   const avgDuration = totalRuns > 0 ? runs.reduce((s, r) => s + r.durationMs, 0) / totalRuns : 0;
   const bestRun = runs.reduce((best, r) => (r.score > (best?.score ?? 0) ? r : best), runs[0]);
@@ -94,6 +94,7 @@ export function EvalDetail() {
 
   // Trend data per runner
   const trendData = buildTrendData(sorted);
+  const tokenTrendData = buildTokenTrendData(sorted);
 
   // Radar chart: per-runner score, pass rate, speed (inverted duration)
   const maxDuration = Math.max(...runnerStats.map((r) => r.avgDuration));
@@ -155,15 +156,15 @@ export function EvalDetail() {
         <MiniKPI icon={<BarChart3 size={14} />} label="Runs" value={totalRuns.toString()} />
         <MiniKPI
           icon={<CheckCircle2 size={14} />}
-          label="Pass Rate"
+          label="Above Threshold"
           value={`${((passCount / totalRuns) * 100).toFixed(0)}%`}
           color="ok"
         />
         <MiniKPI
           icon={<XCircle size={14} />}
-          label="Failures"
-          value={failCount.toString()}
-          color={failCount > 0 ? "err" : "ok"}
+          label="Below Threshold"
+          value={lowScoreCount.toString()}
+          color={lowScoreCount > 0 ? "err" : "ok"}
         />
         <MiniKPI
           icon={<Clock size={14} />}
@@ -231,6 +232,72 @@ export function EvalDetail() {
                   dataKey={runner}
                   stroke={RUNNER_COLORS[runner] ?? "#94a3b8"}
                   fill={`url(#eval-grad-${runner})`}
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: RUNNER_COLORS[runner] ?? "#94a3b8" }}
+                  connectNulls
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Token trend per runner */}
+        <div className="rounded-xl border border-border bg-surface-1 p-5">
+          <h3 className="mb-4 text-sm font-semibold text-txt-base">Token Usage Trend per Runner</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={tokenTrendData}>
+              <defs>
+                {runners.map((runner) => (
+                  <linearGradient
+                    key={runner}
+                    id={`eval-token-grad-${runner}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={RUNNER_COLORS[runner] ?? "#94a3b8"}
+                      stopOpacity={0.2}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={RUNNER_COLORS[runner] ?? "#94a3b8"}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                stroke="var(--color-text-muted)"
+                fontSize={11}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="var(--color-text-muted)"
+                fontSize={11}
+                tickLine={false}
+                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
+                contentStyle={{
+                  backgroundColor: "var(--color-surface-2)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: 12,
+                }}
+              />
+              {runners.map((runner) => (
+                <Area
+                  key={runner}
+                  type="monotone"
+                  dataKey={runner}
+                  stroke={RUNNER_COLORS[runner] ?? "#94a3b8"}
+                  fill={`url(#eval-token-grad-${runner})`}
                   strokeWidth={2}
                   dot={{ r: 3, fill: RUNNER_COLORS[runner] ?? "#94a3b8" }}
                   connectNulls
@@ -441,6 +508,28 @@ function buildTrendData(sorted: LedgerRun[]) {
     const point: Record<string, string | number> = { date };
     for (const [runner, scores] of runners) {
       point[runner] = +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3);
+    }
+    return point;
+  });
+}
+
+function buildTokenTrendData(sorted: LedgerRun[]) {
+  const grouped = new Map<string, Map<string, number[]>>();
+  for (const run of sorted) {
+    if (!run.agentTokenUsage) continue;
+    const date = new Date(run.timestamp).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+    if (!grouped.has(date)) grouped.set(date, new Map());
+    const runners = grouped.get(date)!;
+    if (!runners.has(run.agentRunner)) runners.set(run.agentRunner, []);
+    runners.get(run.agentRunner)!.push(run.agentTokenUsage.totalTokens);
+  }
+  return Array.from(grouped.entries()).map(([date, runners]) => {
+    const point: Record<string, string | number> = { date };
+    for (const [runner, tokens] of runners) {
+      point[runner] = Math.round(tokens.reduce((a, b) => a + b, 0) / tokens.length);
     }
     return point;
   });

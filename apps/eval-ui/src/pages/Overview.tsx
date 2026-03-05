@@ -67,7 +67,7 @@ export function Overview() {
   const totalRuns = runs.length;
   const passCount = runs.filter((r) => r.status === "PASS" || (!r.status && r.pass)).length;
   const warnCount = runs.filter((r) => r.status === "WARN").length;
-  const failCount = runs.filter((r) => r.status === "FAIL" || (!r.status && !r.pass)).length;
+  const lowScoreCount = runs.filter((r) => r.status === "FAIL" || (!r.status && !r.pass)).length;
   const avgScore = totalRuns > 0 ? runs.reduce((s, r) => s + r.score, 0) / totalRuns : 0;
   const recentRuns = [...runs].slice(0, 8);
 
@@ -79,12 +79,13 @@ export function Overview() {
 
   // Score trend data
   const trendData = buildTrendData(runs);
+  const tokenTrendData = buildTokenTrendData(runs);
 
   // Pass/warn/fail donut
   const pieData = [
-    { name: "Pass", value: passCount, color: "var(--color-success)" },
-    { name: "Warn", value: warnCount, color: "var(--color-warning)" },
-    { name: "Fail", value: failCount, color: "var(--color-danger)" },
+    { name: "Above Threshold", value: passCount, color: "var(--color-success)" },
+    { name: "Needs Review", value: warnCount, color: "var(--color-warning)" },
+    { name: "Below Threshold", value: lowScoreCount, color: "var(--color-danger)" },
   ];
 
   return (
@@ -118,9 +119,9 @@ export function Overview() {
         />
         <KPICard
           icon={<XCircle size={18} />}
-          label="Failures"
-          value={failCount.toString()}
-          accent={failCount > 0 ? "err" : "ok"}
+          label="Below Threshold"
+          value={lowScoreCount.toString()}
+          accent={lowScoreCount > 0 ? "err" : "ok"}
           sub={warnCount > 0 ? `+ ${warnCount} warnings` : "No warnings"}
         />
         <KPICard
@@ -226,9 +227,9 @@ export function Overview() {
 
         {/* Pass / Fail + Runner ranking */}
         <div className="flex flex-col gap-4">
-          {/* Pass/Fail donut */}
+          {/* Threshold Distribution donut */}
           <div className="rounded-xl border border-border bg-surface-1 p-5">
-            <h3 className="mb-2 text-sm font-semibold text-txt-base">Pass / Warn / Fail</h3>
+            <h3 className="mb-2 text-sm font-semibold text-txt-base">Threshold Distribution</h3>
             <div className="flex items-center justify-center">
               <PieChart width={120} height={120}>
                 <Pie
@@ -249,7 +250,7 @@ export function Overview() {
               <div className="ml-3 space-y-1.5">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full bg-ok" />
-                  <span className="text-txt-secondary">{passCount} Pass</span>
+                  <span className="text-txt-secondary">{passCount} Above</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full bg-warn" />
@@ -257,7 +258,7 @@ export function Overview() {
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full bg-err" />
-                  <span className="text-txt-secondary">{failCount} Fail</span>
+                  <span className="text-txt-secondary">{lowScoreCount} Below</span>
                 </div>
               </div>
             </div>
@@ -282,6 +283,59 @@ export function Overview() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Token Trend Chart */}
+      <div className="rounded-xl border border-border bg-surface-1 p-5">
+        <h3 className="mb-4 text-sm font-semibold text-txt-base">Agent Token Usage Trend</h3>
+        {tokenTrendData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={tokenTrendData}>
+              <defs>
+                <linearGradient id="colorTokensFull" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                stroke="var(--color-text-muted)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                stroke="var(--color-text-muted)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => formatTokens(v)}
+              />
+              <Tooltip
+                cursor={{ stroke: "var(--color-primary)", strokeWidth: 1 }}
+                contentStyle={{
+                  backgroundColor: "var(--color-surface-2)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: "var(--color-text-base)" }}
+              />
+              <Area
+                type="monotone"
+                dataKey="Agent Tokens"
+                stroke="var(--color-primary)"
+                fill="url(#colorTokensFull)"
+                strokeWidth={2}
+                dot={{ r: 3, fill: "var(--color-primary)" }}
+                activeDot={{ r: 5 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="py-12 text-center text-sm text-txt-muted">Not enough token data</p>
+        )}
       </div>
 
       {/* Per-runner bar chart */}
@@ -400,4 +454,24 @@ function buildTrendData(runs: LedgerRun[]) {
     }
     return point;
   });
+}
+
+function buildTokenTrendData(runs: LedgerRun[]) {
+  const sorted = [...runs].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+  const grouped = new Map<string, number[]>();
+  for (const run of sorted) {
+    if (!run.agentTokenUsage) continue;
+    const date = new Date(run.timestamp).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+    if (!grouped.has(date)) grouped.set(date, []);
+    grouped.get(date)!.push(run.agentTokenUsage.totalTokens);
+  }
+  return Array.from(grouped.entries()).map(([date, tokens]) => ({
+    date,
+    "Agent Tokens": Math.round(tokens.reduce((a, b) => a + b, 0) / tokens.length),
+  }));
 }

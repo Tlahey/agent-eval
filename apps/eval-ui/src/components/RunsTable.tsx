@@ -117,9 +117,9 @@ function timeAgo(timestamp: string): string {
 }
 
 const STATUS_STYLES = {
-  PASS: { bg: "bg-ok/10", text: "text-ok", dot: "bg-ok", label: "Pass" },
+  PASS: { bg: "bg-ok/10", text: "text-ok", dot: "bg-ok", label: "Above" },
   WARN: { bg: "bg-warn/10", text: "text-warn", dot: "bg-warn", label: "Warn" },
-  FAIL: { bg: "bg-err/10", text: "text-err", dot: "bg-err", label: "Fail" },
+  FAIL: { bg: "bg-err/10", text: "text-err", dot: "bg-err", label: "Below" },
 } as const;
 
 export function StatusBadge({ run }: { run: LedgerRun }) {

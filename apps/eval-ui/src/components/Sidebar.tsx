@@ -65,9 +65,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-border px-5 py-3">
-        <p className="text-[10px] text-txt-muted">
-          v0.1.0 · <span className="text-ok">●</span> Connected
-        </p>
+        <p className="text-[10px] text-txt-muted">v0.1.0</p>
       </div>
     </aside>
   );

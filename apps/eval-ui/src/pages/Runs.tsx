@@ -137,7 +137,7 @@ export function Runs() {
                   : "text-txt-muted hover:text-txt-secondary"
               }`}
             >
-              {status === "all" ? "All" : status === "pass" ? "✓ Pass" : "✗ Fail"}
+              {status === "all" ? "All" : status === "pass" ? "✓ Above" : "✗ Below"}
             </button>
           ))}
         </div>

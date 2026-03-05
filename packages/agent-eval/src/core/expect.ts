@@ -127,7 +127,7 @@ export function expect(ctx: TestContext): ExpectChain {
 
       if (status === "FAIL") {
         const error = new Error(
-          `Judge evaluation failed (score: ${result.score.toFixed(2)})\n\n${result.reason}\n\n💡 Improvement suggestions:\n${result.improvement}`,
+          `Score below threshold (${result.score.toFixed(2)} < ${thresholds.fail.toFixed(2)})\n\n${result.reason}\n\n💡 Improvement suggestions:\n${result.improvement}`,
         );
         error.name = "JudgeFailure";
         throw error;
