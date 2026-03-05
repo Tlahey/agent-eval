@@ -22,7 +22,7 @@ export class LocalEnvironment implements IEnvironmentPlugin {
 
   /**
    * Capture current uncommitted changes to restore them later.
-   * Does NOT clean the base, allowing the agent to see current work.
+   * Does NOT clean the base yet, allowing the test lifecycle to control isolation.
    */
   setup(cwd: string): void {
     try {
@@ -137,31 +137,38 @@ export class LocalEnvironment implements IEnvironmentPlugin {
   }
 
   /**
-   * Capture staged + unstaged git diff.
+   * Capture staged + unstaged git diff, including new files.
    */
   getDiff(cwd: string): string {
-    const staged = execSync("git diff --cached", {
+    try {
+      // Intent-to-add untracked files so they show up in git diff
+      execSync("git add -N .", { cwd, stdio: "pipe" });
+    } catch {
+      // Ignore if not a git repo or other issues
+    }
+
+    const diff = execSync("git diff HEAD", {
       cwd,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const unstaged = execSync("git diff", {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return [staged, unstaged].filter(Boolean).join("\n");
+    return diff || "";
   }
 
   /**
    * Rollback agent modifications and restore the original uncommitted changes.
+   * This is called after the judge has finished its evaluation.
    */
   teardown(cwd: string): void {
-    // Clean all agent changes but preserve the ledger output directory
-    execSync("git reset --hard HEAD", { cwd, stdio: "pipe" });
-    execSync("git clean -fd -e .agenteval", { cwd, stdio: "pipe" });
+    // 1. Clean all agent changes but preserve the ledger output directory
+    try {
+      execSync("git reset --hard HEAD", { cwd, stdio: "pipe" });
+      execSync("git clean -fd -e .agenteval", { cwd, stdio: "pipe" });
+    } catch {
+      // Ignore cleanup errors
+    }
 
-    // Restore user's original uncommitted changes
+    // 2. Restore user's original uncommitted changes that were present before setup()
     if (this.initialDiff && this.initialDiff.trim()) {
       const patchPath = join(cwd, ".agenteval_backup.patch");
       try {

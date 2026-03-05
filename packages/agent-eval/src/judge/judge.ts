@@ -39,9 +39,10 @@ async function resolveApiModel(llm: IModelPlugin): Promise<LanguageModelV1> {
 async function executeCliJudge(
   cliModel: ICliModel,
   prompt: string,
+  cwd: string,
 ): Promise<{ result: JudgeResult; tokenUsage?: TokenUsage }> {
   // Write prompt to a temp file to avoid shell escaping issues with large prompts
-  const tmpDir = join(process.cwd(), ".agenteval");
+  const tmpDir = join(cwd, ".agenteval");
   mkdirSync(tmpDir, { recursive: true });
   const tmpFile = join(tmpDir, `.judge-prompt-${randomBytes(4).toString("hex")}.txt`);
   writeFileSync(tmpFile, prompt, "utf-8");
@@ -62,6 +63,7 @@ async function executeCliJudge(
   try {
     stdout = execSync(cmd, {
       encoding: "utf-8",
+      cwd,
       timeout: 300_000,
       stdio: ["pipe", "pipe", "pipe"],
       maxBuffer: 10 * 1024 * 1024,
@@ -151,12 +153,55 @@ async function executeCliJudge(
 }
 
 /**
- * Extract changed file paths from a git diff string.
+ * Check if a file is an AgentEval internal file (config, test, ledger).
+ */
+function isInternalFile(path: string): boolean {
+  return (
+    path.includes(".agenteval/") ||
+    path.endsWith(".eval.ts") ||
+    path.endsWith(".eval.js") ||
+    path.endsWith("agenteval.config.ts") ||
+    path.endsWith("agenteval.config.js") ||
+    path.endsWith("agenteval.config.mjs") ||
+    path === "package.json" ||
+    path === "pnpm-lock.yaml" ||
+    path === "yarn.lock" ||
+    path === "package-lock.json"
+  );
+}
+
+/**
+ * Extract changed file paths from a git diff string, ignoring AgentEval internal files.
  */
 export function extractChangedFiles(diff: string | null): string[] {
   if (!diff) return [];
   const matches = diff.matchAll(/^diff --git a\/(.+?) b\//gm);
-  return [...matches].map((m) => m[1]);
+  const files = [...matches].map((m) => m[1]);
+  return files.filter((f) => !isInternalFile(f));
+}
+
+/**
+ * Filter a git diff to exclude AgentEval internal files.
+ */
+export function filterDiff(diff: string | null): string | null {
+  if (!diff) return null;
+
+  // Split the diff into individual file blocks
+  const blocks = diff.split(/^diff --git /gm);
+  if (blocks.length <= 1) return diff;
+
+  // The first block is usually empty or contains headers
+  const header = blocks[0];
+  const filteredBlocks = blocks.slice(1).filter((block) => {
+    // Extract file path from "a/path/to/file b/path/to/file"
+    const match = block.match(/^a\/(.+?) b\//);
+    if (!match) return true;
+    return !isInternalFile(match[1]);
+  });
+
+  if (filteredBlocks.length === 0) return null;
+  // Note: the leading newline in blocks[1..] is kept because we join with "diff --git "
+  return header + filteredBlocks.map((b) => "diff --git " + b).join("");
 }
 
 /**
@@ -283,7 +328,10 @@ export interface JudgePromptOptions {
 export function buildJudgePrompt(opts: JudgePromptOptions): string;
 export function buildJudgePrompt(opts: JudgePromptOptions): string {
   const { execution } = opts;
-  const fileScopeSection = buildFileScopeSection(execution.changedFiles, opts.expectedFiles);
+  const changedFiles = extractChangedFiles(execution.diff);
+  const fileScopeSection = buildFileScopeSection(changedFiles, opts.expectedFiles);
+
+  const filteredDiff = filterDiff(execution.diff);
 
   // Build instruction section (only in declarative mode)
   const instructionSection = execution.instruction
@@ -325,7 +373,7 @@ ${taskBlocks}\n`;
 ${opts.criteria}
 ${instructionSection}${taskSection}
 ## Code Changes
-${execution.logs || "(no logs captured)"}
+${filteredDiff || "(no business logic changes captured)"}
 ${fileScopeSection}
 
 ## Scoring Instructions
@@ -334,7 +382,16 @@ ${taskScoringInstructions}
 - Score from 0.0 (complete failure) to 1.0 (perfect execution).
 - Set pass=true if the overall score is satisfactory.
 - Provide a detailed Markdown explanation in "reason".
-- Provide actionable Markdown suggestions in "improvement" to help the agent achieve a higher score. If the score is 1.0, write "No improvement needed.".
+
+## Improvement Suggestions (Staff Engineer Persona)
+- If the score is less than 1.0, you MUST provide strategic suggestions in "improvement".
+- Persona: Act as a Staff Engineer reviewing an AI agent's performance.
+- Take a step back: Your goal is to improve the agent's global behavior, not just fix this specific test.
+- Analyze the ROOT CAUSE: Why did the agent fail? Did it lack architectural context? Did it ignore project conventions? Did it fail to discover necessary files?
+- Suggest global updates to the project's instructions (e.g., in AGENTS.md or similar system prompts) that would prevent this entire CLASS of errors in the future.
+- Avoid being specific to the failing component (e.g., don't say "add a button to Banner", say "ensure agents always verify component library availability before implementation").
+- If the score is 1.0, write "No improvement needed.".
+
 - Be strict but fair. Partial credit is encouraged.
 
 ## CRITICAL — Output format
@@ -343,8 +400,8 @@ No markdown, no explanation, no commentary — just the JSON object below:
 
 { "pass": boolean, "score": number, "reason": "string", "improvement": "string" }
 
-The "reason" field should contain a detailed Markdown explanation.
-The "improvement" field should contain actionable Markdown suggestions to update the AGENTS.md instructions (or "No improvement needed." if score is 1.0).
+The "reason" field should contain a detailed Markdown explanation of the evaluation.
+The "improvement" field should contain actionable, high-level Markdown suggestions for the AGENTS.md instructions.
 Do NOT wrap the JSON in a code fence. Do NOT include any text before or after the JSON.`;
 }
 
@@ -382,7 +439,7 @@ export async function judge(
     const cliModel = config.model;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return await executeCliJudge(cliModel, prompt);
+        return await executeCliJudge(cliModel, prompt, _ctx.cwd);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (attempt < maxRetries) {
