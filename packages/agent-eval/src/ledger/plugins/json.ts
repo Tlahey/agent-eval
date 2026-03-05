@@ -5,7 +5,7 @@
  * requiring Node 22's experimental node:sqlite module.
  */
 
-import { mkdirSync, readFileSync, appendFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LedgerEntry, ScoreOverride, Thresholds } from "../../core/types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "../../core/types.js";
@@ -21,22 +21,15 @@ interface StoredEntry extends LedgerEntry {
   id: number;
 }
 
-/** Internal override shape stored in overrides.jsonl */
-interface StoredOverride extends ScoreOverride {
-  runId: number;
-}
-
 export class JsonLedger implements ILedgerPlugin {
   readonly name = "json";
   private outputDir: string;
   private runsFile: string;
-  private overridesFile: string;
   private nextId = 1;
 
   constructor(options?: JsonLedgerOptions) {
     this.outputDir = options?.outputDir ?? ".agenteval";
     this.runsFile = join(this.outputDir, "ledger.jsonl");
-    this.overridesFile = join(this.outputDir, "overrides.jsonl");
   }
 
   initialize(): void {
@@ -56,22 +49,16 @@ export class JsonLedger implements ILedgerPlugin {
   }
 
   getRuns(testId?: string): LedgerEntry[] {
-    const runs = this.readAllRuns();
-    const overrides = this.readAllOverrides();
-    const entries = runs.map((r) => this.attachOverride(r, overrides));
+    const entries = this.readAllRuns();
     return testId ? entries.filter((e) => e.testId === testId) : entries;
   }
 
   getRunById(id: number): LedgerEntry | undefined {
-    const runs = this.readAllRuns();
-    const run = runs.find((r) => r.id === id);
-    if (!run) return undefined;
-    return this.attachOverride(run, this.readAllOverrides());
+    return this.readAllRuns().find((r) => r.id === id);
   }
 
   getTestIds(): string[] {
-    const runs = this.readAllRuns();
-    return [...new Set(runs.map((r) => r.testId))].sort();
+    return [...new Set(this.readAllRuns().map((r) => r.testId))].sort();
   }
 
   getTestTree(): TestTreeNode[] {
@@ -106,32 +93,28 @@ export class JsonLedger implements ILedgerPlugin {
   }
 
   getLatestEntries(): Map<string, LedgerEntry> {
-    const runs = this.getRuns();
-    const result = new Map<string, LedgerEntry & { id?: number }>();
+    const runs = this.readAllRuns();
+    const result = new Map<string, LedgerEntry>();
     for (const run of runs) {
       const existing = result.get(run.testId);
       if (!existing || run.timestamp >= existing.timestamp) {
         result.set(run.testId, run);
       }
     }
-    return result as Map<string, LedgerEntry>;
+    return result;
   }
 
   getStats(testId?: string): RunnerStats[] {
     const runs = this.getRuns(testId);
-    const overrides = this.readAllOverrides();
     const byRunner = new Map<string, { scores: number[]; passes: number }>();
 
     for (const run of runs) {
       const key = run.agentRunner;
       if (!byRunner.has(key)) byRunner.set(key, { scores: [], passes: 0 });
       const bucket = byRunner.get(key)!;
-      // Use override score if available
-      const override = overrides
-        .filter((o) => o.runId === run.id)
-        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
-      const effectiveScore = override ? override.score : run.score;
-      const effectivePass = override ? override.pass : run.pass;
+
+      const effectiveScore = run.override ? run.override.score : run.score;
+      const effectivePass = run.override ? run.override.pass : run.pass;
       bucket.scores.push(effectiveScore);
       if (effectivePass) bucket.passes++;
     }
@@ -150,12 +133,15 @@ export class JsonLedger implements ILedgerPlugin {
     if (score < 0 || score > 1) throw new Error("Score must be between 0 and 1");
     if (!reason.trim()) throw new Error("Reason is required");
 
-    const run = this.readAllRuns().find((r) => r.id === runId);
-    if (!run) throw new Error(`Run #${runId} not found`);
+    const runs = this.readAllRuns();
+    const index = runs.findIndex((r) => r.id === runId);
+    if (index === -1) throw new Error(`Run #${runId} not found`);
 
+    const run = runs[index];
     const thresholds: Thresholds = run.thresholds ?? DEFAULT_THRESHOLDS;
     const status = computeStatus(score, thresholds);
     const timestamp = new Date().toISOString();
+
     const override: ScoreOverride = {
       score,
       pass: status !== "FAIL",
@@ -164,17 +150,19 @@ export class JsonLedger implements ILedgerPlugin {
       timestamp,
     };
 
-    const stored: StoredOverride = { ...override, runId };
-    appendFileSync(this.overridesFile, JSON.stringify(stored) + "\n", "utf-8");
+    // Update the run in place
+    runs[index].override = override;
+
+    // Rewrite the entire JSONL file to persist the update
+    const content = runs.map((r) => JSON.stringify(r)).join("\n") + "\n";
+    writeFileSync(this.runsFile, content, "utf-8");
 
     return override;
   }
 
   getRunOverrides(runId: number): ScoreOverride[] {
-    return this.readAllOverrides()
-      .filter((o) => o.runId === runId)
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .map(({ runId: _, ...rest }) => rest);
+    const run = this.getRunById(runId);
+    return run?.override ? [run.override] : [];
   }
 
   // ─── Private helpers ───
@@ -184,29 +172,5 @@ export class JsonLedger implements ILedgerPlugin {
     const content = readFileSync(this.runsFile, "utf-8").trim();
     if (!content) return [];
     return content.split("\n").map((line) => JSON.parse(line) as StoredEntry);
-  }
-
-  private readAllOverrides(): StoredOverride[] {
-    if (!existsSync(this.overridesFile)) return [];
-    const content = readFileSync(this.overridesFile, "utf-8").trim();
-    if (!content) return [];
-    return content.split("\n").map((line) => JSON.parse(line) as StoredOverride);
-  }
-
-  private attachOverride(run: StoredEntry, overrides: StoredOverride[]): LedgerEntry {
-    const entry: LedgerEntry = { ...run };
-    const latest = overrides
-      .filter((o) => o.runId === run.id)
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
-    if (latest) {
-      entry.override = {
-        score: latest.score,
-        pass: latest.pass,
-        status: latest.status,
-        reason: latest.reason,
-        timestamp: latest.timestamp,
-      };
-    }
-    return entry;
   }
 }

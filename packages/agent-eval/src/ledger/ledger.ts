@@ -54,25 +54,23 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
       expected_files      TEXT,
       warn_threshold      REAL    NOT NULL DEFAULT 0.8,
       fail_threshold      REAL    NOT NULL DEFAULT 0.5,
-      duration_ms         INTEGER NOT NULL
+      duration_ms         INTEGER NOT NULL,
+      override            TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_runs_test_id   ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp  ON runs(timestamp);
   `);
 
-  // Score overrides table (HITL — human-in-the-loop)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS score_overrides (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      run_id    INTEGER NOT NULL REFERENCES runs(id),
-      score     REAL    NOT NULL,
-      pass      INTEGER NOT NULL,
-      status    TEXT    NOT NULL DEFAULT 'FAIL',
-      reason    TEXT    NOT NULL,
-      timestamp TEXT    NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_overrides_run_id ON score_overrides(run_id);
-  `);
+  // ─── Simple Migrations ───
+  // Ensure new columns exist for existing databases
+  const columns = ["improvement", "task_results", "override", "suite_path", "instruction"];
+  for (const col of columns) {
+    try {
+      db.exec(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
+    } catch {
+      // Column already exists, ignore
+    }
+  }
 
   return db;
 }
@@ -106,28 +104,12 @@ interface RunRow {
   warn_threshold: number;
   fail_threshold: number;
   duration_ms: number;
-  /* Override columns (nullable, from LEFT JOIN) */
-  override_score: number | null;
-  override_pass: number | null;
-  override_status: string | null;
-  override_reason: string | null;
-  override_timestamp: string | null;
+  override: string | null;
 }
 
-/** SQL fragment that selects runs with their latest override */
-const RUNS_WITH_OVERRIDE = `
-  SELECT r.*,
-         o.score     AS override_score,
-         o.pass      AS override_pass,
-         o.status    AS override_status,
-         o.reason    AS override_reason,
-         o.timestamp AS override_timestamp
-  FROM runs r
-  LEFT JOIN (
-    SELECT run_id, score, pass, status, reason, timestamp,
-           ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY id DESC) AS rn
-    FROM score_overrides
-  ) o ON o.run_id = r.id AND o.rn = 1
+/** SQL fragment that selects runs */
+const SELECT_RUNS = `
+  SELECT * FROM runs
 `;
 
 function rowToEntry(row: RunRow): LedgerEntry {
@@ -152,6 +134,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
   const judgeTokenUsage = safeJsonParse<TokenUsage | undefined>(row.judge_token_usage, undefined);
   const timing = safeJsonParse<TimingData>(row.timing, { totalMs: row.duration_ms });
   const expectedFiles = safeJsonParse<string[] | undefined>(row.expected_files, undefined);
+  const override = safeJsonParse<ScoreOverride | undefined>(row.override, undefined);
 
   const entry: LedgerEntry = {
     id: row.id,
@@ -181,22 +164,8 @@ function rowToEntry(row: RunRow): LedgerEntry {
     expectedFiles,
     thresholds,
     durationMs: row.duration_ms,
+    override,
   };
-  if (row.override_score != null) {
-    const overrideStatus =
-      row.override_status === "PASS" ||
-      row.override_status === "WARN" ||
-      row.override_status === "FAIL"
-        ? (row.override_status as TestStatus)
-        : computeStatus(row.override_score, thresholds);
-    entry.override = {
-      score: row.override_score,
-      pass: row.override_pass === 1,
-      status: overrideStatus,
-      reason: row.override_reason ?? "",
-      timestamp: row.override_timestamp ?? "",
-    };
-  }
   return entry;
 }
 
@@ -222,9 +191,9 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
         agent_token_usage, timing, agent_output, logs,
         judge_model, score, pass, status, reason, improvement,
         judge_token_usage, criteria, expected_files,
-        warn_threshold, fail_threshold, duration_ms
+        warn_threshold, fail_threshold, duration_ms, override
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
@@ -252,6 +221,7 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.thresholds.warn,
       entry.thresholds.fail,
       entry.durationMs,
+      entry.override ? JSON.stringify(entry.override) : null,
     );
   } finally {
     db.close();
@@ -264,9 +234,7 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
 export function readLedger(outputDir: string): LedgerEntry[] {
   const db = openDb(outputDir);
   try {
-    const rows = db
-      .prepare(`${RUNS_WITH_OVERRIDE} ORDER BY r.timestamp ASC`)
-      .all() as unknown as RunRow[];
+    const rows = db.prepare(`${SELECT_RUNS} ORDER BY timestamp ASC`).all() as unknown as RunRow[];
     return rows.map(rowToEntry);
   } finally {
     db.close();
@@ -280,7 +248,7 @@ export function readLedgerByTestId(outputDir: string, testId: string): LedgerEnt
   const db = openDb(outputDir);
   try {
     const rows = db
-      .prepare(`${RUNS_WITH_OVERRIDE} WHERE r.test_id = ? ORDER BY r.timestamp ASC`)
+      .prepare(`${SELECT_RUNS} WHERE test_id = ? ORDER BY timestamp ASC`)
       .all(testId) as unknown as RunRow[];
     return rows.map(rowToEntry);
   } finally {
@@ -369,19 +337,13 @@ export function getLatestEntries(outputDir: string): Map<string, LedgerEntry> {
     const rows = db
       .prepare(
         `
-        SELECT rr.*, o.score AS override_score, o.pass AS override_pass,
-               o.reason AS override_reason, o.timestamp AS override_timestamp
+        SELECT rr.*
         FROM runs rr
         INNER JOIN (
           SELECT test_id, MAX(timestamp) AS max_ts
           FROM runs
           GROUP BY test_id
         ) latest ON rr.test_id = latest.test_id AND rr.timestamp = latest.max_ts
-        LEFT JOIN (
-          SELECT run_id, score, pass, reason, timestamp,
-                 ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY id DESC) AS rn
-          FROM score_overrides
-        ) o ON o.run_id = rr.id AND o.rn = 1
         ORDER BY rr.test_id
       `,
       )
@@ -407,37 +369,8 @@ export function getRunnerStats(
 ): Array<{ agentRunner: string; avgScore: number; totalRuns: number; passRate: number }> {
   const db = openDb(outputDir);
   try {
-    const rows = db
-      .prepare(
-        `
-        SELECT
-          r.agent_runner,
-          AVG(COALESCE(o.score, r.score)) AS avg_score,
-          COUNT(*) AS total_runs,
-          (SUM(COALESCE(o.pass, r.pass)) * 1.0 / COUNT(*)) AS pass_rate
-        FROM runs r
-        LEFT JOIN (
-          SELECT run_id, score, pass,
-                 ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY id DESC) AS rn
-          FROM score_overrides
-        ) o ON o.run_id = r.id AND o.rn = 1
-        WHERE r.test_id = ?
-        GROUP BY r.agent_runner
-        ORDER BY avg_score DESC
-      `,
-      )
-      .all(testId) as unknown as Array<{
-      agent_runner: string;
-      avg_score: number;
-      total_runs: number;
-      pass_rate: number;
-    }>;
-    return rows.map((r) => ({
-      agentRunner: r.agent_runner,
-      avgScore: r.avg_score,
-      totalRuns: r.total_runs,
-      passRate: r.pass_rate,
-    }));
+    const runs = readLedgerByTestId(outputDir, testId);
+    return computeAggregateStats(runs);
   } finally {
     db.close();
   }
@@ -451,46 +384,40 @@ export function getAllRunnerStats(
 ): Array<{ agentRunner: string; avgScore: number; totalRuns: number; passRate: number }> {
   const db = openDb(outputDir);
   try {
-    const rows = db
-      .prepare(
-        `
-        SELECT
-          r.agent_runner,
-          AVG(COALESCE(o.score, r.score)) AS avg_score,
-          COUNT(*) AS total_runs,
-          (SUM(COALESCE(o.pass, r.pass)) * 1.0 / COUNT(*)) AS pass_rate
-        FROM runs r
-        LEFT JOIN (
-          SELECT run_id, score, pass,
-                 ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY id DESC) AS rn
-          FROM score_overrides
-        ) o ON o.run_id = r.id AND o.rn = 1
-        GROUP BY r.agent_runner
-        ORDER BY avg_score DESC
-      `,
-      )
-      .all() as unknown as Array<{
-      agent_runner: string;
-      avg_score: number;
-      total_runs: number;
-      pass_rate: number;
-    }>;
-    return rows.map((r) => ({
-      agentRunner: r.agent_runner,
-      avgScore: r.avg_score,
-      totalRuns: r.total_runs,
-      passRate: r.pass_rate,
-    }));
+    const runs = readLedger(outputDir);
+    return computeAggregateStats(runs);
   } finally {
     db.close();
   }
+}
+
+function computeAggregateStats(
+  runs: LedgerEntry[],
+): Array<{ agentRunner: string; avgScore: number; totalRuns: number; passRate: number }> {
+  const byRunner = new Map<string, { scores: number[]; passes: number }>();
+  for (const run of runs) {
+    const key = run.agentRunner;
+    if (!byRunner.has(key)) byRunner.set(key, { scores: [], passes: 0 });
+    const bucket = byRunner.get(key)!;
+    const score = run.override ? run.override.score : run.score;
+    const pass = run.override ? run.override.pass : run.pass;
+    bucket.scores.push(score);
+    if (pass) bucket.passes++;
+  }
+  return [...byRunner.entries()]
+    .map(([agentRunner, { scores, passes }]) => ({
+      agentRunner,
+      avgScore: scores.reduce((a, b) => a + b, 0) / scores.length,
+      totalRuns: scores.length,
+      passRate: passes / scores.length,
+    }))
+    .sort((a, b) => b.avgScore - a.avgScore);
 }
 
 // ─── Score Overrides (HITL) ───
 
 /**
  * Override the score for a given run.
- * Adds a new row to score_overrides (audit trail is preserved).
  */
 export function overrideRunScore(
   outputDir: string,
@@ -504,24 +431,30 @@ export function overrideRunScore(
   const db = openDb(outputDir);
   try {
     // Get the run to read its thresholds
-    const run = db
-      .prepare("SELECT id, warn_threshold, fail_threshold FROM runs WHERE id = ?")
-      .get(runId) as { id: number; warn_threshold: number; fail_threshold: number } | undefined;
-    if (!run) throw new Error(`Run #${runId} not found`);
+    const row = db
+      .prepare("SELECT warn_threshold, fail_threshold FROM runs WHERE id = ?")
+      .get(runId) as { warn_threshold: number; fail_threshold: number } | undefined;
+    if (!row) throw new Error(`Run #${runId} not found`);
 
     const thresholds: Thresholds = {
-      warn: run.warn_threshold ?? DEFAULT_THRESHOLDS.warn,
-      fail: run.fail_threshold ?? DEFAULT_THRESHOLDS.fail,
+      warn: row.warn_threshold ?? DEFAULT_THRESHOLDS.warn,
+      fail: row.fail_threshold ?? DEFAULT_THRESHOLDS.fail,
     };
     const timestamp = new Date().toISOString();
     const status = computeStatus(newScore, thresholds);
-    const pass = status !== "FAIL" ? 1 : 0;
+    const pass = status !== "FAIL";
 
-    db.prepare(
-      `INSERT INTO score_overrides (run_id, score, pass, status, reason, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(runId, newScore, pass, status, reason.trim(), timestamp);
+    const override: ScoreOverride = {
+      score: newScore,
+      pass,
+      status,
+      reason: reason.trim(),
+      timestamp,
+    };
 
-    return { score: newScore, pass: pass === 1, status, reason: reason.trim(), timestamp };
+    db.prepare(`UPDATE runs SET override = ? WHERE id = ?`).run(JSON.stringify(override), runId);
+
+    return override;
   } finally {
     db.close();
   }
@@ -529,29 +462,16 @@ export function overrideRunScore(
 
 /**
  * Get all score overrides for a given run (audit trail).
- * Ordered from newest to oldest.
+ * Since we now only keep the latest, this returns a list of 1 or 0.
  */
 export function getRunOverrides(outputDir: string, runId: number): ScoreOverride[] {
   const db = openDb(outputDir);
   try {
-    const rows = db
-      .prepare(
-        `SELECT score, pass, status, reason, timestamp FROM score_overrides WHERE run_id = ? ORDER BY id DESC`,
-      )
-      .all(runId) as unknown as Array<{
-      score: number;
-      pass: number;
-      status: string;
-      reason: string;
-      timestamp: string;
-    }>;
-    return rows.map((r) => ({
-      score: r.score,
-      pass: r.pass === 1,
-      status: (r.status as TestStatus) ?? (r.pass === 1 ? "PASS" : "FAIL"),
-      reason: r.reason,
-      timestamp: r.timestamp,
-    }));
+    const row = db.prepare(`SELECT override FROM runs WHERE id = ?`).get(runId) as
+      | { override: string | null }
+      | undefined;
+    if (!row || !row.override) return [];
+    return [JSON.parse(row.override)];
   } finally {
     db.close();
   }
