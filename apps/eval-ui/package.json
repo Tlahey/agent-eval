@@ -16,8 +16,10 @@
     "react": "^19.0.0",
     "react-diff-viewer-continued": "^4.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.0.0",
-    "recharts": "^2.15.0"
+    "recharts": "^2.15.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

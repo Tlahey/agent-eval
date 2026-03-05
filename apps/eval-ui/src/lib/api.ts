@@ -131,9 +131,3 @@ export async function overrideScore(
   }
   return res.json();
 }
-
-export async function fetchOverrides(runId: number): Promise<ScoreOverride[]> {
-  const res = await fetch(`${BASE}/runs/${runId}/overrides`);
-  if (!res.ok) throw new Error(`Failed to fetch overrides: ${res.statusText}`);
-  return res.json();
-}

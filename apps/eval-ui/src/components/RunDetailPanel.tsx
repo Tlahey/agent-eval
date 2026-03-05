@@ -1,25 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   MessageSquareText,
+  ClipboardCheck,
   Lightbulb,
   GitBranch,
-  Terminal,
+  Bot,
   Pencil,
-  History,
   Coins,
   Clock,
   FileText,
-  CheckCircle2,
   ListChecks,
+  ArrowUp,
+  ArrowDown,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
-import type { LedgerRun, ScoreOverride } from "../lib/api";
-import { overrideScore, fetchOverrides } from "../lib/api";
+import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
+import type { LedgerRun } from "../lib/api";
+import { overrideScore, fetchRuns } from "../lib/api";
 import { ScoreRing } from "./ScoreRing";
 import { DiffViewer } from "./DiffViewer";
 import { OverrideScoreModal } from "./OverrideScoreModal";
+import { Markdown } from "./Markdown";
 
-type Tab = "reason" | "improvement" | "diff" | "commands" | "tasks" | "metrics" | "history";
+type Tab = "summary" | "diff" | "tasks" | "metrics" | "history";
 
 interface Props {
   run: LedgerRun;
@@ -27,54 +32,16 @@ interface Props {
   onOverride?: () => void;
 }
 
-function CommandsViewer({ commands }: { commands: LedgerRun["commands"] }) {
-  if (!commands || commands.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-txt-muted">
-        <Terminal size={32} className="mb-2 opacity-40" />
-        <p className="text-sm">No commands recorded</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {commands.map((cmd, i) => (
-        <div key={i} className="overflow-hidden rounded-lg border border-border bg-surface-1">
-          <div className="flex items-center justify-between bg-surface-2 px-4 py-2.5">
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                  cmd.exitCode === 0 ? "bg-ok/20 text-ok" : "bg-err/20 text-err"
-                }`}
-              >
-                {cmd.exitCode === 0 ? "✓" : "✗"}
-              </span>
-              <span className="text-sm font-medium text-txt-base">{cmd.name}</span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-txt-muted">
-              <code className="rounded bg-surface-3 px-1.5 py-0.5">{cmd.command}</code>
-              <span>{(cmd.durationMs / 1000).toFixed(1)}s</span>
-            </div>
-          </div>
-          {(cmd.stdout || cmd.stderr) && (
-            <pre className="max-h-48 overflow-auto bg-surface-0 p-3 font-mono text-xs leading-relaxed text-txt-secondary">
-              {cmd.stdout}
-              {cmd.stderr && <span className="text-err">{cmd.stderr}</span>}
-            </pre>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function TasksViewer({ run }: { run: LedgerRun }) {
   if (!run.taskResults || run.taskResults.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-txt-muted">
+      <div className="flex flex-col items-center justify-center py-12 text-center text-txt-muted">
         <ListChecks size={32} className="mb-2 opacity-40" />
-        <p className="text-sm">No tasks recorded</p>
+        <p className="text-sm font-medium">No verification tasks recorded</p>
+        <p className="mt-1 max-w-[200px] text-[11px] leading-relaxed opacity-60">
+          Use <code className="text-primary">ctx.addTask()</code> to register automated checks (like
+          tests or builds) that the judge will evaluate.
+        </p>
       </div>
     );
   }
@@ -117,101 +84,265 @@ function TasksViewer({ run }: { run: LedgerRun }) {
 }
 
 function MetricsViewer({ run }: { run: LedgerRun }) {
+  const [history, setHistory] = useState<LedgerRun[]>([]);
   const agentTokens = run.agentTokenUsage;
   const judgeTokens = run.judgeTokenUsage;
   const totalTokens = (agentTokens?.totalTokens ?? 0) + (judgeTokens?.totalTokens ?? 0);
   const timing = run.timing;
 
+  useEffect(() => {
+    fetchRuns(run.testId)
+      .then((runs) => {
+        const filtered = runs
+          .filter((r) => r.agentRunner === run.agentRunner)
+          .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+        setHistory(filtered);
+      })
+      .catch(() => {});
+  }, [run.testId, run.agentRunner]);
+
+  const trendData = history.map((r) => ({
+    value: r.agentTokenUsage?.totalTokens ?? 0,
+  }));
+
+  const lastTokens =
+    history.length > 1 ? (history[history.length - 2].agentTokenUsage?.totalTokens ?? 0) : 0;
+  const currentTokens = agentTokens?.totalTokens ?? 0;
+  const diff = currentTokens - lastTokens;
+  const percentChange = lastTokens > 0 ? ((diff / lastTokens) * 100).toFixed(0) : null;
+
   return (
-    <div className="space-y-4">
-      {/* Token Usage */}
-      <div>
-        <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold text-txt-base">
-          <Coins size={13} /> Token Usage
-        </h4>
+    <div className="space-y-6">
+      {/* Token Usage Section */}
+      <section>
+        <div className="mb-3 flex items-end justify-between">
+          <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-txt-base">
+            <Coins size={14} className="text-primary" /> Token Usage
+          </h4>
+          {totalTokens > 0 && (
+            <span className="text-[10px] font-medium text-txt-muted">
+              Total: <span className="text-txt-base">{totalTokens.toLocaleString()}</span>
+            </span>
+          )}
+        </div>
+
         {totalTokens > 0 ? (
-          <div className="grid grid-cols-2 gap-2">
-            {agentTokens && (
-              <div className="rounded-lg bg-surface-2 p-3">
-                <p className="text-[10px] uppercase tracking-wider text-txt-muted">Agent</p>
-                <p className="mt-1 text-lg font-bold text-primary">
-                  {agentTokens.totalTokens.toLocaleString()}
-                </p>
-                <div className="mt-1 flex gap-3 text-[10px] text-txt-muted">
-                  <span>↑ {agentTokens.inputTokens.toLocaleString()}</span>
-                  <span>↓ {agentTokens.outputTokens.toLocaleString()}</span>
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Agent Card */}
+              <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10">
+                <div className="absolute -right-2 -top-2 opacity-10">
+                  <Bot size={48} className="text-primary" />
                 </div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary">
+                      <Bot size={12} />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                      Agent
+                    </span>
+                  </div>
+                  {percentChange !== null && history.length > 1 && (
+                    <div
+                      className={`flex items-center gap-0.5 text-[10px] font-bold ${diff > 0 ? "text-err" : "text-ok"}`}
+                    >
+                      {diff > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {Math.abs(Number(percentChange))}%
+                    </div>
+                  )}
+                </div>
+                {agentTokens ? (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-txt-muted flex items-center gap-1">
+                          <ArrowUp size={10} className="text-primary/60" /> In
+                        </span>
+                        <p className="text-xl font-black tabular-nums text-txt-base leading-none">
+                          {agentTokens.inputTokens.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end text-right gap-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-txt-muted flex items-center gap-1">
+                          Out <ArrowDown size={10} className="text-primary" />
+                        </span>
+                        <p className="text-xl font-black tabular-nums text-txt-base leading-none">
+                          {agentTokens.outputTokens.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-3 border-t border-primary/10 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-primary/60">
+                        Total
+                      </span>
+                      <p className="text-xl font-black tabular-nums text-primary leading-none">
+                        {agentTokens.totalTokens.toLocaleString()}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs italic text-txt-muted py-2">No agent data</p>
+                )}
               </div>
-            )}
-            {judgeTokens && (
-              <div className="rounded-lg bg-surface-2 p-3">
-                <p className="text-[10px] uppercase tracking-wider text-txt-muted">Judge</p>
-                <p className="mt-1 text-lg font-bold text-accent">
-                  {judgeTokens.totalTokens.toLocaleString()}
+
+              {/* Judge Card */}
+              <div className="relative overflow-hidden rounded-xl border border-accent/20 bg-accent/5 p-4 transition-colors hover:bg-accent/10">
+                <div className="absolute -right-2 -top-2 opacity-10">
+                  <ListChecks size={48} className="text-accent" />
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/20 text-accent">
+                    <ListChecks size={12} />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
+                    Judge
+                  </span>
+                </div>
+                {judgeTokens ? (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-txt-muted flex items-center gap-1">
+                          <ArrowUp size={10} className="text-accent/60" /> In
+                        </span>
+                        <p className="text-xl font-black tabular-nums text-txt-base leading-none">
+                          {judgeTokens.inputTokens.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end text-right gap-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-txt-muted flex items-center gap-1">
+                          Out <ArrowDown size={10} className="text-accent" />
+                        </span>
+                        <p className="text-xl font-black tabular-nums text-txt-base leading-none">
+                          {judgeTokens.outputTokens.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-3 border-t border-accent/10 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-accent/60">
+                        Total
+                      </span>
+                      <p className="text-xl font-black tabular-nums text-accent leading-none">
+                        {judgeTokens.totalTokens.toLocaleString()}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs italic text-txt-muted py-2">No judge data</p>
+                )}
+              </div>
+            </div>
+
+            {/* Agent Token Trend Sparkline */}
+            {trendData.length > 1 && (
+              <div className="rounded-xl border border-border bg-surface-2 p-3">
+                <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-txt-muted">
+                  Agent Token Trend
                 </p>
-                <div className="mt-1 flex gap-3 text-[10px] text-txt-muted">
-                  <span>↑ {judgeTokens.inputTokens.toLocaleString()}</span>
-                  <span>↓ {judgeTokens.outputTokens.toLocaleString()}</span>
+                <div className="h-16 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <YAxis hide domain={["dataMin - 100", "dataMax + 100"]} />
+                      <Area
+                        type="monotone"
+                        dataKey="value"
+                        stroke="var(--color-primary)"
+                        fillOpacity={1}
+                        fill="url(#colorTokens)"
+                        strokeWidth={2}
+                        animationDuration={1000}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <p className="text-xs italic text-txt-muted">No token data available</p>
+          <div className="rounded-xl border border-dashed border-border py-8 text-center text-txt-muted">
+            <Coins size={24} className="mx-auto mb-2 opacity-20" />
+            <p className="text-xs italic">No token consumption recorded</p>
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* Timing Breakdown */}
-      <div>
-        <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold text-txt-base">
-          <Clock size={13} /> Timing Breakdown
+      {/* Timing Breakdown Section */}
+      <section>
+        <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-txt-base">
+          <Clock size={14} className="text-warn" /> Execution Time
         </h4>
         <TimingBar timing={timing} />
-      </div>
+      </section>
 
-      {/* Changed Files */}
+      {/* Changed Files Section */}
       {run.changedFiles && run.changedFiles.length > 0 && (
-        <div>
-          <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold text-txt-base">
-            <FileText size={13} /> Changed Files ({run.changedFiles.length})
+        <section>
+          <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-txt-base">
+            <FileText size={14} className="text-primary" /> Repository Impact
           </h4>
-          <div className="rounded-lg bg-surface-2 p-3">
-            {run.changedFiles.map((f, i) => (
-              <div key={i} className="flex items-center gap-2 py-0.5">
-                <FileText size={11} className="text-primary" />
-                <span className="font-mono text-xs text-txt-secondary">{f}</span>
-              </div>
-            ))}
-          </div>
-          {run.expectedFiles && run.expectedFiles.length > 0 && (
-            <div className="mt-2 rounded-lg bg-surface-2 p-3">
-              <p className="mb-1 text-[10px] uppercase tracking-wider text-txt-muted">
-                Expected scope
-              </p>
-              {run.expectedFiles.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 py-0.5">
-                  <CheckCircle2
-                    size={11}
-                    className={run.changedFiles.includes(f) ? "text-ok" : "text-err"}
-                  />
-                  <span className="font-mono text-xs text-txt-secondary">{f}</span>
-                </div>
-              ))}
+          <div className="overflow-hidden rounded-xl border border-border bg-surface-2">
+            <div className="grid grid-cols-1 divide-y divide-border">
+              {run.changedFiles.map((f, i) => {
+                const isExpected = run.expectedFiles?.includes(f);
+                return (
+                  <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <FileText
+                        size={12}
+                        className={isExpected ? "text-primary" : "text-txt-muted"}
+                      />
+                      <span className="truncate font-mono text-txt-secondary">{f}</span>
+                    </div>
+                    {isExpected && (
+                      <span className="flex-shrink-0 rounded bg-ok/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tighter text-ok">
+                        In Scope
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
+            {run.expectedFiles &&
+              run.expectedFiles.some((ef) => !run.changedFiles.includes(ef)) && (
+                <div className="bg-err/5 px-4 py-2 border-t border-err/10">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-err opacity-70">
+                    Missing from scope
+                  </p>
+                  {run.expectedFiles
+                    .filter((ef) => !run.changedFiles.includes(ef))
+                    .map((f, i) => (
+                      <div key={i} className="flex items-center gap-3 py-1 opacity-60">
+                        <FileText size={12} className="text-err" />
+                        <span className="font-mono text-[11px] text-err line-through decoration-err/30">
+                          {f}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+          </div>
+        </section>
       )}
 
-      {/* Criteria */}
+      {/* Criteria Section */}
       {run.criteria && (
-        <div>
-          <h4 className="mb-2 text-xs font-semibold text-txt-base">Judge Criteria</h4>
-          <div className="rounded-lg bg-surface-2 p-3">
+        <section>
+          <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-txt-base">
+            Original Criteria
+          </h4>
+          <div className="rounded-xl border border-border bg-surface-2 p-4">
             <p className="whitespace-pre-wrap text-xs leading-relaxed text-txt-secondary">
               {run.criteria}
             </p>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );
@@ -219,16 +350,21 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
 
 function TimingBar({ timing }: { timing: LedgerRun["timing"] }) {
   const phases = [
-    { key: "setupMs", label: "Setup", color: "#6366f1", value: timing.setupMs },
-    { key: "agentMs", label: "Agent", color: "#f59e0b", value: timing.agentMs },
-    { key: "tasksMs", label: "Tasks", color: "#34d399", value: timing.tasksMs },
-    { key: "judgeMs", label: "Judge", color: "#a78bfa", value: timing.judgeMs },
+    { key: "setupMs", label: "Setup", color: "rgb(99, 102, 241)", value: timing.setupMs },
+    { key: "agentMs", label: "Agent", color: "rgb(245, 158, 11)", value: timing.agentMs },
+    { key: "tasksMs", label: "Tasks", color: "rgb(52, 211, 153)", value: timing.tasksMs },
+    { key: "judgeMs", label: "Judge", color: "rgb(167, 139, 250)", value: timing.judgeMs },
   ].filter((p) => p.value && p.value > 0);
 
   if (phases.length === 0) {
     return (
-      <div className="rounded-lg bg-surface-2 p-3">
-        <p className="text-xs text-txt-muted">Total: {(timing.totalMs / 1000).toFixed(1)}s</p>
+      <div className="rounded-xl border border-border bg-surface-2 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-txt-muted">Total duration</span>
+          <span className="text-sm font-bold text-txt-base">
+            {(timing.totalMs / 1000).toFixed(1)}s
+          </span>
+        </div>
       </div>
     );
   }
@@ -236,74 +372,61 @@ function TimingBar({ timing }: { timing: LedgerRun["timing"] }) {
   const total = timing.totalMs || 1;
 
   return (
-    <div className="rounded-lg bg-surface-2 p-3">
+    <div className="rounded-xl border border-border bg-surface-2 p-4">
       {/* Stacked bar */}
-      <div className="mb-2 flex h-3 overflow-hidden rounded-full bg-surface-4">
+      <div className="mb-4 flex h-4 overflow-hidden rounded-lg bg-surface-4 shadow-inner">
         {phases.map((p) => (
           <div
             key={p.key}
             style={{ width: `${((p.value! / total) * 100).toFixed(1)}%`, backgroundColor: p.color }}
-            className="h-full"
+            className="h-full transition-all duration-500 ease-out"
             title={`${p.label}: ${(p.value! / 1000).toFixed(1)}s`}
           />
         ))}
       </div>
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-[10px] text-txt-muted">
+      {/* Legend Grid */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
         {phases.map((p) => (
-          <span key={p.key} className="flex items-center gap-1">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: p.color }}
-            />
-            {p.label}: {(p.value! / 1000).toFixed(1)}s
-          </span>
+          <div key={p.key} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+              <span className="text-[11px] font-medium text-txt-muted">{p.label}</span>
+            </div>
+            <span className="text-[11px] font-bold text-txt-secondary tabular-nums">
+              {(p.value! / 1000).toFixed(1)}s
+            </span>
+          </div>
         ))}
-        <span className="ml-auto font-medium text-txt-secondary">
-          Total: {(total / 1000).toFixed(1)}s
-        </span>
+        <div className="col-span-2 mt-1 border-t border-border pt-2 flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-txt-muted">
+            Total
+          </span>
+          <span className="text-sm font-black text-txt-base">{(total / 1000).toFixed(1)}s</span>
+        </div>
       </div>
     </div>
   );
 }
 
-const TABS: { key: Tab; icon: typeof MessageSquareText; label: string }[] = [
-  { key: "reason", icon: MessageSquareText, label: "Reason" },
-  { key: "improvement", icon: Lightbulb, label: "Improve" },
+const TABS: { key: Tab; icon: any; label: string }[] = [
+  { key: "summary", icon: ClipboardCheck, label: "Summary" },
   { key: "diff", icon: GitBranch, label: "Diff" },
-  { key: "commands", icon: Terminal, label: "Cmds" },
   { key: "tasks", icon: ListChecks, label: "Tasks" },
   { key: "metrics", icon: Coins, label: "Metrics" },
-  { key: "history", icon: History, label: "History" },
 ];
 
 export function RunDetailPanel({ run, onClose, onOverride }: Props) {
-  const [tab, setTab] = useState<Tab>("diff");
+  const [tab, setTab] = useState<Tab>("summary");
   const [showOverrideModal, setShowOverrideModal] = useState(false);
-  const [overrides, setOverrides] = useState<ScoreOverride[]>([]);
 
-  const cmdCount = run.commands?.length ?? 0;
   const taskCount = run.taskResults?.length ?? 0;
   const effectiveScore = run.override?.score ?? run.score;
   const effectiveStatus = run.override?.status ?? run.status ?? (run.pass ? "PASS" : "FAIL");
-
-  const loadOverrides = useCallback(() => {
-    if (run.id != null) {
-      fetchOverrides(run.id)
-        .then(setOverrides)
-        .catch(() => {});
-    }
-  }, [run.id]);
-
-  useEffect(() => {
-    loadOverrides();
-  }, [loadOverrides]);
 
   const handleOverrideSubmit = async (score: number, reason: string) => {
     if (run.id == null) return;
     await overrideScore(run.id, score, reason);
     setShowOverrideModal(false);
-    loadOverrides();
     onOverride?.();
   };
 
@@ -384,11 +507,6 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
             >
               <Icon size={13} />
               {label}
-              {key === "commands" && cmdCount > 0 && (
-                <span className="rounded-full bg-surface-3 px-1.5 py-px text-[10px]">
-                  {cmdCount}
-                </span>
-              )}
               {key === "tasks" && taskCount > 0 && (
                 <span className="rounded-full bg-surface-3 px-1.5 py-px text-[10px]">
                   {taskCount}
@@ -403,71 +521,51 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-4">
-          {tab === "reason" && (
-            <div className="rounded-lg bg-surface-2 p-4">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-txt-secondary">
-                {run.reason}
-              </p>
-            </div>
-          )}
+          {tab === "summary" && (
+            <div className="space-y-4">
+              {/* Score Reason Section */}
+              <section className="rounded-xl border border-border bg-surface-2 overflow-hidden">
+                <div className="flex items-center gap-2 bg-surface-3 px-4 py-2 border-b border-border">
+                  <MessageSquareText size={14} className="text-primary" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-txt-base">
+                    Score Reason
+                  </h3>
+                </div>
+                <div className="p-4">
+                  <Markdown content={run.reason} />
+                </div>
+              </section>
 
-          {tab === "improvement" && (
-            <div className="rounded-lg border border-warn/20 bg-warn/5 p-4">
-              {run.improvement ? (
-                <>
-                  <div className="mb-2 flex items-center gap-2">
-                    <Lightbulb size={14} className="text-warn" />
-                    <span className="text-xs font-semibold text-warn">Suggestions</span>
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-txt-secondary">
-                    {run.improvement}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-txt-muted italic">No improvement suggestions.</p>
-              )}
+              {/* How to Improve Section */}
+              <section
+                className={`rounded-xl border border-warn/20 bg-warn/5 overflow-hidden ${!run.improvement && "opacity-50"}`}
+              >
+                <div className="flex items-center gap-2 bg-warn/10 px-4 py-2 border-b border-warn/10">
+                  <Lightbulb size={14} className="text-warn" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-warn">
+                    How to Improve
+                  </h3>
+                </div>
+                <div className="p-4">
+                  {run.improvement ? (
+                    <Markdown content={run.improvement} />
+                  ) : (
+                    <p className="text-sm italic text-txt-muted">
+                      {run.score === 1
+                        ? "Perfect score! No improvements needed."
+                        : "The judge did not provide specific improvement suggestions."}
+                    </p>
+                  )}
+                </div>
+              </section>
             </div>
           )}
 
           {tab === "diff" && <DiffViewer diff={run.diff} />}
 
-          {tab === "commands" && <CommandsViewer commands={run.commands} />}
-
           {tab === "tasks" && <TasksViewer run={run} />}
 
           {tab === "metrics" && <MetricsViewer run={run} />}
-
-          {tab === "history" && (
-            <div className="space-y-3">
-              {overrides.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-txt-muted">
-                  <History size={32} className="mb-2 opacity-40" />
-                  <p className="text-sm">No score overrides</p>
-                </div>
-              ) : (
-                overrides.map((o, i) => (
-                  <div key={i} className="rounded-lg border border-border bg-surface-2 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ScoreRing value={o.score} size={28} strokeWidth={3} />
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            o.pass ? "bg-ok/10 text-ok" : "bg-err/10 text-err"
-                          }`}
-                        >
-                          {o.pass ? "PASS" : "FAIL"}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-txt-muted">
-                        {new Date(o.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-txt-secondary">{o.reason}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </div>
 
         {showOverrideModal && (
