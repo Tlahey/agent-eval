@@ -23,10 +23,10 @@ import { RunsTable, RunnerDot } from "../components/RunsTable";
 import type { AppContext } from "../App";
 
 const RUNNER_COLORS: Record<string, string> = {
-  copilot: "#a855f7",
-  cursor: "#3b82f6",
-  "claude-code": "#10b981",
-  aider: "#ef4444",
+  copilot: "hsl(var(--c-primary))",
+  cursor: "hsl(var(--c-primary))",
+  "claude-code": "hsl(var(--c-ok))",
+  aider: "hsl(var(--c-err))",
 };
 
 type TimeRange = "24h" | "7d" | "30d" | "90d" | "all";
@@ -119,9 +119,9 @@ export function Overview() {
   const activeRunners = Array.from(new Set(filteredRuns.map((r) => r.agentRunner)));
 
   const pieData = [
-    { name: "Above Threshold", value: passCount, color: "#10b981" },
-    { name: "Needs Review", value: warnCount, color: "#f59e0b" },
-    { name: "Below Threshold", value: lowScoreCount, color: "#ef4444" },
+    { name: "Above Threshold", value: passCount, color: "hsl(var(--c-ok))" },
+    { name: "Needs Review", value: warnCount, color: "hsl(var(--c-warn))" },
+    { name: "Below Threshold", value: lowScoreCount, color: "hsl(var(--c-err))" },
   ];
 
   return (
@@ -184,7 +184,7 @@ export function Overview() {
                   <div key={runner} className="flex items-center gap-1.5">
                     <span
                       className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: RUNNER_COLORS[runner] ?? "#a855f7" }}
+                      style={{ backgroundColor: RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))" }}
                     />
                     <span className="text-[10px] font-bold text-txt-muted uppercase">{runner}</span>
                   </div>
@@ -207,21 +207,25 @@ export function Overview() {
                         >
                           <stop
                             offset="0%"
-                            stopColor={RUNNER_COLORS[runner] ?? "#a855f7"}
+                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
                             stopOpacity={0.25}
                           />
                           <stop
                             offset="100%"
-                            stopColor={RUNNER_COLORS[runner] ?? "#a855f7"}
+                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
                             stopOpacity={0}
                           />
                         </linearGradient>
                       ))}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--c-line))"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="date"
-                      stroke="#64748b"
+                      stroke="hsl(var(--c-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -230,7 +234,7 @@ export function Overview() {
                     />
                     <YAxis
                       domain={[0, 1]}
-                      stroke="#64748b"
+                      stroke="hsl(var(--c-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -238,23 +242,31 @@ export function Overview() {
                       tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                     />
                     <Tooltip
-                      cursor={{ stroke: "#a855f7", strokeWidth: 1, strokeDasharray: "4 4" }}
+                      cursor={{
+                        stroke: "hsl(var(--c-primary))",
+                        strokeWidth: 1,
+                        strokeDasharray: "4 4",
+                      }}
                       contentStyle={{
-                        backgroundColor: "#0e1120",
+                        backgroundColor: "hsl(var(--c-surface-2))",
                         border: "1px solid rgba(255,255,255,0.1)",
                         borderRadius: "12px",
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
                         fontSize: 12,
                       }}
                       itemStyle={{ padding: "2px 0" }}
-                      labelStyle={{ color: "#f8fafc", fontWeight: 700, marginBottom: 8 }}
+                      labelStyle={{
+                        color: "hsl(var(--c-txt-base))",
+                        fontWeight: 700,
+                        marginBottom: 8,
+                      }}
                     />
                     {activeRunners.map((runner) => (
                       <Area
                         key={runner}
                         type="monotone"
                         dataKey={runner}
-                        stroke={RUNNER_COLORS[runner] ?? "#a855f7"}
+                        stroke={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
                         fill={`url(#grad-${runner})`}
                         strokeWidth={3}
                         dot={false}
@@ -291,7 +303,7 @@ export function Overview() {
                   <div key={runner} className="flex items-center gap-1">
                     <span
                       className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: RUNNER_COLORS[runner] ?? "#a855f7" }}
+                      style={{ backgroundColor: RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))" }}
                     />
                     <span className="text-[9px] font-black text-txt-muted uppercase">{runner}</span>
                   </div>
@@ -317,21 +329,25 @@ export function Overview() {
                         >
                           <stop
                             offset="0%"
-                            stopColor={RUNNER_COLORS[runner] ?? "#a855f7"}
+                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
                             stopOpacity={0.15}
                           />
                           <stop
                             offset="100%"
-                            stopColor={RUNNER_COLORS[runner] ?? "#a855f7"}
+                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
                             stopOpacity={0}
                           />
                         </linearGradient>
                       ))}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--c-line))"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="date"
-                      stroke="#64748b"
+                      stroke="hsl(var(--c-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -339,7 +355,7 @@ export function Overview() {
                       dy={10}
                     />
                     <YAxis
-                      stroke="#64748b"
+                      stroke="hsl(var(--c-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -347,27 +363,31 @@ export function Overview() {
                       tickFormatter={(v) => formatTokens(v)}
                     />
                     <Tooltip
-                      cursor={{ stroke: "#a855f7", strokeWidth: 1 }}
+                      cursor={{ stroke: "hsl(var(--c-primary))", strokeWidth: 1 }}
                       contentStyle={{
-                        backgroundColor: "#0e1120",
+                        backgroundColor: "hsl(var(--c-surface-2))",
                         border: "1px solid rgba(255,255,255,0.1)",
                         borderRadius: "12px",
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
                         fontSize: 12,
                       }}
-                      labelStyle={{ color: "#f8fafc", fontWeight: 700, marginBottom: 8 }}
+                      labelStyle={{
+                        color: "hsl(var(--c-txt-base))",
+                        fontWeight: 700,
+                        marginBottom: 8,
+                      }}
                     />
                     {activeRunners.map((runner) => (
                       <Area
                         key={runner}
                         type="monotone"
                         dataKey={runner}
-                        stroke={RUNNER_COLORS[runner] ?? "#a855f7"}
+                        stroke={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
                         fill={`url(#token-grad-${runner})`}
                         strokeWidth={3}
                         dot={{
                           r: 3,
-                          fill: RUNNER_COLORS[runner] ?? "#a855f7",
+                          fill: RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))",
                           strokeWidth: 0,
                         }}
                         activeDot={{ r: 5, strokeWidth: 0 }}

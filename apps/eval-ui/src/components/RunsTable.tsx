@@ -9,10 +9,10 @@ interface Props {
 }
 
 const RUNNER_COLORS: Record<string, string> = {
-  copilot: "hsl(265, 90%, 70%)",
-  cursor: "hsl(190, 90%, 60%)",
-  "claude-code": "hsl(160, 85%, 55%)",
-  aider: "hsl(350, 90%, 65%)",
+  copilot: "hsl(var(--c-primary))",
+  cursor: "hsl(var(--c-primary))",
+  "claude-code": "hsl(var(--c-ok))",
+  aider: "hsl(var(--c-err))",
 };
 
 export function RunsTable({ runs, onSelect, compact }: Props) {

@@ -122,7 +122,7 @@ describe("RunnerDot", () => {
   it("renders a colored dot", () => {
     const { container } = render(<RunnerDot runner="copilot" />);
     const dot = container.firstElementChild as HTMLElement;
-    expect(dot.style.backgroundColor).toBe("rgb(167, 110, 247)"); // hsl(265, 90%, 70%)
+    expect(dot.style.backgroundColor).toBe("hsl(var(--c-primary))");
   });
 
   it("uses a fallback color for unknown runners", () => {

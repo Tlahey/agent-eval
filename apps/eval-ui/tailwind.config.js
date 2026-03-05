@@ -4,31 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "hsl(var(--color-primary) / <alpha-value>)",
-        accent: "hsl(var(--color-accent) / <alpha-value>)",
+        primary: "hsl(var(--c-primary) / <alpha-value>)",
+        accent: "hsl(var(--c-accent) / <alpha-value>)",
         surface: {
-          0: "hsl(var(--color-surface-0) / <alpha-value>)",
-          1: "hsl(var(--color-surface-1) / <alpha-value>)",
-          2: "hsl(var(--color-surface-2) / <alpha-value>)",
-          3: "hsl(var(--color-surface-3) / <alpha-value>)",
-          4: "hsl(var(--color-surface-4) / <alpha-value>)",
-        },
-        border: {
-          DEFAULT: "#1e293b", // slate-800
-          hover: "#334155", // slate-700
+          0: "hsl(var(--c-surface-0) / <alpha-value>)",
+          1: "hsl(var(--c-surface-1) / <alpha-value>)",
+          2: "hsl(var(--c-surface-2) / <alpha-value>)",
+          3: "hsl(var(--c-surface-3) / <alpha-value>)",
+          4: "hsl(var(--c-surface-4) / <alpha-value>)",
         },
         txt: {
-          base: "hsl(var(--color-txt-base) / <alpha-value>)",
-          secondary: "hsl(var(--color-txt-secondary) / <alpha-value>)",
-          muted: "hsl(var(--color-txt-muted) / <alpha-value>)",
+          base: "hsl(var(--c-txt-base) / <alpha-value>)",
+          secondary: "hsl(var(--c-txt-secondary) / <alpha-value>)",
+          muted: "hsl(var(--c-txt-muted) / <alpha-value>)",
         },
-        ok: "hsl(var(--color-ok) / <alpha-value>)",
-        err: "hsl(var(--color-err) / <alpha-value>)",
-        warn: "hsl(var(--color-warn) / <alpha-value>)",
-        info: "hsl(var(--color-info) / <alpha-value>)",
+        ok: "hsl(var(--c-ok) / <alpha-value>)",
+        err: "hsl(var(--c-err) / <alpha-value>)",
+        warn: "hsl(var(--c-warn) / <alpha-value>)",
+        info: "hsl(var(--c-info) / <alpha-value>)",
       },
       borderColor: {
-        DEFAULT: "#1e293b",
+        DEFAULT: "hsl(var(--c-line) / 0.15)",
+        divider: "hsl(var(--c-line) / <alpha-value>)",
       },
       fontFamily: {
         mono: ["SF Mono", "Fira Code", "Cascadia Code", "monospace"],

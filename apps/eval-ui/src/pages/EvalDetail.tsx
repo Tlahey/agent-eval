@@ -33,10 +33,10 @@ import { ScoreRing } from "../components/ScoreRing";
 import type { AppContext } from "../App";
 
 const RUNNER_COLORS: Record<string, string> = {
-  copilot: "hsl(265, 90%, 70%)",
-  cursor: "hsl(190, 90%, 60%)",
-  "claude-code": "hsl(160, 85%, 55%)",
-  aider: "hsl(350, 90%, 65%)",
+  copilot: "hsl(var(--c-primary))",
+  cursor: "hsl(var(--c-primary))",
+  "claude-code": "hsl(var(--c-ok))",
+  aider: "hsl(var(--c-err))",
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -310,10 +310,10 @@ export function EvalDetail() {
                   </linearGradient>
                 ))}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--c-line))" vertical={false} />
               <XAxis
                 dataKey="date"
-                stroke="#64748b"
+                stroke="hsl(var(--c-txt-muted))"
                 fontSize={11}
                 fontWeight={600}
                 tickLine={false}
@@ -322,7 +322,7 @@ export function EvalDetail() {
               />
               <YAxis
                 domain={[0, 1]}
-                stroke="#64748b"
+                stroke="hsl(var(--c-txt-muted))"
                 fontSize={11}
                 fontWeight={600}
                 tickLine={false}
@@ -331,13 +331,13 @@ export function EvalDetail() {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#0e1120",
+                  backgroundColor: "hsl(var(--c-surface-2))",
                   border: "1px solid hsl(var(--color-border) / 0.12)",
                   borderRadius: "12px",
                   fontSize: 12,
                 }}
-                itemStyle={{ padding: "2px 0", color: "#f8fafc" }}
-                labelStyle={{ color: "#f8fafc", fontWeight: 700, marginBottom: 8 }}
+                itemStyle={{ padding: "2px 0", color: "hsl(var(--c-txt-base))" }}
+                labelStyle={{ color: "hsl(var(--c-txt-base))", fontWeight: 700, marginBottom: 8 }}
               />
               {runners.map((runner) => (
                 <Area
@@ -366,8 +366,13 @@ export function EvalDetail() {
           </h3>
           <ResponsiveContainer width="100%" height={280}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="#1e293b" />
-              <PolarAngleAxis dataKey="metric" stroke="#64748b" fontSize={11} fontWeight={700} />
+              <PolarGrid stroke="hsl(var(--c-line))" />
+              <PolarAngleAxis
+                dataKey="metric"
+                stroke="hsl(var(--c-txt-muted))"
+                fontSize={11}
+                fontWeight={700}
+              />
               <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
               {runners.map((runner) => (
                 <Radar
@@ -395,10 +400,10 @@ export function EvalDetail() {
           </h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--c-line))" vertical={false} />
               <XAxis
                 dataKey="range"
-                stroke="#64748b"
+                stroke="hsl(var(--c-txt-muted))"
                 fontSize={11}
                 fontWeight={600}
                 tickLine={false}
@@ -406,7 +411,7 @@ export function EvalDetail() {
                 dy={10}
               />
               <YAxis
-                stroke="#64748b"
+                stroke="hsl(var(--c-txt-muted))"
                 fontSize={11}
                 fontWeight={600}
                 tickLine={false}
@@ -416,19 +421,25 @@ export function EvalDetail() {
               <Tooltip
                 cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
                 contentStyle={{
-                  backgroundColor: "#0e1120",
+                  backgroundColor: "hsl(var(--c-surface-2))",
                   border: "1px solid hsl(var(--color-border) / 0.12)",
                   borderRadius: "12px",
                   fontSize: 12,
                 }}
-                itemStyle={{ padding: "2px 0", color: "#f8fafc" }}
-                labelStyle={{ color: "#f8fafc", fontWeight: 700, marginBottom: 8 }}
+                itemStyle={{ padding: "2px 0", color: "hsl(var(--c-txt-base))" }}
+                labelStyle={{ color: "hsl(var(--c-txt-base))", fontWeight: 700, marginBottom: 8 }}
               />
               <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={40}>
                 {distribution.map((d, i) => (
                   <Cell
                     key={i}
-                    fill={d.midpoint >= 0.8 ? "#10b981" : d.midpoint >= 0.6 ? "#f59e0b" : "#ef4444"}
+                    fill={
+                      d.midpoint >= 0.8
+                        ? "hsl(var(--c-ok))"
+                        : d.midpoint >= 0.6
+                          ? "hsl(var(--c-warn))"
+                          : "hsl(var(--c-err))"
+                    }
                     fillOpacity={0.8}
                   />
                 ))}

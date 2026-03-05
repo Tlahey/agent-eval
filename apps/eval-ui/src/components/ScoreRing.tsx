@@ -12,7 +12,8 @@ export function ScoreRing({ value, size = 64, strokeWidth = 5, className = "", l
   const offset = circumference - value * circumference;
 
   // Reconstruct hsl() strings from the raw CSS variables
-  const strokeColor = value >= 0.8 ? "#10b981" : value >= 0.6 ? "#f59e0b" : "#ef4444";
+  const strokeColor =
+    value >= 0.8 ? "hsl(var(--c-ok))" : value >= 0.6 ? "hsl(var(--c-warn))" : "hsl(var(--c-err))";
   const dimColor =
     value >= 0.8
       ? "rgba(16, 185, 129, 0.15)"

@@ -427,19 +427,23 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
                 <AreaChart data={trendData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="panelColorTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--c-primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--c-primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <Tooltip
-                    cursor={{ stroke: "#a855f7", strokeWidth: 1, strokeDasharray: "4 4" }}
+                    cursor={{
+                      stroke: "hsl(var(--c-primary))",
+                      strokeWidth: 1,
+                      strokeDasharray: "4 4",
+                    }}
                     contentStyle={{
-                      backgroundColor: "#0e1120",
+                      backgroundColor: "hsl(var(--c-surface-2))",
                       border: "1px solid hsl(var(--color-border) / 0.12)",
                       borderRadius: "8px",
                       fontSize: 11,
                     }}
-                    itemStyle={{ color: "#a855f7", fontWeight: 700 }}
+                    itemStyle={{ color: "hsl(var(--c-primary))", fontWeight: 700 }}
                     labelStyle={{ display: "none" }}
                     formatter={(value: number) => [`${value.toLocaleString()} tokens`, "Usage"]}
                   />
@@ -447,11 +451,11 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
                   <Area
                     type="monotone"
                     dataKey="value"
-                    stroke="#a855f7"
+                    stroke="hsl(var(--c-primary))"
                     fillOpacity={1}
                     fill="url(#panelColorTokens)"
                     strokeWidth={3}
-                    dot={{ r: 3, fill: "#a855f7", strokeWidth: 0 }}
+                    dot={{ r: 3, fill: "hsl(var(--c-primary))", strokeWidth: 0 }}
                     activeDot={{ r: 5, strokeWidth: 0 }}
                     animationDuration={1500}
                   />
@@ -618,10 +622,15 @@ function TokenCard({
 
 function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
   const phases = [
-    { key: "setup", label: "Initialization", color: "#a855f7", value: timing.setupMs },
-    { key: "agent", label: "Agent Reasoning", color: "#f59e0b", value: timing.agentMs },
-    { key: "tasks", label: "Verification", color: "#10b981", value: timing.tasksMs },
-    { key: "judge", label: "Judgment", color: "#f43f5e", value: timing.judgeMs },
+    {
+      key: "setup",
+      label: "Initialization",
+      color: "hsl(var(--c-primary))",
+      value: timing.setupMs,
+    },
+    { key: "agent", label: "Agent Reasoning", color: "hsl(var(--c-warn))", value: timing.agentMs },
+    { key: "tasks", label: "Verification", color: "hsl(var(--c-ok))", value: timing.tasksMs },
+    { key: "judge", label: "Judgment", color: "hsl(var(--c-accent))", value: timing.judgeMs },
   ].filter((p) => p.value && p.value > 0);
 
   const total = timing.totalMs || 1;
