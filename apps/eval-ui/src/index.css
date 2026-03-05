@@ -2,67 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Themes ─── */
+
 :root {
-  /* Midnight Navy base - HSL components for Tailwind <alpha-value> */
+  /* Default: Nebula Midnight */
   --color-surface-0: 230 45% 4%;
   --color-surface-1: 230 45% 7%;
   --color-surface-2: 230 45% 10%;
   --color-surface-3: 230 45% 13%;
   --color-surface-4: 230 45% 17%;
-
-  /* Primary (Electric Violet) */
   --color-primary: 265 90% 70%;
-
-  /* Accent (Sunset Rose) */
   --color-accent: 330 95% 65%;
-
-  /* Status Colors */
   --color-ok: 160 85% 55%;
   --color-warn: 45 100% 60%;
   --color-err: 350 90% 65%;
-  --color-info: 200 95% 65%;
-
-  /* Typography */
   --color-txt-base: 220 40% 98%;
   --color-txt-secondary: 225 20% 75%;
   --color-txt-muted: 225 15% 55%;
-
-  /* Borders - Subtle and translucent look out of the box */
-  --color-border: 230 45% 18%;
-  --color-border-hover: 230 45% 28%;
-
-  /* Layout Constants */
-  --panel-width: 95vw;
+  --color-line: 230 45% 18%;
+  --color-scheme: dark;
 }
+
+[data-theme="nord"] {
+  --color-surface-0: 220 16% 22%;
+  --color-surface-1: 220 16% 28%;
+  --color-surface-2: 220 17% 32%;
+  --color-surface-3: 220 17% 36%;
+  --color-surface-4: 220 17% 40%;
+  --color-primary: 193 43% 67%;
+  --color-accent: 213 32% 52%;
+  --color-ok: 92 28% 65%;
+  --color-warn: 40 50% 70%;
+  --color-err: 354 35% 56%;
+  --color-txt-base: 218 27% 92%;
+  --color-txt-secondary: 218 27% 85%;
+  --color-txt-muted: 218 13% 65%;
+  --color-line: 220 16% 40%;
+  --color-scheme: dark;
+}
+
+[data-theme="clean-blue"] {
+  --color-surface-0: 0 0% 98%; /* #F9F7F7 */
+  --color-surface-1: 218 41% 94%;
+  --color-surface-2: 218 41% 90%; /* #DBE2EF */
+  --color-surface-3: 218 41% 85%;
+  --color-surface-4: 218 41% 80%;
+  --color-primary: 213 47% 47%; /* #3F72AF */
+  --color-accent: 213 64% 18%; /* #112D4E */
+  --color-ok: 160 84% 39%;
+  --color-warn: 38 92% 50%;
+  --color-err: 0 84% 60%;
+  --color-txt-base: 213 64% 10%;
+  --color-txt-secondary: 213 30% 30%;
+  --color-txt-muted: 213 20% 50%;
+  --color-line: 213 47% 30%;
+  --color-scheme: light;
+}
+
+/* ─── Base Styles ─── */
 
 @layer base {
   body {
-    background-color: var(--color-surface-0);
-    color: var(--color-txt-base);
+    background-color: hsl(var(--color-surface-0));
+    color: hsl(var(--color-txt-base));
     -webkit-font-smoothing: antialiased;
-    color-scheme: dark;
+    color-scheme: var(--color-scheme);
     font-family:
       "Inter Variable",
       "Inter",
       system-ui,
       -apple-system,
       sans-serif;
+
     background-image:
-      radial-gradient(at 0% 0%, hsl(var(--color-primary) / 0.07) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsl(var(--color-accent) / 0.07) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, hsl(var(--color-surface-3) / 0.8) 0px, transparent 80%);
+      radial-gradient(at 0% 0%, hsl(var(--color-primary) / 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsl(var(--color-accent) / 0.05) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, hsl(var(--color-surface-3) / 0.1) 0px, transparent 80%);
     background-attachment: fixed;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: hsl(var(--color-line) / 0.3);
   }
 }
 
 @layer components {
   .glass-panel {
     background-color: hsl(var(--color-surface-2) / 0.75);
-    @apply border border-slate-800 backdrop-blur-2xl shadow-2xl;
+    border: 1px solid hsl(var(--color-line) / 0.25);
+    @apply backdrop-blur-2xl shadow-2xl;
   }
 
   .card-hover {
-    @apply transition-all duration-500 hover:border-primary/40 hover:shadow-[0_0_40px_-10px_rgba(168,85,247,0.2)] hover:-translate-y-1;
+    @apply transition-all duration-500 hover:-translate-y-1;
+  }
+  .card-hover:hover {
+    border-color: hsl(var(--color-primary) / 0.4);
   }
 }
 
@@ -79,31 +116,41 @@
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-primary);
+  background-color: hsl(var(--color-primary));
 }
 
 /* ─── Diff Styles ─── */
 .diff-file-header {
-  @apply flex items-center gap-3 px-4 py-2 bg-surface-2 border-b border-slate-800 sticky top-0 z-10 backdrop-blur-md;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background-color: hsl(var(--color-surface-2));
+  border-bottom: 1px solid hsl(var(--color-line) / 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
 }
 .diff-table {
   @apply w-full border-collapse font-mono text-[12px] leading-relaxed;
 }
 .diff-ln {
-  background-color: rgba(0, 0, 0, 0.2);
-  @apply w-1 min-w-[45px] text-right text-slate-500 select-none border-r border-slate-800 pr-3 font-medium;
+  @apply w-1 min-w-[45px] text-right text-txt-muted select-none pr-3 font-medium;
+  border-right: 1px solid hsl(var(--color-line) / 0.2);
+  background-color: hsl(var(--color-surface-0) / 0.3);
 }
 .diff-add {
   background-color: hsl(var(--color-ok) / 0.08);
 }
 .diff-add .diff-code {
-  @apply text-ok;
+  color: hsl(var(--color-ok));
 }
 .diff-del {
   background-color: hsl(var(--color-err) / 0.08);
 }
 .diff-del .diff-code {
-  @apply text-err;
+  color: hsl(var(--color-err));
 }
 .diff-hunk {
   background-color: hsl(var(--color-primary) / 0.15);

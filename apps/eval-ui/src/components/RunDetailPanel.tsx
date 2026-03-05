@@ -60,9 +60,9 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
       />
 
       {/* Panel */}
-      <div className="fixed right-4 top-4 bottom-4 z-50 flex h-[calc(100vh-32px)] w-[var(--panel-width)] max-w-[95vw] flex-col overflow-hidden rounded-3xl border border-slate-800 bg-surface-1 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-slide-in">
+      <div className="fixed right-4 top-4 bottom-4 z-50 flex h-[calc(100vh-32px)] w-[var(--panel-width)] max-w-[95vw] flex-col overflow-hidden rounded-3xl border bg-surface-1 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-slide-in">
         {/* Modern Header */}
-        <div className="relative overflow-hidden border-b border-slate-800 bg-surface-2/50 px-8 py-8 backdrop-blur-xl">
+        <div className="relative overflow-hidden border-b border bg-surface-2/50 px-8 py-8 backdrop-blur-xl">
           {/* Background Accent */}
           <div
             className={`absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-10 blur-3xl ${effectiveStatus === "PASS" ? "bg-ok" : effectiveStatus === "WARN" ? "bg-warn" : "bg-err"}`}
@@ -101,14 +101,14 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowOverrideModal(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-surface-2 text-txt-muted transition-all hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/20"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border bg-surface-2 text-txt-muted transition-all hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/20"
                 title="Override score"
               >
                 <Pencil size={18} />
               </button>
               <button
                 onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-surface-2 text-txt-muted transition-all hover:bg-surface-3 hover:text-txt-base"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border bg-surface-2 text-txt-muted transition-all hover:bg-surface-3 hover:text-txt-base"
               >
                 <X size={20} />
               </button>
@@ -117,7 +117,7 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
         </div>
 
         {/* Improved Tabs Navigation */}
-        <div className="flex border-b border-slate-800 bg-surface-1/50 px-4">
+        <div className="flex border-b border bg-surface-1/50 px-4">
           {TABS.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -191,7 +191,7 @@ function SummaryView({ run }: { run: LedgerRun }) {
             Judgment Analysis
           </h3>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-surface-2/40 p-8 backdrop-blur-sm shadow-inner prose prose-invert max-w-none">
+        <div className="rounded-2xl border bg-surface-2/40 p-8 backdrop-blur-sm shadow-inner prose prose-invert max-w-none">
           <Markdown content={run.reason} />
         </div>
       </section>
@@ -207,7 +207,7 @@ function SummaryView({ run }: { run: LedgerRun }) {
           </h3>
         </div>
         <div
-          className={`rounded-2xl border border-warn/20 bg-warn/5 p-8 backdrop-blur-sm shadow-inner ${!run.improvement && "opacity-50"}`}
+          className={`rounded-2xl border-warn/20 bg-warn/5 p-8 backdrop-blur-sm shadow-inner ${!run.improvement && "opacity-50"}`}
         >
           {run.improvement ? (
             <Markdown content={run.improvement} />
@@ -233,7 +233,7 @@ function SummaryView({ run }: { run: LedgerRun }) {
             System Instruction
           </h3>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-surface-1/50 p-6 font-mono text-[11px] leading-relaxed text-txt-secondary border-dashed">
+        <div className="rounded-2xl border bg-surface-1/50 p-6 font-mono text-[11px] leading-relaxed text-txt-secondary border-dashed">
           {run.instruction}
         </div>
       </section>
@@ -264,9 +264,9 @@ function TasksViewer({ run }: { run: LedgerRun }) {
       {run.taskResults.map((tr, i) => (
         <div
           key={i}
-          className="group overflow-hidden rounded-2xl border border-slate-800 bg-surface-1 transition-all hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
+          className="group overflow-hidden rounded-2xl border bg-surface-1 transition-all hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
         >
-          <div className="flex items-center justify-between border-b border-slate-800 bg-surface-2/50 px-6 py-4">
+          <div className="flex items-center justify-between border-b border bg-surface-2/50 px-6 py-4">
             <div className="flex items-center gap-4">
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-xl shadow-inner ${
@@ -309,7 +309,7 @@ function TasksViewer({ run }: { run: LedgerRun }) {
             </div>
 
             {(tr.result.stdout || tr.result.stderr) && (
-              <div className="relative overflow-hidden rounded-xl border border-slate-800 bg-black/40">
+              <div className="relative overflow-hidden rounded-xl border bg-black/40">
                 <div className="flex items-center justify-between bg-surface-3 px-4 py-2">
                   <span className="text-[9px] font-black uppercase tracking-[0.2em] text-txt-muted">
                     Console Output
@@ -369,7 +369,7 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
               Resource Utilization
             </h3>
           </div>
-          <div className="rounded-full bg-surface-2 border border-slate-800 px-4 py-1.5 shadow-sm">
+          <div className="rounded-full bg-surface-2 border px-4 py-1.5 shadow-sm">
             <span className="text-[10px] font-black uppercase tracking-widest text-txt-muted">
               Accumulated:{" "}
             </span>
@@ -403,7 +403,7 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
         </div>
 
         {trendData.length > 1 && (
-          <div className="mt-6 rounded-2xl border border-slate-800 bg-surface-1/50 p-6 relative">
+          <div className="mt-6 rounded-2xl border bg-surface-1/50 p-6 relative">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
@@ -414,7 +414,7 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
                     size={12}
                     className="text-txt-muted cursor-help transition-colors hover:text-primary"
                   />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-48 rounded-lg border border-slate-800 bg-surface-2 p-2 text-center text-[10px] font-medium leading-relaxed text-txt-secondary shadow-xl group-hover:block z-10">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-48 rounded-lg border bg-surface-2 p-2 text-center text-[10px] font-medium leading-relaxed text-txt-secondary shadow-xl group-hover:block z-10">
                     Tracks the agent's total token consumption over recent executions of this
                     specific evaluation.
                   </div>
@@ -427,23 +427,23 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
                 <AreaChart data={trendData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="panelColorTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--c-primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--c-primary))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--color-primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--color-primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <Tooltip
                     cursor={{
-                      stroke: "hsl(var(--c-primary))",
+                      stroke: "hsl(var(--color-primary))",
                       strokeWidth: 1,
                       strokeDasharray: "4 4",
                     }}
                     contentStyle={{
-                      backgroundColor: "hsl(var(--c-surface-2))",
-                      border: "1px solid hsl(var(--color-border) / 0.12)",
+                      backgroundColor: "hsl(var(--color-surface-2))",
+                      border: "1px solid hsl(hsl(var(--color-line)) / 0.12)",
                       borderRadius: "8px",
                       fontSize: 11,
                     }}
-                    itemStyle={{ color: "hsl(var(--c-primary))", fontWeight: 700 }}
+                    itemStyle={{ color: "hsl(var(--color-primary))", fontWeight: 700 }}
                     labelStyle={{ display: "none" }}
                     formatter={(value: number) => [`${value.toLocaleString()} tokens`, "Usage"]}
                   />
@@ -451,11 +451,11 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
                   <Area
                     type="monotone"
                     dataKey="value"
-                    stroke="hsl(var(--c-primary))"
+                    stroke="hsl(var(--color-primary))"
                     fillOpacity={1}
                     fill="url(#panelColorTokens)"
                     strokeWidth={3}
-                    dot={{ r: 3, fill: "hsl(var(--c-primary))", strokeWidth: 0 }}
+                    dot={{ r: 3, fill: "hsl(var(--color-primary))", strokeWidth: 0 }}
                     activeDot={{ r: 5, strokeWidth: 0 }}
                     animationDuration={1500}
                   />
@@ -490,7 +490,7 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
               Filesystem Impact
             </h3>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-surface-2/30 backdrop-blur-md">
+          <div className="overflow-hidden rounded-2xl border bg-surface-2/30 backdrop-blur-md">
             <div className="divide-y divide-slate-800/50">
               {run.changedFiles.map((f, i) => {
                 const isExpected = run.expectedFiles?.includes(f);
@@ -625,18 +625,23 @@ function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
     {
       key: "setup",
       label: "Initialization",
-      color: "hsl(var(--c-primary))",
+      color: "hsl(var(--color-primary))",
       value: timing.setupMs,
     },
-    { key: "agent", label: "Agent Reasoning", color: "hsl(var(--c-warn))", value: timing.agentMs },
-    { key: "tasks", label: "Verification", color: "hsl(var(--c-ok))", value: timing.tasksMs },
-    { key: "judge", label: "Judgment", color: "hsl(var(--c-accent))", value: timing.judgeMs },
+    {
+      key: "agent",
+      label: "Agent Reasoning",
+      color: "hsl(var(--color-warn))",
+      value: timing.agentMs,
+    },
+    { key: "tasks", label: "Verification", color: "hsl(var(--color-ok))", value: timing.tasksMs },
+    { key: "judge", label: "Judgment", color: "hsl(var(--color-accent))", value: timing.judgeMs },
   ].filter((p) => p.value && p.value > 0);
 
   const total = timing.totalMs || 1;
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-surface-2/40 p-6 backdrop-blur-sm">
+    <div className="rounded-2xl border bg-surface-2/40 p-6 backdrop-blur-sm">
       <div className="mb-6 flex h-3 overflow-hidden rounded-full bg-surface-4 shadow-inner">
         {phases.map((p) => (
           <div
@@ -649,10 +654,7 @@ function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
 
       <div className="grid grid-cols-2 gap-4">
         {phases.map((p) => (
-          <div
-            key={p.key}
-            className="flex flex-col gap-1 rounded-xl bg-surface-3/50 p-3 border border-slate-800/50"
-          >
+          <div key={p.key} className="flex flex-col gap-1 rounded-xl bg-surface-3/50 p-3 border/50">
             <div className="flex items-center gap-2">
               <div
                 className="h-2 w-2 rounded-full"
@@ -683,10 +685,10 @@ function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
 function StatusBadge({ status, adjusted }: { status: string; adjusted: boolean }) {
   const styles =
     status === "PASS"
-      ? "bg-ok/10 text-ok border border-ok/20"
+      ? "bg-ok/10 text-ok border-ok/20"
       : status === "WARN"
-        ? "bg-warn/10 text-warn border border-warn/20"
-        : "bg-err/10 text-err border border-err/20";
+        ? "bg-warn/10 text-warn border-warn/20"
+        : "bg-err/10 text-err border-err/20";
 
   const label =
     status === "PASS" ? "Above Threshold" : status === "WARN" ? "Needs Review" : "Below Threshold";
@@ -699,7 +701,7 @@ function StatusBadge({ status, adjusted }: { status: string; adjusted: boolean }
         {label}
       </span>
       {adjusted && (
-        <span className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-500">
+        <span className="rounded-lg bg-amber-500/10 border-amber-500/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-500">
           Adjusted
         </span>
       )}

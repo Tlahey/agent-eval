@@ -19,15 +19,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { fetchRuns, type LedgerRun, type RunnerStats } from "../lib/api";
-import { RunsTable, RunnerDot } from "../components/RunsTable";
+import { RunsTable, RunnerDot, getRunnerColor } from "../components/RunsTable";
 import type { AppContext } from "../App";
-
-const RUNNER_COLORS: Record<string, string> = {
-  copilot: "hsl(var(--c-primary))",
-  cursor: "hsl(var(--c-primary))",
-  "claude-code": "hsl(var(--c-ok))",
-  aider: "hsl(var(--c-err))",
-};
 
 type TimeRange = "24h" | "7d" | "30d" | "90d" | "all";
 
@@ -119,9 +112,9 @@ export function Overview() {
   const activeRunners = Array.from(new Set(filteredRuns.map((r) => r.agentRunner)));
 
   const pieData = [
-    { name: "Above Threshold", value: passCount, color: "hsl(var(--c-ok))" },
-    { name: "Needs Review", value: warnCount, color: "hsl(var(--c-warn))" },
-    { name: "Below Threshold", value: lowScoreCount, color: "hsl(var(--c-err))" },
+    { name: "Above Threshold", value: passCount, color: "hsl(var(--color-ok))" },
+    { name: "Needs Review", value: warnCount, color: "hsl(var(--color-warn))" },
+    { name: "Below Threshold", value: lowScoreCount, color: "hsl(var(--color-err))" },
   ];
 
   return (
@@ -174,7 +167,7 @@ export function Overview() {
         {/* Left Column (Main Charts & Rankings) - Takes 2/3 width */}
         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
           {/* Score trend - Main Chart */}
-          <div className="rounded-2xl border border-slate-800 bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
+          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
                 Score Trend
@@ -184,7 +177,7 @@ export function Overview() {
                   <div key={runner} className="flex items-center gap-1.5">
                     <span
                       className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))" }}
+                      style={{ backgroundColor: getRunnerColor(runner) }}
                     />
                     <span className="text-[10px] font-bold text-txt-muted uppercase">{runner}</span>
                   </div>
@@ -205,27 +198,19 @@ export function Overview() {
                           x2="0"
                           y2="1"
                         >
-                          <stop
-                            offset="0%"
-                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
-                            stopOpacity={0.25}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
-                            stopOpacity={0}
-                          />
+                          <stop offset="0%" stopColor={getRunnerColor(runner)} stopOpacity={0.25} />
+                          <stop offset="100%" stopColor={getRunnerColor(runner)} stopOpacity={0} />
                         </linearGradient>
                       ))}
                     </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(var(--c-line))"
+                      stroke="hsl(var(--color-line) / 0.1)"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="date"
-                      stroke="hsl(var(--c-txt-muted))"
+                      stroke="hsl(var(--color-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -234,7 +219,7 @@ export function Overview() {
                     />
                     <YAxis
                       domain={[0, 1]}
-                      stroke="hsl(var(--c-txt-muted))"
+                      stroke="hsl(var(--color-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -243,20 +228,20 @@ export function Overview() {
                     />
                     <Tooltip
                       cursor={{
-                        stroke: "hsl(var(--c-primary))",
+                        stroke: "hsl(var(--color-primary))",
                         strokeWidth: 1,
                         strokeDasharray: "4 4",
                       }}
                       contentStyle={{
-                        backgroundColor: "hsl(var(--c-surface-2))",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        backgroundColor: "hsl(var(--color-surface-2))",
+                        border: "1px solid hsl(var(--color-line) / 0.2)",
                         borderRadius: "12px",
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
                         fontSize: 12,
                       }}
                       itemStyle={{ padding: "2px 0" }}
                       labelStyle={{
-                        color: "hsl(var(--c-txt-base))",
+                        color: "hsl(var(--color-txt-base))",
                         fontWeight: 700,
                         marginBottom: 8,
                       }}
@@ -266,7 +251,7 @@ export function Overview() {
                         key={runner}
                         type="monotone"
                         dataKey={runner}
-                        stroke={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
+                        stroke={getRunnerColor(runner)}
                         fill={`url(#grad-${runner})`}
                         strokeWidth={3}
                         dot={false}
@@ -288,7 +273,7 @@ export function Overview() {
           </div>
 
           {/* Token Usage Chart per Runner */}
-          <div className="rounded-2xl border border-slate-800 bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
+          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
@@ -303,7 +288,7 @@ export function Overview() {
                   <div key={runner} className="flex items-center gap-1">
                     <span
                       className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))" }}
+                      style={{ backgroundColor: getRunnerColor(runner) }}
                     />
                     <span className="text-[9px] font-black text-txt-muted uppercase">{runner}</span>
                   </div>
@@ -327,27 +312,19 @@ export function Overview() {
                           x2="0"
                           y2="1"
                         >
-                          <stop
-                            offset="0%"
-                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
-                            stopOpacity={0.15}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
-                            stopOpacity={0}
-                          />
+                          <stop offset="0%" stopColor={getRunnerColor(runner)} stopOpacity={0.15} />
+                          <stop offset="100%" stopColor={getRunnerColor(runner)} stopOpacity={0} />
                         </linearGradient>
                       ))}
                     </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(var(--c-line))"
+                      stroke="hsl(var(--color-line) / 0.1)"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="date"
-                      stroke="hsl(var(--c-txt-muted))"
+                      stroke="hsl(var(--color-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -355,7 +332,7 @@ export function Overview() {
                       dy={10}
                     />
                     <YAxis
-                      stroke="hsl(var(--c-txt-muted))"
+                      stroke="hsl(var(--color-txt-muted))"
                       fontSize={11}
                       fontWeight={600}
                       tickLine={false}
@@ -363,16 +340,16 @@ export function Overview() {
                       tickFormatter={(v) => formatTokens(v)}
                     />
                     <Tooltip
-                      cursor={{ stroke: "hsl(var(--c-primary))", strokeWidth: 1 }}
+                      cursor={{ stroke: "hsl(var(--color-primary))", strokeWidth: 1 }}
                       contentStyle={{
-                        backgroundColor: "hsl(var(--c-surface-2))",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        backgroundColor: "hsl(var(--color-surface-2))",
+                        border: "1px solid hsl(var(--color-line) / 0.2)",
                         borderRadius: "12px",
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
                         fontSize: 12,
                       }}
                       labelStyle={{
-                        color: "hsl(var(--c-txt-base))",
+                        color: "hsl(var(--color-txt-base))",
                         fontWeight: 700,
                         marginBottom: 8,
                       }}
@@ -382,12 +359,12 @@ export function Overview() {
                         key={runner}
                         type="monotone"
                         dataKey={runner}
-                        stroke={RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))"}
+                        stroke={getRunnerColor(runner)}
                         fill={`url(#token-grad-${runner})`}
                         strokeWidth={3}
                         dot={{
                           r: 3,
-                          fill: RUNNER_COLORS[runner] ?? "hsl(var(--c-primary))",
+                          fill: getRunnerColor(runner),
                           strokeWidth: 0,
                         }}
                         activeDot={{ r: 5, strokeWidth: 0 }}
@@ -406,7 +383,7 @@ export function Overview() {
           </div>
 
           {/* Performance Ranking */}
-          <div className="rounded-2xl border border-slate-800 bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5">
+          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5">
             <h3 className="mb-5 text-sm font-bold uppercase tracking-widest text-txt-muted">
               Performance Ranking
             </h3>
@@ -417,7 +394,7 @@ export function Overview() {
                   .map((s, i) => (
                     <div
                       key={s.agentRunner}
-                      className="group flex items-center gap-4 rounded-xl p-3 border border-slate-800/50 bg-surface-2/40 transition-colors hover:bg-surface-2"
+                      className="group flex items-center gap-4 rounded-xl p-3 border bg-surface-2/40 transition-colors hover:bg-surface-2"
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-xs font-bold text-txt-muted group-hover:bg-primary group-hover:text-white transition-colors">
                         {i + 1}
@@ -455,12 +432,12 @@ export function Overview() {
         {/* Right Column (Metrics & Distribution) - Takes 1/3 width */}
         <div className="lg:col-span-1 flex flex-col gap-6 min-w-0">
           {/* Threshold Distribution Gauge */}
-          <div className="rounded-2xl border border-slate-800 bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
+          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
                 Distribution
               </h3>
-              <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded border border-slate-800">
+              <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded border">
                 {totalRuns} RUNS
               </span>
             </div>
@@ -515,7 +492,7 @@ export function Overview() {
           </div>
 
           {/* Resource Telemetry Dashboard */}
-          <div className="rounded-2xl border border-slate-800 bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
+          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
                 Resource Telemetry
@@ -525,7 +502,7 @@ export function Overview() {
             <div className="flex-1 space-y-6">
               {/* Main Stats Row */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl bg-surface-2/50 p-4 border border-slate-800/50">
+                <div className="rounded-xl bg-surface-2/50 p-4 border">
                   <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-1">
                     Total Volume
                   </p>
@@ -536,7 +513,7 @@ export function Overview() {
                     <span className="text-[10px] font-bold text-primary">TOKENS</span>
                   </div>
                 </div>
-                <div className="rounded-xl bg-surface-2/50 p-4 border border-slate-800/50">
+                <div className="rounded-xl bg-surface-2/50 p-4 border">
                   <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-1">
                     Avg per run
                   </p>
@@ -574,7 +551,7 @@ export function Overview() {
 
               {/* Top Consuming Tests */}
               <div className="space-y-3 pt-2">
-                <h4 className="text-[10px] font-black text-txt-muted uppercase tracking-widest border-b border-slate-800/50 pb-2">
+                <h4 className="text-[10px] font-black text-txt-muted uppercase tracking-widest border-b pb-2">
                   Most Intensive Tests
                 </h4>
                 <div className="space-y-2">
@@ -595,7 +572,7 @@ export function Overview() {
                             {run.agentRunner}
                           </span>
                         </div>
-                        <span className="text-[10px] font-black text-txt-base bg-surface-3 px-2 py-0.5 rounded tabular-nums border border-slate-800/50">
+                        <span className="text-[10px] font-black text-txt-base bg-surface-3 px-2 py-0.5 rounded tabular-nums border">
                           {formatTokens(run.agentTokenUsage?.totalTokens ?? 0)}
                         </span>
                       </div>
@@ -608,8 +585,8 @@ export function Overview() {
       </div>
 
       {/* Bottom Section: Recent Activity */}
-      <div className="rounded-2xl border border-slate-800 bg-surface-1/40 backdrop-blur-sm card-hover shadow-xl shadow-black/5 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-800 p-6">
+      <div className="rounded-2xl border bg-surface-1/40 backdrop-blur-sm card-hover shadow-xl shadow-black/5 overflow-hidden">
+        <div className="flex items-center justify-between border-b p-6">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
               Recent Activity
@@ -620,7 +597,7 @@ export function Overview() {
           </div>
           <Link
             to="/runs"
-            className="flex items-center gap-2 rounded-lg bg-surface-2 px-4 py-2 text-xs font-bold text-txt-base transition-colors hover:bg-primary hover:text-white border border-slate-800"
+            className="flex items-center gap-2 rounded-lg bg-surface-2 px-4 py-2 text-xs font-bold text-txt-base transition-colors hover:bg-primary hover:text-white border"
           >
             View Full Ledger <ArrowRight size={14} />
           </Link>
@@ -649,7 +626,7 @@ function TimeRangeSelector({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-3 rounded-xl border border-slate-800 bg-surface-2 px-4 py-2.5 text-sm font-bold text-txt-base transition-all hover:border-primary/50 hover:shadow-lg shadow-inner"
+        className="flex items-center gap-3 rounded-xl border bg-surface-2 px-4 py-2.5 text-sm font-bold text-txt-base transition-all hover:border-primary/50 hover:shadow-lg shadow-inner"
       >
         <Calendar size={16} className="text-primary" />
         {activeLabel}
@@ -661,7 +638,7 @@ function TimeRangeSelector({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-2 w-56 origin-top-right rounded-xl border border-slate-800 bg-surface-2 p-1.5 shadow-2xl animate-scale-in">
+          <div className="absolute right-0 top-full z-20 mt-2 w-56 origin-top-right rounded-xl border bg-surface-2 p-1.5 shadow-2xl animate-scale-in">
             {TIME_RANGES.map((r) => (
               <button
                 key={r.value}

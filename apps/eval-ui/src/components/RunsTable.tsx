@@ -8,110 +8,134 @@ interface Props {
   compact?: boolean;
 }
 
-const RUNNER_COLORS: Record<string, string> = {
-  copilot: "hsl(var(--c-primary))",
-  cursor: "hsl(var(--c-primary))",
-  "claude-code": "hsl(var(--c-ok))",
-  aider: "hsl(var(--c-err))",
+export const RUNNER_COLORS: Record<string, string> = {
+  copilot: "hsl(var(--color-primary))",
+  cursor: "hsl(var(--color-primary))",
+  "claude-code": "hsl(var(--color-ok))",
+  aider: "hsl(var(--color-err))",
 };
+
+const EXTRA_COLORS = [
+  "hsl(200, 80%, 60%)",
+  "hsl(280, 80%, 60%)",
+  "hsl(30, 90%, 60%)",
+  "hsl(120, 60%, 50%)",
+  "hsl(190, 70%, 50%)",
+  "hsl(330, 80%, 60%)",
+];
+
+export function getRunnerColor(runner: string): string {
+  if (RUNNER_COLORS[runner]) return RUNNER_COLORS[runner];
+  let hash = 0;
+  for (let i = 0; i < runner.length; i++) {
+    hash = runner.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % EXTRA_COLORS.length;
+  return EXTRA_COLORS[index];
+}
 
 export function RunsTable({ runs, onSelect, compact }: Props) {
   if (runs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-surface-1/40 py-16 backdrop-blur-sm">
+      <div className="flex flex-col items-center justify-center rounded-2xl border bg-surface-1/40 py-16 backdrop-blur-sm">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2 shadow-inner">
           <Bot size={32} className="text-txt-muted opacity-20" />
         </div>
-        <p className="text-sm font-bold text-txt-base">No evaluation runs found</p>
-        <p className="mt-1 text-xs font-medium text-txt-muted">
-          Execute{" "}
-          <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-primary">
-            agenteval run
-          </code>{" "}
-          to begin
+        <p className="text-sm font-bold uppercase tracking-widest text-txt-muted">
+          No evaluation runs found
+        </p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-txt-muted/40 mt-1">
+          agenteval run
         </p>
       </div>
     );
   }
 
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full border-collapse table-fixed min-w-[800px]">
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-surface-2/50 backdrop-blur-md">
+          <tr className="border-b border/50 text-left">
             {!compact && (
-              <th className="w-[35%] px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
                 Evaluation
               </th>
             )}
-            <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
               Agent
             </th>
-            <th className="w-28 px-6 py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
               Score
             </th>
-            <th className="w-32 px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
               Status
             </th>
-            <th className="w-32 px-6 py-4 text-right text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
-              Metrics
-            </th>
-            <th className="w-28 px-6 py-4 text-right text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+            {!compact && (
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+                Metrics
+              </th>
+            )}
+            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted text-right">
               Time
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800/50">
-          {runs.map((run, i) => (
+        <tbody className="divide-y divide-line/30">
+          {runs.map((run) => (
             <tr
-              key={run.id ?? i}
+              key={run.id}
               onClick={() => onSelect(run)}
-              className="group cursor-pointer transition-all duration-200 hover:bg-primary/5 active:scale-[0.995]"
+              className="group cursor-pointer transition-colors hover:bg-surface-2/40"
             >
               {!compact && (
-                <td className="px-6 pt-8 pb-6 align-top">
-                  <div className="flex flex-col overflow-hidden">
-                    <span className="text-sm font-bold text-txt-base group-hover:text-primary transition-colors truncate">
+                <td className="px-6 py-4">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-txt-base group-hover:text-primary transition-colors">
                       {run.testId}
                     </span>
-                    <span className="text-[10px] font-medium text-txt-muted truncate">
-                      {run.suitePath.join(" / ")}
+                    <span className="text-[9px] font-bold text-txt-muted uppercase tracking-tighter mt-0.5">
+                      {run.agentRunner}
                     </span>
                   </div>
                 </td>
               )}
-              <td className="px-6 pt-8 pb-6 align-top">
-                <span className="text-sm font-bold text-txt-secondary group-hover:text-txt-base transition-colors truncate block">
-                  {run.agentRunner}
-                </span>
+              <td className="px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <RunnerDot runner={run.agentRunner} />
+                  <span className="text-[11px] font-bold text-txt-secondary uppercase tracking-wider">
+                    {run.agentRunner}
+                  </span>
+                </div>
               </td>
-              <td className="px-6 align-middle">
-                <div className="flex flex-col items-center">
-                  <ScoreRing value={run.override?.score ?? run.score} size={36} strokeWidth={4} />
+              <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <ScoreRing value={run.override?.score ?? run.score} size={32} strokeWidth={3} />
                   {run.override && (
-                    <span className="mt-2 inline-flex items-center rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-500 border border-amber-500/20 shadow-sm leading-none whitespace-nowrap">
+                    <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-tighter text-amber-500 border-amber-500/20">
                       Adjusted
                     </span>
                   )}
                 </div>
               </td>
-              <td className="px-6 pt-8 pb-6 align-top">
+              <td className="px-6 py-4 whitespace-nowrap">
                 <StatusBadge run={run} />
               </td>
-              <td className="px-6 pt-8 pb-6 text-right align-top">
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[11px] font-bold text-txt-base leading-none">
-                    {(run.durationMs / 1000).toFixed(1)}s
-                  </span>
-                  <span className="text-[10px] font-medium text-txt-muted leading-none">
-                    {run.agentTokenUsage
-                      ? `${formatTokens(run.agentTokenUsage.totalTokens)} tokens`
-                      : "N/A"}
-                  </span>
-                </div>
-              </td>
-              <td className="px-6 pt-8 pb-6 text-right align-top">
-                <span className="text-[11px] font-bold text-txt-muted group-hover:text-txt-secondary transition-colors">
+              {!compact && (
+                <td className="px-6 py-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-txt-muted">
+                      <Bot size={10} className="text-primary opacity-50" />
+                      {formatTokens(run.agentTokenUsage?.totalTokens ?? 0)}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-txt-muted">
+                      <span className="w-2.5 text-center opacity-50">⏱</span>
+                      {(run.durationMs / 1000).toFixed(1)}s
+                    </div>
+                  </div>
+                </td>
+              )}
+              <td className="px-6 py-4 text-right">
+                <span className="text-[10px] font-black text-txt-muted uppercase tabular-nums">
                   {timeAgo(run.timestamp)}
                 </span>
               </td>
@@ -124,7 +148,7 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
 }
 
 export function RunnerDot({ runner, size = 8 }: { runner: string; size?: number }) {
-  const color = RUNNER_COLORS[runner] ?? "#94a3b8";
+  const color = getRunnerColor(runner);
   return (
     <span
       className="inline-block rounded-full"
@@ -133,9 +157,10 @@ export function RunnerDot({ runner, size = 8 }: { runner: string; size?: number 
   );
 }
 
-function timeAgo(timestamp: string): string {
-  const diff = Date.now() - new Date(timestamp).getTime();
-  const mins = Math.floor(diff / 60000);
+function timeAgo(date: string) {
+  const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return "Just now";
+  const mins = Math.floor(seconds / 60);
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;

@@ -159,7 +159,7 @@ export function Runs() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-xl bg-surface-1 border border-slate-800 p-1 shadow-sm">
+          <div className="flex items-center gap-1 rounded-xl bg-surface-1 border p-1 shadow-sm">
             <button
               onClick={() => updateParams({ status: "all" })}
               className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${statusFilter === "all" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-txt-muted hover:text-txt-secondary"}`}
@@ -194,7 +194,7 @@ export function Runs() {
             placeholder="Search test ID or agent..."
             value={search}
             onChange={(e) => updateParams({ q: e.target.value })}
-            className="w-full h-12 rounded-xl border border-slate-800 bg-surface-2 pl-11 pr-4 text-sm font-bold text-txt-base placeholder:text-txt-muted/50 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all shadow-inner"
+            className="w-full h-12 rounded-xl border bg-surface-2 pl-11 pr-4 text-sm font-bold text-txt-base placeholder:text-txt-muted/50 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all shadow-inner"
           />
         </div>
 
@@ -241,11 +241,11 @@ export function Runs() {
       </div>
 
       {/* Ledger Table */}
-      <div className="rounded-2xl border border-slate-800 bg-surface-1/40 backdrop-blur-sm card-hover shadow-2xl shadow-black/5 overflow-hidden">
+      <div className="rounded-2xl border bg-surface-1/40 backdrop-blur-sm card-hover shadow-2xl shadow-black/5 overflow-hidden">
         <RunsTable runs={paginatedRuns} onSelect={handleSelectRun} />
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 bg-surface-2/30 border-t border-slate-800">
+          <div className="flex items-center justify-between px-6 py-4 bg-surface-2/30 border-t border">
             <p className="text-[10px] font-black text-txt-muted uppercase tracking-widest">
               Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
               {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
@@ -254,7 +254,7 @@ export function Runs() {
               <button
                 disabled={currentPage === 1}
                 onClick={() => updateParams({ page: (currentPage - 1).toString() })}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-800 bg-surface-1 text-txt-muted transition-all hover:bg-primary hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border bg-surface-1 text-txt-muted transition-all hover:bg-primary hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -272,7 +272,7 @@ export function Runs() {
                     <button
                       key={pageNum}
                       onClick={() => updateParams({ page: pageNum.toString() })}
-                      className={`h-8 min-w-[32px] px-2 rounded-lg border border-slate-800 text-[10px] font-black transition-all ${
+                      className={`h-8 min-w-[32px] px-2 rounded-lg border text-[10px] font-black transition-all ${
                         currentPage === pageNum
                           ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
                           : "bg-surface-1 text-txt-muted hover:bg-surface-3"
@@ -287,7 +287,7 @@ export function Runs() {
               <button
                 disabled={currentPage === totalPages}
                 onClick={() => updateParams({ page: (currentPage + 1).toString() })}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-800 bg-surface-1 text-txt-muted transition-all hover:bg-primary hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border bg-surface-1 text-txt-muted transition-all hover:bg-primary hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
               >
                 <ChevronRight size={16} />
               </button>
@@ -322,7 +322,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full h-12 appearance-none rounded-xl border border-slate-800 bg-surface-2 pr-10 text-sm font-bold text-txt-base focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all shadow-inner ${
+        className={`w-full h-12 appearance-none rounded-xl border bg-surface-2 pr-10 text-sm font-bold text-txt-base focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all shadow-inner ${
           icon ? "pl-11" : "pl-4"
         }`}
       >
@@ -357,7 +357,7 @@ function SortButton({
   return (
     <button
       onClick={() => onClick(field)}
-      className={`flex flex-1 items-center justify-center gap-2 h-12 rounded-xl border border-slate-800 transition-all font-black text-[10px] uppercase tracking-widest ${
+      className={`flex flex-1 items-center justify-center gap-2 h-12 rounded-xl border transition-all font-black text-[10px] uppercase tracking-widest ${
         active
           ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
           : "bg-surface-2 text-txt-muted hover:bg-surface-3 hover:text-txt-base"

@@ -29,11 +29,11 @@ export function OverrideScoreModal({ currentScore, onSubmit, onClose }: Props) {
       {/* Modal */}
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
         <div
-          className="w-full max-w-md rounded-xl border border-slate-800 bg-surface-1 shadow-2xl animate-slide-in"
+          className="w-full max-w-md rounded-xl border bg-surface-1 shadow-2xl animate-slide-in"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+          <div className="flex items-center justify-between border-b border px-5 py-4">
             <div className="flex items-center gap-2">
               <Pencil size={16} className="text-primary" />
               <h3 className="text-sm font-bold text-txt-base">Override Score</h3>
@@ -99,14 +99,14 @@ export function OverrideScoreModal({ currentScore, onSubmit, onClose }: Props) {
                 }}
                 placeholder="Why are you overriding this score?"
                 rows={3}
-                className="w-full rounded-lg border border-slate-800 bg-surface-2 px-3 py-2 text-sm text-txt-base placeholder:text-txt-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border bg-surface-2 px-3 py-2 text-sm text-txt-base placeholder:text-txt-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {error && <p className="mt-1 text-xs text-err">{error}</p>}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-5 py-3">
+          <div className="flex items-center justify-end gap-2 border-t border px-5 py-3">
             <button
               onClick={onClose}
               className="rounded-lg px-3 py-1.5 text-xs font-medium text-txt-muted transition-colors hover:bg-surface-3 hover:text-txt-base"

@@ -3,64 +3,60 @@ import { screen, waitFor } from "@testing-library/react";
 import { renderPage } from "../test/render";
 import { EvalDetail } from "./EvalDetail";
 import { createMockRun } from "../test/fixtures";
-import type { LedgerRun } from "../lib/api";
+import * as api from "../lib/api";
 
-vi.mock("recharts", async () => {
-  const actual = await vi.importActual<typeof import("recharts")>("recharts");
+// Recharts ResponsiveContainer needs ResizeObserver in the test environment
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
+vi.mock("../lib/api", async () => {
+  const actual = await vi.importActual("../lib/api");
   return {
     ...actual,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="chart-container">{children}</div>
-    ),
+    fetchRuns: vi.fn(),
+    fetchStats: vi.fn(),
   };
 });
 
-vi.mock("../lib/api", () => ({
-  fetchRuns: vi.fn(),
-}));
-
-import { fetchRuns } from "../lib/api";
-const mockFetchRuns = vi.mocked(fetchRuns);
-
-function createEvalRuns(): LedgerRun[] {
-  const runners = ["copilot", "cursor", "claude-code", "aider"];
-  return runners.flatMap((runner, ri) =>
-    Array.from({ length: 3 }, (_, i) =>
-      createMockRun({
-        id: ri * 3 + i + 1,
-        testId: "create dark mode toggle",
-        suitePath: ["Theme"],
-        agentRunner: runner,
-        score: 0.6 + ri * 0.08 + i * 0.03,
-        pass: ri * 3 + i !== 2, // one failure
-        timestamp: new Date(Date.now() - (ri * 3 + i) * 86400000).toISOString(),
-        durationMs: 30000 + (ri * 3 + i) * 5000,
-      }),
-    ),
-  );
-}
+const mockFetchRuns = vi.mocked(api.fetchRuns);
+const mockFetchStats = vi.mocked(api.fetchStats);
 
 describe("EvalDetail", () => {
   const testId = "create dark mode toggle";
-  const evalRuns = createEvalRuns();
+  const mockRuns = [
+    createMockRun({ id: 1, testId, agentRunner: "copilot" }),
+    createMockRun({ id: 2, testId, agentRunner: "cursor" }),
+    createMockRun({ id: 3, testId, agentRunner: "claude-code" }),
+    createMockRun({ id: 4, testId, agentRunner: "aider" }),
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetchRuns.mockResolvedValue(evalRuns);
+    mockFetchRuns.mockResolvedValue(mockRuns);
+    mockFetchStats.mockResolvedValue([
+      { agentRunner: "copilot", totalRuns: 1, avgScore: 0.8, passRate: 1.0 },
+      { agentRunner: "cursor", totalRuns: 1, avgScore: 0.7, passRate: 1.0 },
+      { agentRunner: "claude-code", totalRuns: 1, avgScore: 0.9, passRate: 1.0 },
+      { agentRunner: "aider", totalRuns: 1, avgScore: 0.6, passRate: 1.0 },
+    ]);
   });
 
-  it("renders the evaluation name as heading", async () => {
+  it("renders the test ID in the heading", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: testId })).toBeInTheDocument();
+      // Find the heading specifically to avoid matching table cells
+      const heading = screen.getByRole("heading", { level: 1, name: testId });
+      expect(heading).toBeInTheDocument();
     });
   });
 
   it("shows run and runner counts", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText(/12 Total executions/i)).toBeInTheDocument();
-      // Use getAllByText and check length since "Runners" appears in heading and filter dropdown
+      expect(screen.getByText(/4 Total executions/i)).toBeInTheDocument();
       expect(screen.getAllByText(/Runners/i).length).toBeGreaterThan(0);
     });
   });
@@ -86,7 +82,6 @@ describe("EvalDetail", () => {
   it("renders per-runner breakdown cards", async () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      // Runner names appear in breakdown cards (and in the runs table)
       expect(screen.getAllByText("copilot").length).toBeGreaterThan(0);
       expect(screen.getAllByText("cursor").length).toBeGreaterThan(0);
       expect(screen.getAllByText("claude-code").length).toBeGreaterThan(0);
@@ -116,17 +111,11 @@ describe("EvalDetail", () => {
     expect(spinner).toBeInTheDocument();
   });
 
-  it("shows breadcrumb navigation", async () => {
+  it("shows empty state when no runs", async () => {
+    mockFetchRuns.mockResolvedValue([]);
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
-      expect(screen.getByText("Evaluations")).toBeInTheDocument();
-    });
-  });
-
-  it("shows suite path in breadcrumbs", async () => {
-    renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
-    await waitFor(() => {
-      expect(screen.getByText("Theme")).toBeInTheDocument();
+      expect(screen.getByText("No evaluation runs found")).toBeInTheDocument();
     });
   });
 

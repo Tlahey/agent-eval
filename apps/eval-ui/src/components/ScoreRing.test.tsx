@@ -57,18 +57,18 @@ describe("ScoreRing", () => {
   it("uses success color for high scores (≥ 0.8)", () => {
     const { container } = render(<ScoreRing value={0.9} />);
     const progressCircle = container.querySelectorAll("circle")[1];
-    expect(progressCircle.getAttribute("stroke")).toBe("hsl(var(--c-ok))");
+    expect(progressCircle.getAttribute("stroke")).toBe("hsl(var(--color-ok))");
   });
 
   it("uses warning color for medium scores (0.6-0.79)", () => {
     const { container } = render(<ScoreRing value={0.65} />);
     const progressCircle = container.querySelectorAll("circle")[1];
-    expect(progressCircle.getAttribute("stroke")).toBe("hsl(var(--c-warn))");
+    expect(progressCircle.getAttribute("stroke")).toBe("hsl(var(--color-warn))");
   });
 
   it("uses danger color for low scores (< 0.6)", () => {
     const { container } = render(<ScoreRing value={0.3} />);
     const progressCircle = container.querySelectorAll("circle")[1];
-    expect(progressCircle.getAttribute("stroke")).toBe("hsl(var(--c-err))");
+    expect(progressCircle.getAttribute("stroke")).toBe("hsl(var(--color-err))");
   });
 });

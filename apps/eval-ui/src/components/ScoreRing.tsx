@@ -13,7 +13,11 @@ export function ScoreRing({ value, size = 64, strokeWidth = 5, className = "", l
 
   // Reconstruct hsl() strings from the raw CSS variables
   const strokeColor =
-    value >= 0.8 ? "hsl(var(--c-ok))" : value >= 0.6 ? "hsl(var(--c-warn))" : "hsl(var(--c-err))";
+    value >= 0.8
+      ? "hsl(var(--color-ok))"
+      : value >= 0.6
+        ? "hsl(var(--color-warn))"
+        : "hsl(var(--color-err))";
   const dimColor =
     value >= 0.8
       ? "rgba(16, 185, 129, 0.15)"

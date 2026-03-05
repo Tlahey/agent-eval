@@ -180,8 +180,8 @@ export function DiffViewer({ diff }: { diff: string | null }) {
   return (
     <div className="flex h-full overflow-hidden bg-surface-1/20">
       {/* Sidebar Tree */}
-      <aside className="w-64 flex-shrink-0 border-r border-slate-800 bg-surface-2/30 flex flex-col overflow-hidden">
-        <div className="p-3 border-b border-slate-800 bg-surface-3/20">
+      <aside className="w-64 flex-shrink-0 border-r border bg-surface-2/30 flex flex-col overflow-hidden">
+        <div className="p-3 border-b border bg-surface-3/20">
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-[9px] font-black uppercase tracking-[0.2em] text-txt-muted">
               Files
@@ -196,7 +196,7 @@ export function DiffViewer({ diff }: { diff: string | null }) {
             <input
               type="text"
               placeholder="Filter..."
-              className="w-full h-7 rounded bg-surface-3 border border-slate-800 pl-7 pr-2 text-[10px] font-bold text-txt-base focus:border-primary/50 focus:outline-none transition-all"
+              className="w-full h-7 rounded bg-surface-3 border pl-7 pr-2 text-[10px] font-bold text-txt-base focus:border-primary/50 focus:outline-none transition-all"
             />
           </div>
         </div>
@@ -218,11 +218,11 @@ export function DiffViewer({ diff }: { diff: string | null }) {
             <div
               key={idx}
               id={`diff-file-${idx}`}
-              className="border-b border-slate-800 last:border-b-0 animate-fade-in"
+              className="border-b border last:border-b-0 animate-fade-in"
             >
               <div
                 onClick={() => toggleCollapse(idx)}
-                className="sticky top-0 z-10 flex items-center justify-between bg-surface-2 px-4 py-2 border-b border-slate-800 shadow-md cursor-pointer group hover:bg-surface-3 transition-colors"
+                className="sticky top-0 z-10 flex items-center justify-between bg-surface-2 px-4 py-2 border-b border shadow-md cursor-pointer group hover:bg-surface-3 transition-colors"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <div
