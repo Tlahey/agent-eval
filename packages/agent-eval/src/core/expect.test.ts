@@ -170,7 +170,7 @@ describe("expect", () => {
 
     await vitestExpect(
       agentExpect(ctx).toPassJudge({ criteria: "must have close button" }),
-    ).rejects.toThrow("Judge evaluation failed");
+    ).rejects.toThrow("Score below threshold");
   });
 
   it("includes score and reason in the thrown error", async () => {

@@ -160,13 +160,14 @@ describe("SqliteLedger", () => {
     expect(override.reason).toBe("Manual correction");
   });
 
-  it("getRunOverrides returns override history", () => {
+  it("getRunOverrides returns latest override", () => {
     ledger.recordRun(makeLedgerEntry({ score: 0.5 }));
     ledger.overrideRunScore(1, 0.8, "First override");
     ledger.overrideRunScore(1, 0.9, "Second override");
 
     const overrides = ledger.getRunOverrides(1);
-    expect(overrides).toHaveLength(2);
+    expect(overrides).toHaveLength(1);
+    expect(overrides[0].score).toBe(0.9);
   });
 
   it("returns empty results for empty ledger", () => {

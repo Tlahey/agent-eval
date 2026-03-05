@@ -1,4 +1,5 @@
 import type { IModelPlugin } from "../../core/interfaces.js";
+import { env } from "../../core/env.js";
 
 export interface AnthropicModelOptions {
   /** Model identifier (default: "claude-sonnet-4-20250514") */
@@ -34,7 +35,7 @@ export class AnthropicModel implements IModelPlugin {
   async createModel(): Promise<unknown> {
     const { createAnthropic } = await import("@ai-sdk/anthropic");
     const provider = createAnthropic({
-      apiKey: this.apiKey ?? process.env.ANTHROPIC_API_KEY,
+      apiKey: this.apiKey ?? env.anthropicApiKey,
       ...(this.baseURL ? { baseURL: this.baseURL } : {}),
     });
     return provider(this.modelId);

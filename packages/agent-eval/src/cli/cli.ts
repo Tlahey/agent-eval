@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import "dotenv/config";
 import { resolve, join, extname } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -268,6 +269,12 @@ program
     }
 
     const ledger = resolveLedger(outputDir, ledgerPlugin);
+
+    // Initialize ledger (plugin or built-in)
+    if (ledgerPlugin) {
+      await ledgerPlugin.initialize();
+    }
+
     const entries = (await ledger.getRuns()) as {
       pass: boolean;
       score: number;
@@ -326,6 +333,11 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
 
   const ledger = resolveLedger(outputDir, ledgerPlugin);
 
+  // Initialize ledger (plugin or built-in)
+  if (ledgerPlugin) {
+    await ledgerPlugin.initialize();
+  }
+
   const port = parseInt(opts.port, 10);
 
   // Resolve the bundled UI static files directory
@@ -334,7 +346,10 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
   const hasUI = existsSync(join(uiDistDir, "index.html"));
 
   console.log(pc.bold("🧪 AgentEval Dashboard\n"));
-  console.log(pc.dim(`  Ledger: ${outputDir}/ledger.sqlite`));
+  console.log(pc.dim(`  Ledger: ${ledger.name}`));
+  if (!ledgerPlugin) {
+    console.log(pc.dim(`  Path:   ${outputDir}/ledger.sqlite`));
+  }
   console.log(pc.dim(`  Port:   ${port}`));
   if (hasUI) {
     console.log(pc.dim(`  UI:     bundled (serving static files)`));
@@ -407,9 +422,6 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
         }
         const result = await ledger.overrideRunScore(runId, body.score, body.reason);
         res.end(JSON.stringify(result));
-      } else if (req.method === "GET" && /^\/api\/runs\/\d+\/overrides$/.test(url.pathname)) {
-        const runId = parseInt(url.pathname.split("/")[3], 10);
-        res.end(JSON.stringify(await ledger.getRunOverrides(runId)));
       } else if (hasUI && !url.pathname.startsWith("/api")) {
         // Serve static UI files (SPA fallback)
         let filePath = join(uiDistDir, url.pathname === "/" ? "index.html" : url.pathname);
@@ -445,10 +457,7 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
     console.log(pc.dim(`    GET   /api/tree           Hierarchical test tree`));
     console.log(pc.dim(`    GET   /api/stats          Aggregate stats per runner`));
     console.log(pc.dim(`    PATCH /api/runs/:id/override  Override a run score`));
-    console.log(pc.dim(`    GET   /api/runs/:id/overrides Override audit trail`));
-    if (hasUI) {
-      console.log(pc.dim(`    GET   /*                  Static UI (SPA)`));
-    }
+
     console.log(pc.dim(`\n  Press Ctrl+C to stop.\n`));
   });
 }

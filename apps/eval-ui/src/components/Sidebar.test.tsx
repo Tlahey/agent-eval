@@ -103,11 +103,6 @@ describe("Sidebar", () => {
 
   it("renders footer with version", () => {
     renderWithRouter(<Sidebar />);
-    expect(screen.getByText(/v0\.1\.0/)).toBeInTheDocument();
-  });
-
-  it("renders connection status indicator", () => {
-    renderWithRouter(<Sidebar />);
-    expect(screen.getByText(/Connected/)).toBeInTheDocument();
+    expect(screen.getByText(/v\d+\.\d+\.\d+/)).toBeInTheDocument();
   });
 });

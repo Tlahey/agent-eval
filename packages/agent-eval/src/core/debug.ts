@@ -37,3 +37,12 @@ export function debug(...args: unknown[]): void {
     console.log("    🔍", ...args);
   }
 }
+
+/**
+ * Mask a token for logging (e.g., "sk-abc...xyz")
+ */
+export function maskToken(token?: string): string {
+  if (!token) return "(empty)";
+  if (token.length < 8) return "***";
+  return `${token.slice(0, 4)}...${token.slice(-4)}`;
+}

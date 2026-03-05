@@ -15,7 +15,7 @@ vi.mock("../lib/api", async () => {
       reason: "test",
       timestamp: "2025-01-01",
     }),
-    fetchOverrides: vi.fn().mockResolvedValue([]),
+    fetchRuns: vi.fn().mockResolvedValue([]),
   };
 });
 
@@ -49,82 +49,46 @@ describe("RunDetailPanel", () => {
     expect(screen.getByText("FAIL")).toBeInTheDocument();
   });
 
-  it("renders all 7 tab buttons", () => {
+  it("renders the active tabs", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-    expect(screen.getByText("Reason")).toBeInTheDocument();
-    expect(screen.getByText("Improve")).toBeInTheDocument();
+    expect(screen.getByText("Summary")).toBeInTheDocument();
     expect(screen.getByText("Diff")).toBeInTheDocument();
-    expect(screen.getByText("Cmds")).toBeInTheDocument();
     expect(screen.getByText("Tasks")).toBeInTheDocument();
     expect(screen.getByText("Metrics")).toBeInTheDocument();
-    expect(screen.getByText("History")).toBeInTheDocument();
   });
 
-  it("defaults to showing the Diff tab content", () => {
+  it("defaults to showing the Summary tab content", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-    // Diff tab is active by default, should see diff content
+    // Summary tab is active by default
+    expect(screen.getByText("Score Reason")).toBeInTheDocument();
+    expect(screen.getByText("How to Improve")).toBeInTheDocument();
+  });
+
+  it("switches to Diff tab on click", async () => {
+    const user = userEvent.setup();
+    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
+
+    await user.click(screen.getByText("Diff"));
     expect(screen.getByText(/changed file/)).toBeInTheDocument();
   });
 
-  it("switches to Reason tab on click", async () => {
-    const user = userEvent.setup();
+  it("shows improvement content in summary tab", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("Reason"));
-    expect(screen.getByText(defaultRun.reason)).toBeInTheDocument();
-  });
-
-  it("switches to Improve tab on click", async () => {
-    const user = userEvent.setup();
-    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("Improve"));
-    expect(screen.getByText("Suggestions")).toBeInTheDocument();
     expect(screen.getByText(defaultRun.improvement)).toBeInTheDocument();
   });
 
-  it("shows placeholder when no improvement available", async () => {
-    const user = userEvent.setup();
-    const run = createMockRun({ improvement: "" });
+  it("shows placeholder when no improvement available", () => {
+    const run = createMockRun({ improvement: "", score: 1.0 });
     render(<RunDetailPanel run={run} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("Improve"));
-    expect(screen.getByText("No improvement suggestions.")).toBeInTheDocument();
+    expect(screen.getByText("Perfect score! No improvements needed.")).toBeInTheDocument();
   });
 
-  it("switches to Commands tab on click", async () => {
-    const user = userEvent.setup();
+  it("shows task count badge on Tasks tab", () => {
     render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("Cmds"));
-    expect(screen.getByText("unit tests")).toBeInTheDocument();
-    expect(screen.getByText("type check")).toBeInTheDocument();
-  });
-
-  it("shows command count badge on Commands tab", () => {
-    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-    const commandsBtn = screen
+    const tasksBtn = screen
       .getAllByRole("button")
-      .find((btn) => btn.textContent?.includes("Cmds"));
-    expect(commandsBtn?.textContent).toContain("2");
-  });
-
-  it("shows command exit code indicators", async () => {
-    const user = userEvent.setup();
-    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("Cmds"));
-    expect(screen.getByText("✓")).toBeInTheDocument(); // exitCode 0
-    expect(screen.getByText("✗")).toBeInTheDocument(); // exitCode 1
-  });
-
-  it("shows no commands placeholder when commands array is empty", async () => {
-    const user = userEvent.setup();
-    const run = createMockRun({ commands: [] });
-    render(<RunDetailPanel run={run} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("Cmds"));
-    expect(screen.getByText("No commands recorded")).toBeInTheDocument();
+      .find((btn) => btn.textContent?.includes("Tasks"));
+    expect(tasksBtn?.textContent).toContain("1");
   });
 
   it("calls onClose when close button is clicked", async () => {
@@ -208,13 +172,5 @@ describe("RunDetailPanel", () => {
 
     await user.click(screen.getByTitle("Override score"));
     expect(screen.getByText("Override Score")).toBeInTheDocument();
-  });
-
-  it("shows no overrides message on History tab", async () => {
-    const user = userEvent.setup();
-    render(<RunDetailPanel run={defaultRun} onClose={vi.fn()} />);
-
-    await user.click(screen.getByText("History"));
-    expect(screen.getByText("No score overrides")).toBeInTheDocument();
   });
 });

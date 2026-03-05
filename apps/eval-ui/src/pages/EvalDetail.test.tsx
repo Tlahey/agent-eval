@@ -68,8 +68,8 @@ describe("EvalDetail", () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
       expect(screen.getByText("Runs")).toBeInTheDocument();
-      expect(screen.getByText("Pass Rate")).toBeInTheDocument();
-      expect(screen.getByText("Failures")).toBeInTheDocument();
+      expect(screen.getByText("Above Threshold")).toBeInTheDocument();
+      expect(screen.getByText("Below Threshold")).toBeInTheDocument();
       expect(screen.getByText("Avg Duration")).toBeInTheDocument();
     });
   });

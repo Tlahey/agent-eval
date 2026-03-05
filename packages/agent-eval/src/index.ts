@@ -135,7 +135,7 @@ export function clearRegisteredTests(): void {
  *   beforeEach(({ ctx }) => {
  *     ctx.addTask({
  *       name: "typecheck",
- *       action: () => ctx.exec("pnpm tsc --noEmit"),
+ *       action: ({ exec }) => exec("pnpm tsc --noEmit"),
  *       criteria: "must pass type checking",
  *     });
  *   });
@@ -285,6 +285,7 @@ export type { PluginValidationError } from "./core/plugin-validator.js";
 // ─── Debug utilities ───
 
 export { setDebug, isDebug, debug } from "./core/debug.js";
+export { env } from "./core/env.js";
 
 // ─── Built-in plugins are NOT re-exported from the main entry. ───
 // Import them from their sub-paths:

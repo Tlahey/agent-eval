@@ -1,4 +1,6 @@
 import type { IModelPlugin, ModelSettings } from "../../core/interfaces.js";
+import { env } from "../../core/env.js";
+import { debug, isDebug, maskToken } from "../../core/debug.js";
 
 export interface GitHubModelsOptions {
   /**
@@ -128,7 +130,7 @@ export class GitHubModelsModel implements IModelPlugin {
   }
 
   private resolveToken(): string {
-    const token = this.token ?? process.env.GH_COPILOT_TOKEN ?? process.env.GITHUB_TOKEN;
+    const token = this.token ?? env.ghCopilotToken;
     if (!token) {
       throw new Error(
         "GitHub Models requires a token. Set GH_COPILOT_TOKEN or GITHUB_TOKEN env var, " +
@@ -141,10 +143,53 @@ export class GitHubModelsModel implements IModelPlugin {
 
   async createModel(): Promise<unknown> {
     const { createOpenAI } = await import("@ai-sdk/openai");
+
+    const token = this.resolveToken();
+
+    if (isDebug()) {
+      debug(`[github-models] Initializing with baseURL: ${this.baseURL}`);
+      debug(`[github-models] Token: ${maskToken(token)}`);
+    }
+
     const provider = createOpenAI({
       baseURL: this.baseURL,
-      apiKey: this.resolveToken(),
+      apiKey: token,
+      fetch: async (url, options) => {
+        if (isDebug()) {
+          debug(`[github-models] fetch: ${options?.method ?? "GET"} ${url}`);
+          // Log headers but mask Authorization
+          const headers = (options?.headers as Record<string, string>) || {};
+          const safeHeaders = { ...headers };
+          if (safeHeaders["Authorization"]) {
+            const val = safeHeaders["Authorization"];
+            safeHeaders["Authorization"] = val.startsWith("Bearer ")
+              ? `Bearer ${maskToken(val.substring(7))}`
+              : maskToken(val);
+          }
+          debug(`[github-models] headers:`, JSON.stringify(safeHeaders));
+        }
+
+        try {
+          const response = await fetch(url, options);
+          if (isDebug()) {
+            debug(`[github-models] response: ${response.status} ${response.statusText}`);
+          }
+          return response;
+        } catch (err: any) {
+          if (isDebug()) {
+            debug(`[github-models] fetch ERROR:`, err.message);
+            if (err.message.includes("local issuer certificate")) {
+              debug(
+                `[github-models] TIP: This SSL error often occurs behind a corporate proxy. ` +
+                  `Try setting NODE_TLS_REJECT_UNAUTHORIZED=0 (insecure) or NODE_EXTRA_CA_CERTS.`,
+              );
+            }
+          }
+          throw err;
+        }
+      },
     });
+
     // Enable structuredOutputs for guaranteed JSON responses
     return provider(this.modelId, { structuredOutputs: true });
   }

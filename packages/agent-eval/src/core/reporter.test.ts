@@ -181,7 +181,7 @@ describe("DefaultReporter", () => {
   it("prints FAIL on onTestFail", () => {
     const reporter = new DefaultReporter();
     reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("FAIL"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("LOW SCORE"));
   });
 
   it("prints ERROR on onTestError", () => {
@@ -205,17 +205,17 @@ describe("DefaultReporter", () => {
     expect(output).toContain("Results");
     expect(output).toContain("Summary");
     expect(output).toContain("1 passed");
-    expect(output).toContain("1 failed");
+    expect(output).toContain("1 below threshold");
     expect(output).toContain("5.0s total");
   });
 
-  it("does not print 'failed' when all pass", () => {
+  it("does not print 'below threshold' when all pass", () => {
     const reporter = new DefaultReporter();
     reporter.onRunEnd([makeResultEvent()], 2000);
 
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("1 passed");
-    expect(output).not.toContain("failed");
+    expect(output).not.toContain("below threshold");
   });
 
   it("prints warning count when WARN entries exist", () => {
@@ -339,7 +339,7 @@ describe("VerboseReporter", () => {
       }),
     );
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
-    expect(output).toContain("FAIL");
+    expect(output).toContain("LOW SCORE");
     expect(output).toContain("Reason:");
     expect(output).toContain("Improve:");
   });
@@ -414,7 +414,7 @@ describe("CIReporter", () => {
     const reporter = new CIReporter();
     reporter.onTestFail(makeResultEvent({ entry: makeLedgerEntry({ score: 0.3 }) }));
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
-    expect(output).toContain("FAIL");
+    expect(output).toContain("BELOW_THRESHOLD");
     expect(output).toContain("reason:");
   });
 
@@ -448,6 +448,8 @@ describe("CIReporter", () => {
       ],
       5000,
     );
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("1 passed, 0 warnings, 1 failed"));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("1 passed, 0 warnings, 1 below threshold"),
+    );
   });
 });

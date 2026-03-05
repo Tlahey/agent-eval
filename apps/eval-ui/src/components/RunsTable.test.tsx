@@ -44,13 +44,13 @@ describe("RunsTable", () => {
   it("shows PASS badge for passing runs", () => {
     const run = createMockRun({ pass: true });
     render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
-    expect(screen.getByText("Pass")).toBeInTheDocument();
+    expect(screen.getByText("Above")).toBeInTheDocument();
   });
 
   it("shows FAIL badge for failing runs", () => {
     const run = createMockRun({ score: 0.3 });
     render(<RunsTable runs={[run]} onSelect={vi.fn()} />);
-    expect(screen.getByText("Fail")).toBeInTheDocument();
+    expect(screen.getByText("Below")).toBeInTheDocument();
   });
 
   it("shows WARN badge for warning runs", () => {

@@ -66,8 +66,8 @@ describe("Runs", () => {
     renderPage(<Runs />, { path: "/runs" });
     await waitFor(() => {
       expect(screen.getByText("All")).toBeInTheDocument();
-      expect(screen.getByText("✓ Pass")).toBeInTheDocument();
-      expect(screen.getByText("✗ Fail")).toBeInTheDocument();
+      expect(screen.getByText("✓ Above")).toBeInTheDocument();
+      expect(screen.getByText("✗ Below")).toBeInTheDocument();
     });
   });
 

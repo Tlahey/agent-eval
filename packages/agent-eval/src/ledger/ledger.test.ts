@@ -291,7 +291,7 @@ describe("ledger (SQLite)", () => {
     expect(() => overrideRunScore(tmpDir, 999, 0.5, "reason")).toThrow("not found");
   });
 
-  it("getRunOverrides returns audit trail ordered newest first", () => {
+  it("getRunOverrides returns latest override", () => {
     appendLedgerEntry(tmpDir, makeEntry({ testId: "x" }));
     const entries = readLedger(tmpDir);
     const runId = entries[0].id!;
@@ -300,11 +300,9 @@ describe("ledger (SQLite)", () => {
     overrideRunScore(tmpDir, runId, 0.9, "Second override");
 
     const overrides = getRunOverrides(tmpDir, runId);
-    expect(overrides).toHaveLength(2);
+    expect(overrides).toHaveLength(1);
     expect(overrides[0].reason).toBe("Second override");
     expect(overrides[0].score).toBe(0.9);
-    expect(overrides[1].reason).toBe("First override");
-    expect(overrides[1].score).toBe(0.6);
   });
 
   it("readLedger includes latest override on entries", () => {

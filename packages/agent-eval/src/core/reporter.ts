@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { env } from "./env.js";
 import type { LedgerEntry } from "./types.js";
 
 // ─── CI Environment Detection ───
@@ -8,17 +9,7 @@ import type { LedgerEntry } from "./types.js";
  * Checks common CI env vars and TTY status.
  */
 export function isCI(): boolean {
-  return !!(
-    process.env.CI ||
-    process.env.GITHUB_ACTIONS ||
-    process.env.GITLAB_CI ||
-    process.env.JENKINS_URL ||
-    process.env.CIRCLECI ||
-    process.env.BUILDKITE ||
-    process.env.TF_BUILD ||
-    process.env.CODEBUILD_BUILD_ID ||
-    !process.stdout.isTTY
-  );
+  return env.isCI || !process.stdout.isTTY;
 }
 
 // ─── Pipeline Step Types ───
@@ -302,7 +293,7 @@ export class DefaultReporter implements Reporter {
   onTestFail(event: TestResultEvent): void {
     const score = pc.yellow(event.entry.score.toFixed(2));
     const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    console.log(`  ${pc.red("✗ FAIL")} ${score} ${dur}`);
+    console.log(`  ${pc.red("✗ LOW SCORE")} ${score} ${dur} (below threshold)`);
   }
 
   onTestError(_event: TestEvent, error: string): void {
@@ -412,7 +403,7 @@ export class VerboseReporter implements Reporter {
   onTestFail(event: TestResultEvent): void {
     const score = pc.yellow(event.entry.score.toFixed(2));
     const dur = pc.dim(`${(event.durationMs / 1000).toFixed(1)}s`);
-    console.log(`  ${pc.red("✗ FAIL")} ${score} ${dur}`);
+    console.log(`  ${pc.red("✗ LOW SCORE")} ${score} ${dur} (below threshold)`);
     if (event.entry.reason) {
       console.log(pc.dim(`    Reason: ${truncate(event.entry.reason, 120)}`));
     }
@@ -481,7 +472,7 @@ export class CIReporter implements Reporter {
 
   onTestFail(event: TestResultEvent): void {
     console.log(
-      `  FAIL score=${event.entry.score.toFixed(2)} ${(event.durationMs / 1000).toFixed(1)}s`,
+      `  BELOW_THRESHOLD score=${event.entry.score.toFixed(2)} ${(event.durationMs / 1000).toFixed(1)}s`,
     );
     if (event.entry.reason) {
       console.log(`  reason: ${truncate(event.entry.reason, 200)}`);
@@ -495,9 +486,9 @@ export class CIReporter implements Reporter {
   onRunEnd(results: TestResultEvent[], durationMs: number): void {
     const passed = results.filter((r) => r.entry.status === "PASS").length;
     const warned = results.filter((r) => r.entry.status === "WARN").length;
-    const failed = results.filter((r) => r.entry.status === "FAIL").length;
+    const lowScore = results.filter((r) => r.entry.status === "FAIL").length;
     console.log(
-      `\nSummary: ${passed} passed, ${warned} warnings, ${failed} failed (${(durationMs / 1000).toFixed(1)}s)`,
+      `\nSummary: ${passed} passed, ${warned} warnings, ${lowScore} below threshold (${(durationMs / 1000).toFixed(1)}s)`,
     );
   }
 }
@@ -515,10 +506,10 @@ function printSummaryTable(results: TestResultEvent[]): void {
     pad("Test", testCol) +
     pad("Runner", runnerCol) +
     pad("Score", 8) +
-    pad("Status", 8) +
+    pad("Result", 12) +
     pad("Duration", 10);
 
-  const sep = pc.dim("  " + "─".repeat(testCol + runnerCol + 8 + 8 + 10));
+  const sep = pc.dim("  " + "─".repeat(testCol + runnerCol + 8 + 12 + 10));
 
   console.log(pc.bold("\n─── Results ───\n"));
   console.log(hdr);
@@ -528,9 +519,9 @@ function printSummaryTable(results: TestResultEvent[]): void {
     const statusMap = {
       PASS: pc.green("PASS"),
       WARN: pc.yellow("WARN"),
-      FAIL: pc.red("FAIL"),
+      FAIL: pc.red("LOW SCORE"),
     };
-    const status = statusMap[r.entry.status] ?? pc.red("FAIL");
+    const status = statusMap[r.entry.status] ?? pc.red("LOW SCORE");
     const score = pc.yellow(r.entry.score.toFixed(2));
     const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
 
@@ -539,7 +530,7 @@ function printSummaryTable(results: TestResultEvent[]): void {
         pad(r.testId, testCol) +
         pad(r.runner, runnerCol) +
         pad(score, 8) +
-        pad(status, 8) +
+        pad(status, 12) +
         pad(dur, 10),
     );
   }
@@ -548,15 +539,15 @@ function printSummaryTable(results: TestResultEvent[]): void {
 function printSummaryFooter(results: TestResultEvent[], durationMs: number): void {
   const passed = results.filter((r) => r.entry.status === "PASS").length;
   const warned = results.filter((r) => r.entry.status === "WARN").length;
-  const failed = results.filter((r) => r.entry.status === "FAIL").length;
+  const lowScore = results.filter((r) => r.entry.status === "FAIL").length;
 
   console.log(pc.bold("\n─── Summary ───"));
   console.log(pc.green(`  ✓ ${passed} passed`));
   if (warned > 0) {
     console.log(pc.yellow(`  ⚠ ${warned} warnings`));
   }
-  if (failed > 0) {
-    console.log(pc.red(`  ✗ ${failed} failed`));
+  if (lowScore > 0) {
+    console.log(pc.red(`  ✗ ${lowScore} below threshold`));
   }
   console.log(pc.dim(`  ⏱ ${(durationMs / 1000).toFixed(1)}s total\n`));
 }

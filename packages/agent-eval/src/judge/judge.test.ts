@@ -121,7 +121,7 @@ describe("judge", () => {
     // Verify the prompt contains the criteria and context
     const callArgs = vi.mocked(generateObject).mock.calls[0][0];
     expect(callArgs.prompt).toContain("has close button");
-    expect(callArgs.prompt).toContain("Diff");
+    expect(callArgs.prompt).toContain("Code Changes");
   });
 
   it("resolves model from IModelPlugin", async () => {
@@ -153,7 +153,7 @@ describe("judge", () => {
     expect(result.pass).toBe(false);
 
     const callArgs = vi.mocked(generateObject).mock.calls[0][0];
-    expect(callArgs.prompt).toContain("(no logs captured)");
+    expect(callArgs.prompt).toContain("(no business logic changes captured)");
   });
 
   it("throws when judge has no llm plugin", async () => {
@@ -216,10 +216,14 @@ describe("judge", () => {
       vi.mocked(execSync).mockReturnValue(JSON.stringify(judgeResult));
 
       const config: JudgeConfig = { model: createCliJudgeModel() };
-      const { result } = await judge(createMockContext(), "evaluate this", config);
+      const mockCtx = createMockContext({ cwd: "/mock/cwd" });
+      const { result } = await judge(mockCtx, "evaluate this", config);
 
       expect(result).toEqual(judgeResult);
       expect(execSync).toHaveBeenCalledOnce();
+      expect(vi.mocked(execSync).mock.calls[0][1]).toEqual(
+        expect.objectContaining({ cwd: "/mock/cwd" }),
+      );
       expect(generateObject).not.toHaveBeenCalled();
     });
 
@@ -229,7 +233,8 @@ describe("judge", () => {
       );
 
       const config: JudgeConfig = { model: createCliJudgeModel() };
-      await judge(createMockContext(), "my test prompt", config);
+      const mockCtx = createMockContext({ cwd: "/tmp/judge-test" });
+      await judge(mockCtx, "my test prompt", config);
 
       const calledCmd = vi.mocked(execSync).mock.calls[0][0] as string;
       expect(calledCmd).toContain("$(cat ");
@@ -251,7 +256,8 @@ describe("judge", () => {
       const config: JudgeConfig = {
         model: createCliJudgeModel({ parseOutput }),
       };
-      const { result } = await judge(createMockContext(), "prompt", config);
+      const mockCtx = createMockContext({ cwd: "/tmp/parse" });
+      const { result } = await judge(mockCtx, "prompt", config);
 
       expect(parseOutput).toHaveBeenCalledOnce();
       expect(result.score).toBe(0.8);
@@ -261,8 +267,9 @@ describe("judge", () => {
       vi.mocked(execSync).mockReturnValue("not valid json");
 
       const config: JudgeConfig = { model: createCliJudgeModel(), maxRetries: 0 };
+      const mockCtx = createMockContext({ cwd: "/tmp/invalid" });
 
-      await expect(judge(createMockContext(), "prompt", config)).rejects.toThrow(
+      await expect(judge(mockCtx, "prompt", config)).rejects.toThrow(
         "CLI judge output is not valid JSON",
       );
     });
@@ -271,8 +278,9 @@ describe("judge", () => {
       vi.mocked(execSync).mockReturnValue(JSON.stringify({ foo: "bar" }));
 
       const config: JudgeConfig = { model: createCliJudgeModel(), maxRetries: 0 };
+      const mockCtx = createMockContext({ cwd: "/tmp/missing" });
 
-      await expect(judge(createMockContext(), "prompt", config)).rejects.toThrow(
+      await expect(judge(mockCtx, "prompt", config)).rejects.toThrow(
         "CLI judge JSON missing required fields",
       );
     });
@@ -287,7 +295,8 @@ describe("judge", () => {
         );
 
       const config: JudgeConfig = { model: createCliJudgeModel(), maxRetries: 1 };
-      const { result } = await judge(createMockContext(), "prompt", config);
+      const mockCtx = createMockContext({ cwd: "/tmp/retry" });
+      const { result } = await judge(mockCtx, "prompt", config);
 
       expect(result.score).toBe(0.7);
       expect(execSync).toHaveBeenCalledTimes(2);
@@ -299,7 +308,8 @@ describe("judge", () => {
       );
 
       const config: JudgeConfig = { model: createCliJudgeModel() };
-      const { result } = await judge(createMockContext(), "prompt", config);
+      const mockCtx = createMockContext({ cwd: "/tmp/default-pass" });
+      const { result } = await judge(mockCtx, "prompt", config);
 
       expect(result.pass).toBe(false); // 0.3 < 0.5
       expect(result.score).toBe(0.3);
@@ -365,8 +375,10 @@ describe("buildJudgePrompt - expectedFiles", () => {
       expectedFiles: ["src/Banner.tsx"],
     });
 
-    expect(prompt).toContain("Unexpected file changes");
-    expect(prompt).toContain("package.json");
+    expect(prompt).toContain("**Actually changed:** src/Banner.tsx");
+    expect(prompt).toContain(
+      "Unexpected file changes are acceptable ONLY if they are directly necessary",
+    );
   });
 
   it("shows no warnings when all expected files match", () => {

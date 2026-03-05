@@ -1,4 +1,5 @@
 import type { IModelPlugin } from "../../core/interfaces.js";
+import { env } from "../../core/env.js";
 
 export interface OpenAIModelOptions {
   /** Model identifier (default: "gpt-4o") */
@@ -34,7 +35,7 @@ export class OpenAIModel implements IModelPlugin {
   async createModel(): Promise<unknown> {
     const { createOpenAI } = await import("@ai-sdk/openai");
     const provider = createOpenAI({
-      apiKey: this.apiKey ?? process.env.OPENAI_API_KEY,
+      apiKey: this.apiKey ?? env.openaiApiKey,
       ...(this.baseURL ? { baseURL: this.baseURL } : {}),
     });
     return provider(this.modelId);

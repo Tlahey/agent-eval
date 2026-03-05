@@ -53,6 +53,7 @@ vi.mock("../judge/judge.js", () => ({
   })),
   buildJudgePrompt: vi.fn(() => "mock judge prompt"),
   extractChangedFiles: vi.fn(() => []),
+  filterDiff: vi.fn((diff) => diff),
 }));
 
 // Mock the index module for hook registration
