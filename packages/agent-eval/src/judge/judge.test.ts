@@ -65,10 +65,10 @@ function createMockExecution(overrides: Partial<ExecutionData> = {}): ExecutionD
 
 function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
   return {
+    cwd: "/mock/cwd",
     storeDiff: vi.fn(),
     runCommand: vi.fn(),
     addTask: vi.fn(),
-    exec: vi.fn(),
     diff: "diff --git a/test.ts b/test.ts\n+const x = 1;",
     commands: [
       {

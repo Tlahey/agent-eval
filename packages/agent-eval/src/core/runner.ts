@@ -19,6 +19,7 @@ import type {
   TaskDefinition,
   TaskResult,
   TestDefinition,
+  TestContext,
   TimingData,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
@@ -362,7 +363,8 @@ export async function dryRunTest(
   };
 
   // Create a mock context to capture tasks
-  const mockCtx = {
+  const mockCtx: TestContext = {
+    cwd: config.rootDir ?? process.cwd(),
     storeDiff: () => {},
     runCommand: async () => ({
       name: "",
@@ -375,14 +377,6 @@ export async function dryRunTest(
     addTask: (task: TaskDefinition) => {
       tasks.push({ name: task.name, criteria: task.criteria, weight: task.weight ?? 1 });
     },
-    exec: async () => ({
-      name: "",
-      command: "",
-      stdout: "",
-      stderr: "",
-      exitCode: 0,
-      durationMs: 0,
-    }),
     get diff() {
       return null;
     },

@@ -351,6 +351,8 @@ export interface TaskDefinition {
 }
 
 export interface TestContext {
+  /** The working directory of the project */
+  readonly cwd: string;
   /** Store the current git diff into context */
   storeDiff(): void;
   /**
@@ -359,6 +361,11 @@ export interface TestContext {
    * Each task's criteria and result are sent to the judge for evaluation.
    */
   addTask(task: TaskDefinition): void;
+  /**
+   * Internal/expert-only: run a command manually and record it in the context.
+   * Prefer using addTask() for declarative execution.
+   */
+  runCommand(name: string, command: string): Promise<CommandResult>;
   /** Get the stored git diff */
   readonly diff: string | null;
   /** Get all stored command results */

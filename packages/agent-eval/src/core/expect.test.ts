@@ -26,10 +26,10 @@ import { judge as mockJudge } from "../judge/judge.js";
 
 function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
   return {
+    cwd: "/mock/cwd",
     storeDiff: vi.fn(),
     runCommand: vi.fn(),
     addTask: vi.fn(),
-    exec: vi.fn(),
     diff: "diff --git a/test.ts",
     commands: [],
     tasks: [],
