@@ -10,10 +10,13 @@ import {
   FilterX,
   PlusSquare,
   MinusSquare,
+  Activity,
+  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { type TestTreeNode } from "../../lib/api";
+import { getRunnerColor } from "../../components/RunsTable";
 
 export function Explorer() {
   const {
@@ -274,7 +277,7 @@ function RecursiveTreeNode({
   return (
     <Link
       to={`/evals/${encodeURIComponent(node.testId ?? node.name)}`}
-      className="group flex items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all relative"
+      className="group flex flex-col lg:flex-row lg:items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all relative"
       style={{ paddingLeft: `${depth * 24 + 43}px` }}
     >
       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -291,14 +294,16 @@ function RecursiveTreeNode({
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {metrics && (
-              <span className="text-[9px] font-black text-primary uppercase">
-                Rank #{metrics.rank}
-              </span>
+              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
+                <Activity size={10} />
+                {metrics.runCount} runs
+              </div>
             )}
 
             {metrics && (
               <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
-                {metrics.runCount} runs • {metrics.agentCount} agents
+                <Users size={10} />
+                {metrics.agentCount} agents
               </div>
             )}
 
@@ -306,7 +311,7 @@ function RecursiveTreeNode({
               {node.tags?.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[8px] font-black text-primary uppercase tracking-widest px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5"
+                  className="text-[8px] font-black text-primary uppercase tracking-widest px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10"
                 >
                   {tag}
                 </span>
@@ -317,14 +322,23 @@ function RecursiveTreeNode({
       </div>
 
       {metrics && (
-        <div className="flex items-center gap-3 pr-4 shrink-0">
+        <div className="flex items-center gap-2 pr-4 shrink-0">
           {metrics.topRunners.map((runner, i) => (
             <div
               key={i}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-3/50 text-[9px] font-black uppercase text-txt-secondary border"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-lg border bg-surface-3/50 group-hover:bg-surface-3 transition-colors border-line/10"
             >
-              <span>{runner.name}</span>
-              <span className="text-primary opacity-80">{(runner.avgScore * 100).toFixed(0)}%</span>
+              <div
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: getRunnerColor(runner.name) }}
+              />
+              <span className="text-[9px] font-black text-primary opacity-60">#{i + 1}</span>
+              <span className="text-[9px] font-black uppercase text-txt-secondary tracking-tighter">
+                {runner.name}
+              </span>
+              <span className="text-[9px] font-black tabular-nums text-txt-base">
+                {(runner.avgScore * 100).toFixed(0)}%
+              </span>
             </div>
           ))}
         </div>

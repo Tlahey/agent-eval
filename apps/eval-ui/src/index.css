@@ -139,6 +139,28 @@
   --glow-primary: 205 82% 43% / 0.1;
 }
 
+[data-theme="terra"] {
+  --color-surface-0: 45 30% 96%; /* Creamy Beige */
+  --color-surface-1: 45 20% 92%;
+  --color-surface-2: 45 20% 88%;
+  --color-surface-3: 45 20% 84%;
+  --color-surface-4: 45 20% 80%;
+  --color-primary: 113 39% 25%; /* Forest Green */
+  --color-accent: 16 59% 41%; /* Terra Cotta */
+  --color-ok: 142 71% 35%;
+  --color-warn: 38 92% 40%;
+  --color-err: 0 70% 45%;
+  --color-txt-base: 0 0% 15%;
+  --color-txt-secondary: 0 0% 25%;
+  --color-txt-muted: 0 0% 45%;
+  --color-txt-on-primary: 45 30% 96%;
+  --color-line: 113 39% 25% / 0.15;
+  --color-scheme: light;
+  --glass-bg: hsl(45 30% 96% / 0.8);
+  --glass-border: hsl(113 39% 25% / 0.1);
+  --glow-primary: 113 39% 25% / 0.1;
+}
+
 /* ─── Base Styles ─── */
 
 @layer base {

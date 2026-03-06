@@ -25,7 +25,8 @@ type Theme =
   | "light"
   | "high-contrast"
   | "solarized-light"
-  | "cyber-neon";
+  | "cyber-neon"
+  | "terra";
 
 const THEMES: { id: Theme; label: string; colors: string[] }[] = [
   { id: "nebula", label: "Nebula Midnight", colors: ["#BD93F9", "#FF79C6"] },
@@ -35,6 +36,7 @@ const THEMES: { id: Theme; label: string; colors: string[] }[] = [
   { id: "high-contrast", label: "High Contrast", colors: ["#FFFF00", "#00FFFF"] },
   { id: "solarized-light", label: "Solarized Light", colors: ["#fdf6e3", "#268bd2"] },
   { id: "cyber-neon", label: "Cyber Neon", colors: ["#A855F7", "#06B6D4"] },
+  { id: "terra", label: "Terra Earth", colors: ["#2D5A27", "#A64B2A"] },
 ];
 
 export function Sidebar() {
@@ -66,14 +68,14 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="text-base font-bold text-txt-base tracking-tight">AgentEval</h1>
-            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-txt-muted">
-              Framework
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary opacity-80">
+              v0.1.0
             </p>
           </div>
         </div>
 
         {/* Main Nav */}
-        <nav className="flex flex-col gap-1 px-3">
+        <nav className="space-y-1 px-3">
           <span className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-txt-muted/60">
             Main
           </span>
@@ -106,56 +108,59 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Footer & Theme Selector */}
-        <div className="mt-auto border-t border/50 px-4 py-4 bg-surface-2/30 relative">
-          <div className="flex items-center justify-between gap-2">
+        {/* Bottom Actions */}
+        <div className="mt-auto border-t bg-surface-2/30 p-3">
+          <div className="relative">
             <button
               onClick={() => setShowThemeMenu(!showThemeMenu)}
-              className="flex flex-1 items-center gap-2 px-3 py-2 rounded-xl border bg-surface-1 hover:bg-surface-3 transition-colors text-txt-secondary hover:text-txt-base text-xs font-bold"
+              className="flex w-full items-center justify-between rounded-xl border bg-surface-1/50 px-4 py-2.5 text-xs font-bold text-txt-secondary transition-all hover:border-primary/30 hover:bg-surface-1"
             >
-              <Palette size={14} className="text-primary" />
-              <span className="truncate">{THEMES.find((t) => t.id === currentTheme)?.label}</span>
-            </button>
-            <span className="text-[10px] font-bold text-txt-muted tracking-wider uppercase opacity-50 pr-1">
-              v0.1.0
-            </span>
-          </div>
-
-          {showThemeMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowThemeMenu(false)} />
-              <div className="absolute bottom-full left-4 right-4 mb-2 z-20 overflow-hidden rounded-2xl border bg-surface-2 p-1.5 shadow-2xl animate-slide-up">
-                {THEMES.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setCurrentTheme(t.id);
-                      setShowThemeMenu(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-all ${
-                      currentTheme === t.id
-                        ? "bg-primary text-txt-onprimary shadow-lg shadow-primary/20"
-                        : "text-txt-secondary hover:bg-surface-3 hover:text-txt-base"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex -space-x-1">
-                        {t.colors.map((c, i) => (
-                          <div
-                            key={i}
-                            className="h-3 w-3 rounded-full border border-line/20"
-                            style={{ backgroundColor: c }}
-                          />
-                        ))}
-                      </div>
-                      {t.label}
-                    </div>
-                    {currentTheme === t.id && <Check size={14} />}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2.5">
+                <Palette size={16} className="text-primary" />
+                <span className="capitalize">{currentTheme.replace("-", " ")}</span>
               </div>
-            </>
-          )}
+              <ChevronRight
+                size={14}
+                className={`text-txt-muted transition-transform ${showThemeMenu ? "-rotate-90" : "rotate-90"}`}
+              />
+            </button>
+
+            {showThemeMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowThemeMenu(false)} />
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-full origin-bottom rounded-2xl border bg-surface-1 p-1.5 shadow-2xl animate-scale-in">
+                  {THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setCurrentTheme(t.id);
+                        setShowThemeMenu(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-all ${
+                        currentTheme === t.id
+                          ? "bg-primary text-txt-onprimary shadow-lg shadow-primary/20"
+                          : "text-txt-secondary hover:bg-surface-3 hover:text-txt-base"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex -space-x-1">
+                          {t.colors.map((c, i) => (
+                            <div
+                              key={i}
+                              className="h-3 w-3 rounded-full border border-line/20"
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                        {t.label}
+                      </div>
+                      {currentTheme === t.id && <Check size={14} />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </aside>
@@ -170,13 +175,19 @@ function EvalTree({ currentPath }: { currentPath: string }) {
   }, []);
 
   if (tree.length === 0) {
-    return <p className="px-3 py-2 text-xs text-txt-muted italic">No evaluations yet</p>;
+    return (
+      <div className="px-4 py-8 text-center">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-txt-muted/40">
+          No evaluations yet
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="space-y-1 py-2">
       {tree.map((node, i) => (
-        <TreeNode key={`${node.name}-${i}`} node={node} currentPath={currentPath} depth={0} />
+        <TreeNode key={i} node={node} currentPath={currentPath} />
       ))}
     </div>
   );
@@ -185,17 +196,18 @@ function EvalTree({ currentPath }: { currentPath: string }) {
 function TreeNode({
   node,
   currentPath,
-  depth,
+  depth = 0,
 }: {
   node: TestTreeNode;
   currentPath: string;
-  depth: number;
+  depth?: number;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const isTest = node.type === "test";
+  const to = `/evals/${encodeURIComponent(node.testId ?? node.name)}`;
+  const isActive = currentPath === to;
 
-  if (node.type === "test") {
-    const to = `/evals/${encodeURIComponent(node.testId ?? node.name)}`;
-    const isActive = currentPath === to;
+  if (isTest) {
     return (
       <NavLink
         to={to}
@@ -227,7 +239,7 @@ function TreeNode({
       >
         <ChevronRight
           size={12}
-          className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`shrink-0 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
         />
         <Folder size={13} className="shrink-0" />
         <span className="truncate flex-1 text-left min-w-0">{node.name}</span>

@@ -12,7 +12,6 @@ export interface TestMetrics {
   runCount: number;
   agentCount: number;
   avgScore: number;
-  rank?: number;
 }
 
 export function useExplorer() {
@@ -46,12 +45,10 @@ export function useExplorer() {
     };
   }, []);
 
-  // Compute metrics and ranking
+  // Compute metrics for each testId
   const metricsMap = useMemo(() => {
     const map = new Map<string, TestMetrics>();
     const testIds = [...new Set(allRuns.map((r) => r.testId))];
-
-    const results: { testId: string; avgScore: number }[] = [];
 
     for (const id of testIds) {
       const testRuns = allRuns.filter((r) => r.testId === id);
@@ -70,7 +67,6 @@ export function useExplorer() {
       }
 
       const avgScore = totalTestScore / testRuns.length;
-      results.push({ testId: id, avgScore });
 
       const topRunners = Array.from(runnerStats.entries())
         .map(([name, s]) => ({ name, avgScore: s.total / s.count }))
@@ -84,13 +80,6 @@ export function useExplorer() {
         agentCount: runnerStats.size,
       });
     }
-
-    // Assign ranks based on avgScore
-    results.sort((a, b) => b.avgScore - a.avgScore);
-    results.forEach((res, index) => {
-      const m = map.get(res.testId);
-      if (m) m.rank = index + 1;
-    });
 
     return map;
   }, [allRuns]);

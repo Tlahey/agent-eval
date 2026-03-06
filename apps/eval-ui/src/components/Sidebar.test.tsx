@@ -53,22 +53,20 @@ describe("Sidebar", () => {
     mockFetchTestTree.mockResolvedValue(createMockTree());
     renderWithRouter(<Sidebar />);
 
-    await waitFor(() => {
-      expect(screen.getByText("UI Components")).toBeInTheDocument();
-      expect(screen.getByText("Banner")).toBeInTheDocument();
-      expect(screen.getByText("add close button to Banner")).toBeInTheDocument();
-      expect(screen.getByText("refactor API service layer")).toBeInTheDocument();
-    });
+    // Top level suite
+    expect(await screen.findByText("UI Components")).toBeInTheDocument();
+
+    // Expand it to see tests
+    await userEvent.click(screen.getByText("UI Components"));
+    expect(await screen.findByText("Banner")).toBeInTheDocument();
   });
 
   it("renders test links with correct href", async () => {
     mockFetchTestTree.mockResolvedValue([{ name: "my test", type: "test", testId: "my test" }]);
     renderWithRouter(<Sidebar />);
 
-    await waitFor(() => {
-      const link = screen.getByText("my test").closest("a");
-      expect(link).toHaveAttribute("href", "/evals/my%20test");
-    });
+    const link = await screen.findByText("my test");
+    expect(link.closest("a")).toHaveAttribute("href", "/evals/my%20test");
   });
 
   it("collapses and expands suite nodes on click", async () => {
@@ -82,17 +80,19 @@ describe("Sidebar", () => {
     ]);
     renderWithRouter(<Sidebar />);
 
+    // Initially collapsed
     await waitFor(() => {
-      expect(screen.getByText("nested test")).toBeInTheDocument();
+      expect(screen.getByText("Suite")).toBeInTheDocument();
     });
-
-    // Click to collapse
-    await user.click(screen.getByText("Suite"));
     expect(screen.queryByText("nested test")).not.toBeInTheDocument();
 
     // Click to expand
     await user.click(screen.getByText("Suite"));
-    expect(screen.getByText("nested test")).toBeInTheDocument();
+    expect(await screen.findByText("nested test")).toBeInTheDocument();
+
+    // Click to collapse
+    await user.click(screen.getByText("Suite"));
+    expect(screen.queryByText("nested test")).not.toBeInTheDocument();
   });
 
   it("shows empty state while evals have not loaded yet", () => {
@@ -109,20 +109,21 @@ describe("Sidebar", () => {
   describe("Theme Selection", () => {
     it("shows the current theme label in the button", () => {
       renderWithRouter(<Sidebar />);
-      // Default theme is Nebula Midnight
-      expect(screen.getByText(/Nebula Midnight/i)).toBeInTheDocument();
+      // Button shows the theme ID capitalized/formatted
+      expect(screen.getByText(/nebula/i)).toBeInTheDocument();
     });
 
     it("opens the theme menu on click", async () => {
       const user = userEvent.setup();
       renderWithRouter(<Sidebar />);
 
-      const themeBtn = screen.getByRole("button", { name: /Nebula Midnight/i });
+      const themeBtn = screen.getByRole("button", { name: /nebula/i });
       await user.click(themeBtn);
 
       expect(screen.getByText("Pure Light")).toBeInTheDocument();
       expect(screen.getByText("High Contrast")).toBeInTheDocument();
       expect(screen.getByText("Solarized Light")).toBeInTheDocument();
+      expect(screen.getByText("Terra Earth")).toBeInTheDocument();
       expect(screen.getByText("Nord Frost")).toBeInTheDocument();
     });
 
@@ -132,7 +133,7 @@ describe("Sidebar", () => {
 
       renderWithRouter(<Sidebar />);
 
-      const themeBtn = screen.getByRole("button", { name: /Nebula Midnight/i });
+      const themeBtn = screen.getByRole("button", { name: /nebula/i });
       await user.click(themeBtn);
 
       const highContrastBtn = screen.getByText("High Contrast");
@@ -140,7 +141,7 @@ describe("Sidebar", () => {
 
       expect(document.documentElement.getAttribute("data-theme")).toBe("high-contrast");
       expect(setItemSpy).toHaveBeenCalledWith("agent-eval-theme", "high-contrast");
-      expect(screen.getByText(/High Contrast/i)).toBeInTheDocument();
+      expect(screen.getByText(/high contrast/i)).toBeInTheDocument();
     });
   });
 });
