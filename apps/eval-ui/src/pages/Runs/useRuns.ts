@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { useOutletContext, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { fetchRuns, fetchTestIds, type LedgerRun } from "../../lib/api";
-import type { AppContext } from "../../App";
+import { useRunSelection } from "../../lib/contexts/RunContext";
 
 export type SortField = "timestamp" | "score" | "durationMs";
 export type SortDir = "asc" | "desc";
@@ -9,7 +9,7 @@ export type SortDir = "asc" | "desc";
 export const ITEMS_PER_PAGE = 20;
 
 export function useRuns() {
-  const { setSelectedRun } = useOutletContext<AppContext>();
+  const { setSelectedRun } = useRunSelection();
   const [searchParams, setSearchParams] = useSearchParams();
   const [runs, setRuns] = useState<LedgerRun[]>([]);
   const [testIds, setTestIds] = useState<string[]>([]);

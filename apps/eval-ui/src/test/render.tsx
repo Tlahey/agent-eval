@@ -1,7 +1,6 @@
 import { render, type RenderOptions } from "@testing-library/react";
-import { MemoryRouter, Outlet, Route, Routes, type MemoryRouterProps } from "react-router-dom";
-import { useState, type ReactElement } from "react";
-import type { LedgerRun } from "../lib/api";
+import { MemoryRouter, Route, Routes, type MemoryRouterProps } from "react-router-dom";
+import { type ReactElement } from "react";
 
 interface WrapperOptions extends RenderOptions {
   routerProps?: MemoryRouterProps;
@@ -19,9 +18,10 @@ export function renderWithRouter(ui: ReactElement, options: WrapperOptions = {})
   return render(ui, { wrapper: Wrapper, ...renderOptions });
 }
 
+import { RunProvider } from "../lib/contexts/RunContext";
+
 /**
- * Render a page component inside an outlet that provides AppContext.
- * Useful for pages that call useOutletContext<AppContext>().
+ * Render a page component inside providers.
  */
 export function renderPage(
   pageElement: ReactElement,
@@ -29,20 +29,15 @@ export function renderPage(
 ) {
   const { routerProps, path = "/", ...renderOptions } = options;
 
-  function LayoutWithContext() {
-    const [selectedRun, setSelectedRun] = useState<LedgerRun | null>(null);
-    return <Outlet context={{ selectedRun, setSelectedRun }} />;
-  }
-
   return render(
     <MemoryRouter initialEntries={[path]} {...routerProps}>
-      <Routes>
-        <Route element={<LayoutWithContext />}>
+      <RunProvider>
+        <Routes>
           <Route path={path} element={pageElement} />
           {/* Catch-all for dynamic paths */}
           <Route path="/evals/:testId" element={pageElement} />
-        </Route>
-      </Routes>
+        </Routes>
+      </RunProvider>
     </MemoryRouter>,
     renderOptions,
   );

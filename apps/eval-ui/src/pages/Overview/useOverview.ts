@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { useOutletContext } from "react-router-dom";
 import { fetchRuns, type LedgerRun, type RunnerStats } from "../../lib/api";
-import type { AppContext } from "../../App";
+import { useRunSelection } from "../../lib/contexts/RunContext";
 
 export type TimeRange = "24h" | "7d" | "30d" | "90d" | "all";
 
@@ -14,7 +13,7 @@ export const TIME_RANGES: { label: string; value: TimeRange }[] = [
 ];
 
 export function useOverview() {
-  const { setSelectedRun } = useOutletContext<AppContext>();
+  const { setSelectedRun } = useRunSelection();
   const [allRuns, setAllRuns] = useState<LedgerRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");

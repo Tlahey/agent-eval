@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useOutletContext, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { fetchRuns, type LedgerRun } from "../../lib/api";
-import type { AppContext } from "../../App";
+import { useRunSelection } from "../../lib/contexts/RunContext";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -11,7 +11,7 @@ type SortDir = "asc" | "desc";
 export function useEvalDetail() {
   const { testId: rawTestId } = useParams<{ testId: string }>();
   const testId = decodeURIComponent(rawTestId ?? "");
-  const { setSelectedRun } = useOutletContext<AppContext>();
+  const { setSelectedRun } = useRunSelection();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [allRuns, setAllRuns] = useState<LedgerRun[]>([]);
