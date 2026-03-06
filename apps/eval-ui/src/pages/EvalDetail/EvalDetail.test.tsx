@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
-import { renderPage } from "../test/render";
+import { renderPage } from "../../test/render";
 import { EvalDetail } from "./EvalDetail";
-import { createMockRun } from "../test/fixtures";
-import * as api from "../lib/api";
+import { createMockRun } from "../../test/fixtures";
+import * as api from "../../lib/api";
 
 // Recharts ResponsiveContainer needs ResizeObserver in the test environment
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -12,8 +12,8 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }));
 
-vi.mock("../lib/api", async () => {
-  const actual = await vi.importActual("../lib/api");
+vi.mock("../../lib/api", async () => {
+  const actual = await vi.importActual("../../lib/api");
   return {
     ...actual,
     fetchRuns: vi.fn(),
