@@ -7,6 +7,8 @@ export function useExplorer() {
   const [loading, setLoading] = useState(true);
   const [tagFilter, setTagFilter] = useState<string>("");
   const [search, setSearch] = useState<string>("");
+  const [forceExpand, setForceExpand] = useState<boolean | null>(null);
+  const [treeKey, setTreeKey] = useState(0);
 
   useEffect(() => {
     Promise.all([fetchTestTree(), fetchTags()])
@@ -23,14 +25,12 @@ export function useExplorer() {
     if (!search && !tagFilter) return tree;
 
     const filterNode = (node: TestTreeNode): TestTreeNode | null => {
-      // If it's a test, check if it matches
       if (node.type === "test") {
         const matchesSearch = !search || node.name.toLowerCase().includes(search.toLowerCase());
         const matchesTag = !tagFilter || (node.tags && node.tags.includes(tagFilter));
         return matchesSearch && matchesTag ? node : null;
       }
 
-      // If it's a suite, filter children
       if (node.children) {
         const filteredChildren = node.children
           .map(filterNode)
@@ -47,6 +47,16 @@ export function useExplorer() {
     return tree.map(filterNode).filter((n): n is TestTreeNode => n !== null);
   }, [tree, search, tagFilter]);
 
+  const expandAll = () => {
+    setForceExpand(true);
+    setTreeKey((k) => k + 1);
+  };
+
+  const collapseAll = () => {
+    setForceExpand(false);
+    setTreeKey((k) => k + 1);
+  };
+
   return {
     loading,
     tree: filteredTree,
@@ -55,5 +65,9 @@ export function useExplorer() {
     setTagFilter,
     search,
     setSearch,
+    expandAll,
+    collapseAll,
+    forceExpand,
+    treeKey,
   };
 }

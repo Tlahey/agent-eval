@@ -8,13 +8,27 @@ import {
   BarChart3,
   ArrowRight,
   FilterX,
+  PlusSquare,
+  MinusSquare,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { type TestTreeNode } from "../../lib/api";
 
 export function Explorer() {
-  const { loading, tree, tags, tagFilter, setTagFilter, search, setSearch } = useExplorer();
+  const {
+    loading,
+    tree,
+    tags,
+    tagFilter,
+    setTagFilter,
+    search,
+    setSearch,
+    expandAll,
+    collapseAll,
+    forceExpand,
+    treeKey,
+  } = useExplorer();
 
   if (loading) {
     return (
@@ -32,7 +46,7 @@ export function Explorer() {
         <div>
           <h1 className="text-3xl font-black text-txt-base tracking-tight mb-1">Evaluations</h1>
           <p className="text-sm text-txt-muted font-bold uppercase tracking-wider">
-            Explore your test hierarchy and analyze results
+            Repository Explorer & Result Analysis
           </p>
         </div>
 
@@ -119,9 +133,30 @@ export function Explorer() {
         <div className="lg:col-span-3">
           <div className="rounded-3xl border bg-surface-1/40 backdrop-blur-sm shadow-2xl shadow-black/5 overflow-hidden">
             <div className="bg-surface-2/50 border-b px-8 py-4 flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
-                Test Repository Explorer
-              </span>
+              <div className="flex items-center gap-4">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
+                  Test Repository
+                </span>
+                <div className="h-4 w-px bg-line/10" />
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={expandAll}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-surface-3 text-[10px] font-bold text-txt-muted hover:text-primary transition-all"
+                    title="Expand all folders"
+                  >
+                    <PlusSquare size={14} />
+                    Expand
+                  </button>
+                  <button
+                    onClick={collapseAll}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-surface-3 text-[10px] font-bold text-txt-muted hover:text-primary transition-all"
+                    title="Collapse all folders"
+                  >
+                    <MinusSquare size={14} />
+                    Collapse
+                  </button>
+                </div>
+              </div>
               {hasFilters && (
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 uppercase">
@@ -131,11 +166,16 @@ export function Explorer() {
               )}
             </div>
 
-            <div className="p-4">
+            <div className="p-2" key={treeKey}>
               {tree.length > 0 ? (
-                <div className="divide-y divide-line/5">
+                <div className="py-2">
                   {tree.map((node, i) => (
-                    <RecursiveTreeNode key={i} node={node} depth={0} defaultExpanded={hasFilters} />
+                    <RecursiveTreeNode
+                      key={i}
+                      node={node}
+                      depth={0}
+                      defaultExpanded={hasFilters || forceExpand === true}
+                    />
                   ))}
                 </div>
               ) : (
@@ -176,42 +216,41 @@ function RecursiveTreeNode({
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Auto-expand when filters are active to show results
+  // Use a local variable to determine the actual expanded state
   const expanded = defaultExpanded || isExpanded;
 
   if (node.type === "suite") {
     return (
       <div className="select-none">
         <div
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="group flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-surface-2/50 cursor-pointer transition-colors"
+          onClick={() => setIsExpanded(!expanded)}
+          className="group flex items-center gap-3 py-2 px-4 rounded-lg hover:bg-surface-2/50 cursor-pointer transition-colors"
           style={{ paddingLeft: `${depth * 24 + 16}px` }}
         >
-          <div
-            className={`p-1.5 rounded-lg transition-colors ${expanded ? "bg-primary/10 text-primary" : "bg-surface-3 text-txt-muted group-hover:text-txt-base"}`}
-          >
-            <Folder size={16} />
-          </div>
+          <ChevronRight
+            size={14}
+            className={`text-txt-muted shrink-0 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
+          />
+          <Folder
+            size={16}
+            className={`shrink-0 transition-colors ${expanded ? "text-primary" : "text-txt-muted group-hover:text-txt-base"}`}
+          />
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-bold text-txt-base uppercase tracking-tight truncate">
+            <h4 className="text-xs font-bold text-txt-base uppercase tracking-tight truncate">
               {node.name}
             </h4>
-            <p className="text-[10px] font-medium text-txt-muted uppercase tracking-wider">
-              {node.children?.length ?? 0} items
-            </p>
           </div>
-          <ChevronRight
-            size={16}
-            className={`text-txt-muted transition-transform duration-300 ${expanded ? "rotate-90" : ""}`}
-          />
+          <span className="text-[9px] font-black text-txt-muted/40 uppercase tracking-widest bg-surface-3/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+            {node.children?.length ?? 0} items
+          </span>
         </div>
 
         {expanded && node.children && (
           <div className="relative">
-            {/* Thread line */}
+            {/* Hierarchy vertical line */}
             <div
-              className="absolute left-0 top-0 bottom-0 w-px bg-line/10"
-              style={{ marginLeft: `${depth * 24 + 27}px` }}
+              className="absolute left-0 top-0 bottom-0 w-px bg-line/10 group-hover:bg-line/20 transition-colors"
+              style={{ marginLeft: `${depth * 24 + 23}px` }}
             />
             {node.children.map((child, i) => (
               <RecursiveTreeNode
@@ -230,19 +269,21 @@ function RecursiveTreeNode({
   return (
     <Link
       to={`/evals/${encodeURIComponent(node.testId ?? node.name)}`}
-      className="group flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-surface-2 transition-colors"
-      style={{ paddingLeft: `${depth * 24 + 16}px` }}
+      className="group flex items-center gap-3 py-2 px-4 rounded-lg hover:bg-surface-2 transition-colors"
+      style={{ paddingLeft: `${depth * 24 + 43}px` }}
     >
-      <div className="p-1.5 rounded-lg bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white transition-all">
-        <FlaskConical size={16} />
-      </div>
+      <FlaskConical
+        size={14}
+        className="shrink-0 text-accent group-hover:scale-110 transition-transform"
+      />
       <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-bold text-txt-base uppercase tracking-tight truncate group-hover:text-accent transition-colors">
+        <h4 className="text-xs font-bold text-txt-base uppercase tracking-tight truncate group-hover:text-accent transition-colors">
           {node.name}
         </h4>
-        <div className="flex flex-wrap gap-1.5 mt-1">
-          {node.tags && node.tags.length > 0 ? (
-            node.tags.map((tag) => (
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {node.tags && node.tags.length > 0
+          ? node.tags.map((tag) => (
               <span
                 key={tag}
                 className="text-[8px] font-black text-txt-muted/60 uppercase tracking-widest px-1.5 py-0.5 rounded-md border border-line/10 bg-surface-2 group-hover:border-accent/20 transition-colors"
@@ -250,15 +291,10 @@ function RecursiveTreeNode({
                 {tag}
               </span>
             ))
-          ) : (
-            <span className="text-[8px] font-bold text-txt-muted/30 uppercase tracking-widest">
-              No tags
-            </span>
-          )}
-        </div>
+          : null}
       </div>
-      <div className="opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-        <ArrowRight size={16} className="text-accent" />
+      <div className="opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 ml-2">
+        <ArrowRight size={14} className="text-accent" />
       </div>
     </Link>
   );
