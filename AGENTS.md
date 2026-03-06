@@ -678,7 +678,7 @@ The `agenteval ui` CLI command serves a bundled copy of the React dashboard:
 
 ```bash
 # Build everything with UI bundled into the CLI package
-pnpm build:all    # builds eval-ui → builds agent-eval → copies UI dist to agent-eval/dist/ui
+pnpm build    # builds eval-ui → builds agent-eval → copies UI dist to agent-eval/dist/ui
 
 # For development, run the UI dev server separately
 pnpm dev:ui   # Vite dev server on :5173, proxies API to :4747

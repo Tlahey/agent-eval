@@ -41,13 +41,8 @@ jobs:
         run: pnpm test
         working-directory: apps/eval-ui
 
-      - name: Build core package
+      - name: Build
         run: pnpm build
-        working-directory: packages/agent-eval
-
-      - name: Build eval-ui
-        run: pnpm run build
-        working-directory: apps/eval-ui
 
       - name: Check types
         run: pnpm exec tsc --noEmit
