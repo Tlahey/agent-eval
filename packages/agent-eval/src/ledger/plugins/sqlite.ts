@@ -12,6 +12,7 @@ import {
   readLedger,
   readLedgerByTestId,
   getTestIds as _getTestIds,
+  getTags as _getTags,
   getTestTree as _getTestTree,
   getLatestEntries as _getLatestEntries,
   getRunnerStats as _getRunnerStats,
@@ -53,6 +54,10 @@ export class SqliteLedger implements ILedgerPlugin {
 
   getTestIds(): string[] {
     return _getTestIds(this.outputDir);
+  }
+
+  getTags(): string[] {
+    return _getTags(this.outputDir);
   }
 
   getTestTree(): TestTreeNode[] {

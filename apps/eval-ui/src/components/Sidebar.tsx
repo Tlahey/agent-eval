@@ -14,6 +14,7 @@ import { fetchTestTree, type TestTreeNode } from "../lib/api";
 
 const NAV = [
   { to: "/", icon: LayoutDashboard, label: "Overview", end: true },
+  { to: "/evaluations", icon: FlaskConical, label: "Evaluations", end: false },
   { to: "/runs", icon: ListChecks, label: "All Runs", end: false },
 ] as const;
 
@@ -87,7 +88,7 @@ export function Sidebar() {
         {/* Evals section */}
         <div className="mt-8 flex flex-1 flex-col overflow-hidden px-3">
           <span className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-txt-muted/60">
-            Evaluations
+            Tree View
           </span>
           <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
             <EvalTree currentPath={location.pathname} />

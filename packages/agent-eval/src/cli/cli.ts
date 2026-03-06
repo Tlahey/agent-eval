@@ -24,6 +24,7 @@ import {
   readLedger,
   readLedgerByTestId,
   getTestIds,
+  getTags,
   getTestTree,
   getRunnerStats,
   getAllRunnerStats,
@@ -50,6 +51,7 @@ function resolveLedger(
   name: string;
   getRuns: (testId?: string) => Promise<unknown[]> | unknown[];
   getTestIds: () => Promise<string[]> | string[];
+  getTags: () => Promise<string[]> | string[];
   getTestTree: () => Promise<unknown[]> | unknown[];
   getStats: (testId?: string) => Promise<unknown> | unknown;
   overrideRunScore: (runId: number, score: number, reason: string) => Promise<unknown> | unknown;
@@ -60,6 +62,7 @@ function resolveLedger(
       name: plugin.name,
       getRuns: (testId) => plugin.getRuns(testId),
       getTestIds: () => plugin.getTestIds(),
+      getTags: () => plugin.getTags(),
       getTestTree: () => plugin.getTestTree(),
       getStats: (testId) => plugin.getStats(testId),
       overrideRunScore: (runId, score, reason) => plugin.overrideRunScore(runId, score, reason),
@@ -70,6 +73,7 @@ function resolveLedger(
     name: "sqlite (built-in)",
     getRuns: (testId) => (testId ? readLedgerByTestId(outputDir, testId) : readLedger(outputDir)),
     getTestIds: () => getTestIds(outputDir),
+    getTags: () => getTags(outputDir),
     getTestTree: () => getTestTree(outputDir),
     getStats: (testId) =>
       testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir),
@@ -405,6 +409,8 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
         res.end(JSON.stringify(entries));
       } else if (url.pathname === "/api/tests") {
         res.end(JSON.stringify(await ledger.getTestIds()));
+      } else if (url.pathname === "/api/tags") {
+        res.end(JSON.stringify(await ledger.getTags()));
       } else if (url.pathname === "/api/tree") {
         res.end(JSON.stringify(await ledger.getTestTree()));
       } else if (url.pathname === "/api/stats") {
@@ -454,6 +460,7 @@ async function launchDashboard(opts: UiOptions): Promise<void> {
     console.log(pc.dim(`\n  Endpoints:`));
     console.log(pc.dim(`    GET   /api/runs           All runs (or ?testId=...)`));
     console.log(pc.dim(`    GET   /api/tests          List of test IDs`));
+    console.log(pc.dim(`    GET   /api/tags           List of unique tags`));
     console.log(pc.dim(`    GET   /api/tree           Hierarchical test tree`));
     console.log(pc.dim(`    GET   /api/stats          Aggregate stats per runner`));
     console.log(pc.dim(`    PATCH /api/runs/:id/override  Override a run score`));

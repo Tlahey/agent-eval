@@ -49,6 +49,7 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
       status              TEXT    NOT NULL DEFAULT 'FAIL',
       reason              TEXT    NOT NULL,
       improvement         TEXT    NOT NULL DEFAULT '',
+      tags                TEXT    NOT NULL DEFAULT '[]',
       judge_token_usage   TEXT,
       criteria            TEXT    NOT NULL DEFAULT '',
       expected_files      TEXT,
@@ -63,7 +64,7 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
 
   // ─── Simple Migrations ───
   // Ensure new columns exist for existing databases
-  const columns = ["improvement", "task_results", "override", "suite_path", "instruction"];
+  const columns = ["improvement", "task_results", "override", "suite_path", "instruction", "tags"];
   for (const col of columns) {
     try {
       db.exec(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
@@ -98,6 +99,7 @@ interface RunRow {
   status: string;
   reason: string;
   improvement: string;
+  tags: string;
   judge_token_usage: string | null;
   criteria: string;
   expected_files: string | null;
@@ -159,6 +161,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
     status,
     reason: row.reason,
     improvement: row.improvement ?? "",
+    tags: safeJsonParse<string[]>(row.tags, []),
     judgeTokenUsage,
     criteria: row.criteria ?? "",
     expectedFiles,
@@ -189,11 +192,11 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
         test_id, suite_path, timestamp, agent_runner, instruction,
         diff, changed_files, commands, task_results,
         agent_token_usage, timing, agent_output, logs,
-        judge_model, score, pass, status, reason, improvement,
+        judge_model, score, pass, status, reason, improvement, tags,
         judge_token_usage, criteria, expected_files,
         warn_threshold, fail_threshold, duration_ms, override
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
@@ -215,6 +218,7 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.status,
       entry.reason,
       entry.improvement,
+      JSON.stringify(entry.tags ?? []),
       entry.judgeTokenUsage ? JSON.stringify(entry.judgeTokenUsage) : null,
       entry.criteria ?? "",
       entry.expectedFiles ? JSON.stringify(entry.expectedFiles) : null,
@@ -273,11 +277,32 @@ export function getTestIds(outputDir: string): string[] {
   }
 }
 
+/**
+ * Get unique tags from the ledger.
+ */
+export function getTags(outputDir: string): string[] {
+  const db = openDb(outputDir);
+  try {
+    const rows = db.prepare("SELECT DISTINCT tags FROM runs").all() as unknown as Array<{
+      tags: string;
+    }>;
+    const allTags = new Set<string>();
+    for (const row of rows) {
+      const tags = safeJsonParse<string[]>(row.tags, []);
+      tags.forEach((t) => allTags.add(t));
+    }
+    return Array.from(allTags).sort();
+  } finally {
+    db.close();
+  }
+}
+
 /** A tree node representing a suite or test in the hierarchy */
 export interface TestTreeNode {
   name: string;
   type: "suite" | "test";
   testId?: string;
+  tags?: string[];
   children?: TestTreeNode[];
 }
 
@@ -289,22 +314,25 @@ export function getTestTree(outputDir: string): TestTreeNode[] {
   const db = openDb(outputDir);
   try {
     const rows = db
-      .prepare("SELECT DISTINCT test_id, suite_path FROM runs ORDER BY test_id")
-      .all() as unknown as Array<{ test_id: string; suite_path: string }>;
+      .prepare("SELECT DISTINCT test_id, suite_path, tags FROM runs ORDER BY test_id")
+      .all() as unknown as Array<{ test_id: string; suite_path: string; tags: string }>;
 
     const root: TestTreeNode[] = [];
 
     for (const row of rows) {
       let suitePath: string[];
+      let tags: string[];
       try {
         suitePath = JSON.parse(row.suite_path) as string[];
+        tags = JSON.parse(row.tags) as string[];
       } catch {
         suitePath = [];
+        tags = [];
       }
 
       if (suitePath.length === 0) {
         // Top-level test (no suite)
-        root.push({ name: row.test_id, type: "test", testId: row.test_id });
+        root.push({ name: row.test_id, type: "test", testId: row.test_id, tags });
         continue;
       }
 
@@ -319,7 +347,7 @@ export function getTestTree(outputDir: string): TestTreeNode[] {
         if (!suiteNode.children) suiteNode.children = [];
         current = suiteNode.children;
       }
-      current.push({ name: row.test_id, type: "test", testId: row.test_id });
+      current.push({ name: row.test_id, type: "test", testId: row.test_id, tags });
     }
 
     return root;

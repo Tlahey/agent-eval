@@ -95,11 +95,18 @@ export async function fetchTestIds(): Promise<string[]> {
   return res.json();
 }
 
+export async function fetchTags(): Promise<string[]> {
+  const res = await fetch(`${BASE}/tags`);
+  if (!res.ok) throw new Error(`Failed to fetch tags: ${res.statusText}`);
+  return res.json();
+}
+
 /** A tree node representing a suite or test in the hierarchy */
 export interface TestTreeNode {
   name: string;
   type: "suite" | "test";
   testId?: string;
+  tags?: string[];
   children?: TestTreeNode[];
 }
 

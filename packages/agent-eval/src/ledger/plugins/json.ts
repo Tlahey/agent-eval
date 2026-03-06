@@ -61,6 +61,17 @@ export class JsonLedger implements ILedgerPlugin {
     return [...new Set(this.readAllRuns().map((r) => r.testId))].sort();
   }
 
+  getTags(): string[] {
+    const runs = this.readAllRuns();
+    const allTags = new Set<string>();
+    for (const run of runs) {
+      if (run.tags) {
+        run.tags.forEach((t) => allTags.add(t));
+      }
+    }
+    return Array.from(allTags).sort();
+  }
+
   getTestTree(): TestTreeNode[] {
     const runs = this.readAllRuns();
     const seen = new Map<string, string[]>();

@@ -286,6 +286,9 @@ export interface ILedgerPlugin {
   /** Get unique test IDs */
   getTestIds(): string[] | Promise<string[]>;
 
+  /** Get unique tags */
+  getTags(): string[] | Promise<string[]>;
+
   /** Get hierarchical test tree */
   getTestTree(): TestTreeNode[] | Promise<TestTreeNode[]>;
 

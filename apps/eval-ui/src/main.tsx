@@ -5,6 +5,7 @@ import { App } from "./App";
 import { Overview } from "./pages/Overview/Overview";
 import { Runs } from "./pages/Runs/Runs";
 import { EvalDetail } from "./pages/EvalDetail/EvalDetail";
+import { Explorer } from "./pages/Explorer/Explorer";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
@@ -12,8 +13,9 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route element={<App />}>
-          <Route index element={<Overview />} />
+          <Route path="/" element={<Overview />} />
           <Route path="runs" element={<Runs />} />
+          <Route path="evaluations" element={<Explorer />} />
           <Route path="evals/:testId" element={<EvalDetail />} />
         </Route>
       </Routes>

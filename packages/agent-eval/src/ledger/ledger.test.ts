@@ -7,6 +7,7 @@ import {
   readLedger,
   readLedgerByTestId,
   getTestIds,
+  getTags,
   getTestTree,
   getLatestEntries,
   getRunnerStats,
@@ -221,9 +222,22 @@ describe("ledger (SQLite)", () => {
 
     const tree = getTestTree(tmpDir);
     expect(tree).toEqual([
-      { name: "test-a", type: "test", testId: "test-a" },
-      { name: "test-b", type: "test", testId: "test-b" },
+      { name: "test-a", type: "test", testId: "test-a", tags: [] },
+      { name: "test-b", type: "test", testId: "test-b", tags: [] },
     ]);
+  });
+
+  it("getTags returns unique tags sorted alphabetically", () => {
+    const run1 = makeEntry({ testId: "t1" });
+    run1.tags = ["ui", "fast"];
+    const run2 = makeEntry({ testId: "t2" });
+    run2.tags = ["api", "ui"];
+
+    appendLedgerEntry(tmpDir, run1);
+    appendLedgerEntry(tmpDir, run2);
+
+    const tags = getTags(tmpDir);
+    expect(tags).toEqual(["api", "fast", "ui"]);
   });
 
   it("getTestTree builds hierarchical structure from suitePaths", () => {

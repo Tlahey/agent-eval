@@ -414,6 +414,8 @@ export interface LedgerEntry {
   id?: number;
   /** Unique test identifier */
   testId: string;
+  /** Optional tags for filtering */
+  tags?: string[];
   /** Suite path from nested describe() blocks (e.g., ["UI Components", "Banner"]) */
   suitePath: string[];
   /** ISO timestamp */

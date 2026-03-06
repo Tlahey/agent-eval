@@ -575,6 +575,7 @@ export async function runTest(
           testId: testDef.title,
           suitePath: testDef.suitePath ?? [],
           timestamp: new Date().toISOString(),
+          tags: testDef.tags ?? [],
           agentRunner: runner.name,
           instruction: ctx.instruction || undefined,
           diff: ctx.diff,
@@ -610,6 +611,7 @@ export async function runTest(
           testId: testDef.title,
           suitePath: testDef.suitePath ?? [],
           timestamp: new Date().toISOString(),
+          tags: testDef.tags ?? [],
           agentRunner: runner.name,
           instruction: ctx.instruction || undefined,
           diff: ctx.diff,
@@ -774,6 +776,7 @@ async function executeDeclarativePipeline(
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
+    tags: testDef.tags ?? [],
     // Execution data
     agentRunner: runner.name,
     instruction,
@@ -830,6 +833,7 @@ function buildImperativeEntry(
     testId: testDef.title,
     suitePath: testDef.suitePath ?? [],
     timestamp: new Date().toISOString(),
+    tags: testDef.tags ?? [],
     // Execution data
     agentRunner: runner.name,
     instruction: ctx.instruction,
