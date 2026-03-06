@@ -100,17 +100,10 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 ### Dashboard (`apps/eval-ui`)
 
 - Tests use **Vitest + React Testing Library** (colocated next to source)
-- Components: `DiffViewer.test.tsx`, `Sidebar.test.tsx`, `RunDetailPanel.test.tsx`
-- Pages: `Overview.test.tsx`, `Runs.test.tsx`, `EvalDetail.test.tsx`
-- API: `api.test.ts`
-- Use `renderPage()` from `src/test/render.tsx` for page components (provides `useOutletContext`)
-- Mock `fetch` via `vi.fn()` — never make real API calls
-- Mock `ResponsiveContainer` from Recharts (jsdom can't measure SVG)
-- **128 tests** covering all components, pages, and API functions
-
-::: tip CSS text-transform gotcha
-CSS `text-transform: uppercase` changes visual appearance but **not** DOM `textContent`. Test against the original source text (e.g., "Navigation" not "NAVIGATION").
-:::
+- **Design Standards**: STRICTLY FORBIDDEN to use hardcoded Tailwind color classes (e.g., `text-white`, `bg-zinc-800`). You **must** use semantic theme variables (e.g., `text-txt-onprimary`, `text-primary`, `bg-surface-1`). This ensures compatibility with all 9 themes.
+- **Translucency**: Use `.glass-card` for translucent, theme-aware panels.
+- **Responsiveness**: Always use `flex-wrap` and grid adjustments for small screens.
+- **Testing**: Mock `fetch` via `vi.fn()`, mock `ResponsiveContainer` from Recharts.
 
 ## Local Development
 
@@ -126,16 +119,14 @@ pnpm build        # Build with tsup
 
 ```bash
 cd apps/eval-ui
-npx tsx src/seed.ts  # Generate seed data
 pnpm dev             # Start dev server
 pnpm test            # Run component tests
 ```
 
-### Documentation
+### Building the whole project
 
 ```bash
-cd apps/docs
-pnpm dev          # Start VitePress dev server
+pnpm build           # Builds both Framework and UI + bundles them
 ```
 
 ## Global Install (for testing locally)

@@ -164,7 +164,7 @@ Every run records:
 - Token usage (prompt + completion) and timing data
 - Task results (tests, builds, linters)
 
-This gives you a **complete history** to track improvements over time, compare agents, and identify regressions.
+This gives you a **complete history** to track improvements over time, compare agents, and identify regressions via a **visual dashboard** featuring 9 custom themes and a hierarchical tree-view explorer.
 
 ## How It All Fits Together
 

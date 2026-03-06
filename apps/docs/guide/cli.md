@@ -246,16 +246,15 @@ agenteval ledger --json > results.json
 agenteval ledger -o ./my-results
 ```
 
-## `agenteval ui` / `agenteval view`
+## `agenteval ui`
 
 Launch the evaluation dashboard. Starts a local server that serves both the bundled React dashboard and a JSON API reading the SQLite ledger.
 
-When the UI is bundled (production/npm install), the dashboard is served at the root URL. In development mode (UI not bundled), only the API endpoints are available — run the eval-ui dev server separately.
-
 ```bash
 agenteval ui [options]
-agenteval view [options]   # alias
 ```
+
+**Shorthand:** `agenteval view` is an alias for `agenteval ui`.
 
 ### Options
 
@@ -263,6 +262,20 @@ agenteval view [options]   # alias
 | -------------------- | -------------------------------- |
 | `-p, --port <port>`  | Port to serve on (default: 4747) |
 | `-o, --output <dir>` | Override ledger directory        |
+
+### Development & Build
+
+To build the entire project (Framework + UI):
+
+```bash
+pnpm build
+```
+
+Then launch the production UI:
+
+```bash
+agenteval ui
+```
 
 ### API Endpoints
 
