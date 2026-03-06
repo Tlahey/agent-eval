@@ -9,7 +9,7 @@
     "build:ui": "pnpm --filter eval-ui build",
     "build:agent-eval": "pnpm --filter agent-eval build",
     "bundle-ui": "rm -rf packages/agent-eval/dist/ui && mkdir -p packages/agent-eval/dist/ui && cp -r apps/eval-ui/dist/* packages/agent-eval/dist/ui/",
-    "sync-assets": "cp README.md packages/agent-eval/README.md && cp -r assets packages/agent-eval/ && mkdir -p packages/agent-eval/dist && cp README.md packages/agent-eval/dist/README.md && cp -r assets packages/agent-eval/dist/",
+    "sync-assets": "cp README.md packages/agent-eval/README.md && mkdir -p packages/agent-eval/dist && cp README.md packages/agent-eval/dist/README.md",
     "dev:docs": "pnpm --filter docs dev",
     "dev:ui": "pnpm --filter eval-ui dev",
     "ui": "node packages/agent-eval/dist/cli.js ui",

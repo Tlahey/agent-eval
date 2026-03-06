@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="AgentEval" width="200" />
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/logo.png" alt="AgentEval" width="200" />
 </p>
 
 <h1 align="center">AgentEval</h1>
@@ -22,22 +22,22 @@
 ## Dashboard
 
 <p align="center">
-  <img src="assets/screenshots/overview.png" alt="Overview — KPIs, score trends, and resource telemetry" width="100%" />
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/overview.png" alt="Overview — KPIs, score trends, and resource telemetry" width="100%" />
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/eval-detail.png" alt="Explorer — hierarchical tree view with top agent rankings" width="100%" />
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/eval-detail.png" alt="Explorer — hierarchical tree view with top agent rankings" width="100%" />
 </p>
 
 <details>
 <summary>More screenshots</summary>
 
 <p align="center">
-  <img src="assets/screenshots/all-runs.png" alt="All Runs — filterable execution ledger" width="100%" />
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/all-runs.png" alt="All Runs — filterable execution ledger" width="100%" />
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/run-detail.png" alt="Run Detail — diff viewer, judge reasoning, and metrics" width="100%" />
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/run-detail.png" alt="Run Detail — diff viewer, judge reasoning, and metrics" width="100%" />
 </p>
 
 </details>
