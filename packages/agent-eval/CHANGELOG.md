@@ -1,5 +1,11 @@
 # @tlahey/agent-eval
 
+## 0.1.2-alpha
+
+### Patch Changes
+
+- Maintenance release 0.1.2-alpha. Included LICENSE file in the package and refined the asset synchronization process to ensure all documentation is correctly bundled in the dist folder.
+
 ## 0.1.1-alpha
 
 ### Patch Changes
