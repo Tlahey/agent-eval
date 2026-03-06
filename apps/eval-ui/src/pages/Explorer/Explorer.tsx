@@ -11,12 +11,11 @@ import {
   PlusSquare,
   MinusSquare,
   Activity,
-  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { type TestTreeNode } from "../../lib/api";
-import { getRunnerColor } from "../../components/RunsTable";
+import { ScoreRing } from "../../components/ScoreRing";
 
 export function Explorer() {
   const {
@@ -273,18 +272,20 @@ function RecursiveTreeNode({
   }
 
   const metrics = node.testId ? metricsMap.get(node.testId) : null;
+  const bestAgent = metrics?.topRunners[0];
 
   return (
     <Link
       to={`/evals/${encodeURIComponent(node.testId ?? node.name)}`}
-      className="group flex flex-col lg:flex-row lg:items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all relative"
+      className="group flex items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all relative border border-transparent hover:border-line/10"
       style={{ paddingLeft: `${depth * 24 + 43}px` }}
     >
+      {/* Left: Icon & Info */}
       <div className="flex items-start gap-3 flex-1 min-w-0">
-        <div className="mt-1">
+        <div className="mt-1 shrink-0">
           <FlaskConical
             size={14}
-            className="shrink-0 text-accent group-hover:scale-110 transition-transform"
+            className="text-accent group-hover:scale-110 transition-transform"
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -292,18 +293,11 @@ function RecursiveTreeNode({
             {node.name}
           </h4>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {metrics && (
-              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
-                <Activity size={10} />
-                {metrics.runCount} runs
-              </div>
-            )}
-
-            {metrics && (
-              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
-                <Users size={10} />
-                {metrics.agentCount} agents
+              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase whitespace-nowrap">
+                <Activity size={10} className="text-primary/60" />
+                {metrics.runCount} runs • {metrics.agentCount} agents
               </div>
             )}
 
@@ -321,34 +315,30 @@ function RecursiveTreeNode({
         </div>
       </div>
 
-      {metrics && (
-        <div className="flex items-center gap-2 pr-4 shrink-0">
-          {metrics.topRunners.map((runner, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-lg border bg-surface-3/50 group-hover:bg-surface-3 transition-colors border-line/10"
-            >
-              <div
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: getRunnerColor(runner.name) }}
-              />
-              <span className="text-[9px] font-black text-primary opacity-60">#{i + 1}</span>
-              <span className="text-[9px] font-black uppercase text-txt-secondary tracking-tighter">
-                {runner.name}
+      {/* Right: Top Agent WoW Effect */}
+      <div className="flex items-center gap-6 shrink-0 pr-2">
+        {bestAgent && (
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end">
+              <span className="text-[8px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1">
+                Top Agent #1
               </span>
-              <span className="text-[9px] font-black tabular-nums text-txt-base">
-                {(runner.avgScore * 100).toFixed(0)}%
+              <span className="text-[10px] font-black uppercase text-txt-base tracking-tighter">
+                {bestAgent.name}
               </span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="h-10 w-10">
+              <ScoreRing value={bestAgent.avgScore} size={40} strokeWidth={4} />
+            </div>
+          </div>
+        )}
 
-      <div className="w-6 flex items-center justify-center shrink-0">
-        <ArrowRight
-          size={14}
-          className="text-accent opacity-0 group-hover:opacity-100 transition-opacity"
-        />
+        <div className="w-6 flex items-center justify-center">
+          <ArrowRight
+            size={16}
+            className="text-accent opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1"
+          />
+        </div>
       </div>
     </Link>
   );

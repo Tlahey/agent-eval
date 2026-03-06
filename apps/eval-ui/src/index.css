@@ -294,17 +294,11 @@
 }
 /* GitHub-like green for additions */
 .diff-add {
-  background-color: hsla(142, 71%, 45%, 0.15) !important;
-}
-.diff-add .diff-code {
-  color: hsl(var(--color-ok)) !important;
+  background-color: hsla(142, 71%, 45%, 0.2) !important;
 }
 /* GitHub-like red for deletions */
 .diff-del {
-  background-color: hsla(0, 84%, 60%, 0.15) !important;
-}
-.diff-del .diff-code {
-  color: hsl(var(--color-err)) !important;
+  background-color: hsla(0, 84%, 60%, 0.2) !important;
 }
 .diff-hunk {
   background-color: hsl(var(--color-primary) / 0.15);
