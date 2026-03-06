@@ -566,7 +566,7 @@ function buildTrendData(runs: LedgerRun[]) {
     runners.get(run.agentRunner)!.push(run.score);
   }
   return Array.from(grouped.entries()).map(([date, runners]) => {
-    const point: any = { date };
+    const point: Record<string, string | number> = { date };
     for (const [runner, scores] of runners) {
       point[runner] = +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3);
     }
@@ -583,7 +583,7 @@ function buildRadarData(runs: LedgerRun[]) {
   ];
 
   return metrics.map((m) => {
-    const row: any = { subject: m.label };
+    const row: Record<string, string | number> = { subject: m.label };
     runners.forEach((r) => {
       const rRuns = runs.filter((x) => x.agentRunner === r);
       let val = 0;

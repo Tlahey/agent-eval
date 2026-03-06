@@ -2,6 +2,7 @@
   "name": "agent-eval-monorepo",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "AgentEval – AI coding agent evaluation framework",
   "scripts": {
     "build": "pnpm --filter agent-eval build",

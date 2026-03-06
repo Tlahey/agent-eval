@@ -175,10 +175,11 @@ export class GitHubModelsModel implements IModelPlugin {
             debug(`[github-models] response: ${response.status} ${response.statusText}`);
           }
           return response;
-        } catch (err: any) {
+        } catch (err: unknown) {
           if (isDebug()) {
-            debug(`[github-models] fetch ERROR:`, err.message);
-            if (err.message.includes("local issuer certificate")) {
+            const message = err instanceof Error ? err.message : String(err);
+            debug(`[github-models] fetch ERROR:`, message);
+            if (message.includes("local issuer certificate")) {
               debug(
                 `[github-models] TIP: This SSL error often occurs behind a corporate proxy. ` +
                   `Try setting NODE_TLS_REJECT_UNAUTHORIZED=0 (insecure) or NODE_EXTRA_CA_CERTS.`,
