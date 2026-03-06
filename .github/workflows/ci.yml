@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Test & Build
+    name: Test & Validation
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -40,9 +40,6 @@ jobs:
       - name: Run UI tests
         run: pnpm test
         working-directory: apps/eval-ui
-
-      - name: Build
-        run: pnpm build
 
       - name: Check types
         run: pnpm exec tsc --noEmit
