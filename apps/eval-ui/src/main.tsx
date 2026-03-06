@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { App } from "./App";
 import { Overview } from "./pages/Overview/Overview";
-import { Runs } from "./pages/Runs";
+import { Runs } from "./pages/Runs/Runs";
 import { EvalDetail } from "./pages/EvalDetail/EvalDetail";
 import "./index.css";
 

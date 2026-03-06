@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { renderPage } from "../test/render";
+import { renderPage } from "../../test/render";
 import { Runs } from "./Runs";
-import { createMockRuns } from "../test/fixtures";
+import { createMockRuns } from "../../test/fixtures";
 
 vi.mock("recharts", async () => {
   const actual = await vi.importActual<typeof import("recharts")>("recharts");
@@ -15,12 +15,12 @@ vi.mock("recharts", async () => {
   };
 });
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   fetchRuns: vi.fn(),
   fetchTestIds: vi.fn(),
 }));
 
-import { fetchRuns, fetchTestIds } from "../lib/api";
+import { fetchRuns, fetchTestIds } from "../../lib/api";
 const mockFetchRuns = vi.mocked(fetchRuns);
 const mockFetchTestIds = vi.mocked(fetchTestIds);
 
