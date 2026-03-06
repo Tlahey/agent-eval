@@ -1,5 +1,6 @@
 import { Search, Filter, LayoutGrid } from "lucide-react";
-import { Select, SortButton } from "./RunsUI";
+import { Select } from "../../../components/ui/Select";
+import { SortButton } from "../../../components/ui/SortButton";
 import type { SortField, SortDir } from "../useRuns";
 
 interface RunsToolbarProps {

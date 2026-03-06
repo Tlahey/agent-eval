@@ -1,4 +1,4 @@
-import { formatTokens } from "./formatTokens";
+import { formatTokens } from "../../../lib/format";
 import type { LedgerRun } from "../../../lib/api";
 
 interface OverviewTelemetryProps {

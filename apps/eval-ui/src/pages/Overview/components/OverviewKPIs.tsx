@@ -1,5 +1,5 @@
 import { BarChart3, TrendingUp, CheckCircle2, Clock } from "lucide-react";
-import { KPICard } from "./KPICard";
+import { KPICard } from "../../../components/ui/KPICard";
 
 interface OverviewKPIsProps {
   totalRunsCount: number;

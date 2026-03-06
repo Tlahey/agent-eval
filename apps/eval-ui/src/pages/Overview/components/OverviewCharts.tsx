@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { RunnerDot, getRunnerColor } from "../../../components/RunsTable";
-import { formatTokens } from "./formatTokens";
+import { formatTokens } from "../../../lib/format";
 import type { RunnerStats } from "../../../lib/api";
 
 interface OverviewChartsProps {
