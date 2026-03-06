@@ -140,13 +140,13 @@
 }
 
 [data-theme="terra"] {
-  --color-surface-0: 45 30% 96%; /* Creamy Beige */
+  --color-surface-0: 45 30% 96%;
   --color-surface-1: 45 20% 92%;
   --color-surface-2: 45 20% 88%;
   --color-surface-3: 45 20% 84%;
   --color-surface-4: 45 20% 80%;
-  --color-primary: 113 39% 25%; /* Forest Green */
-  --color-accent: 16 59% 41%; /* Terra Cotta */
+  --color-primary: 113 39% 25%;
+  --color-accent: 16 59% 41%;
   --color-ok: 142 71% 35%;
   --color-warn: 38 92% 40%;
   --color-err: 0 70% 45%;
@@ -159,6 +159,50 @@
   --glass-bg: hsl(45 30% 96% / 0.8);
   --glass-border: hsl(113 39% 25% / 0.1);
   --glow-primary: 113 39% 25% / 0.1;
+}
+
+[data-theme="admiral"] {
+  --color-surface-0: 210 15% 95%; /* Off-white gray */
+  --color-surface-1: 210 15% 90%;
+  --color-surface-2: 210 15% 85%;
+  --color-surface-3: 210 15% 80%;
+  --color-surface-4: 210 15% 75%;
+  --color-primary: 220 32% 15%; /* Admiral Navy */
+  --color-accent: 0 68% 17%; /* Deep Burgundy */
+  --color-ok: 142 71% 30%;
+  --color-warn: 38 92% 40%;
+  --color-err: 0 84% 45%;
+  --color-txt-base: 220 32% 10%;
+  --color-txt-secondary: 220 20% 25%;
+  --color-txt-muted: 220 15% 45%;
+  --color-txt-on-primary: 0 0% 100%;
+  --color-line: 220 32% 15% / 0.1;
+  --color-scheme: light;
+  --glass-bg: hsl(210 15% 95% / 0.85);
+  --glass-border: hsl(220 32% 15% / 0.15);
+  --glow-primary: 220 32% 15% / 0.1;
+}
+
+[data-theme="energy"] {
+  --color-surface-0: 0 0% 10%; /* Very dark gray */
+  --color-surface-1: 0 0% 13%;
+  --color-surface-2: 0 0% 16%;
+  --color-surface-3: 0 0% 20%;
+  --color-surface-4: 0 0% 25%;
+  --color-primary: 18 100% 50%; /* Vibrant Orange */
+  --color-accent: 185 100% 45%; /* Bright Turquoise */
+  --color-ok: 142 71% 45%;
+  --color-warn: 45 100% 50%;
+  --color-err: 0 84% 60%;
+  --color-txt-base: 0 0% 98%;
+  --color-txt-secondary: 0 0% 85%;
+  --color-txt-muted: 0 0% 65%;
+  --color-txt-on-primary: 0 0% 0%; /* Black on orange */
+  --color-line: 18 100% 50% / 0.2;
+  --color-scheme: dark;
+  --glass-bg: hsl(0 0% 10% / 0.6);
+  --glass-border: hsl(18 100% 50% / 0.3);
+  --glow-primary: 18 100% 50% / 0.25;
 }
 
 /* ─── Base Styles ─── */

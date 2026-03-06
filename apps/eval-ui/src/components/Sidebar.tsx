@@ -26,7 +26,9 @@ type Theme =
   | "high-contrast"
   | "solarized-light"
   | "cyber-neon"
-  | "terra";
+  | "terra"
+  | "admiral"
+  | "energy";
 
 const THEMES: { id: Theme; label: string; colors: string[] }[] = [
   { id: "nebula", label: "Nebula Midnight", colors: ["#BD93F9", "#FF79C6"] },
@@ -37,6 +39,8 @@ const THEMES: { id: Theme; label: string; colors: string[] }[] = [
   { id: "solarized-light", label: "Solarized Light", colors: ["#fdf6e3", "#268bd2"] },
   { id: "cyber-neon", label: "Cyber Neon", colors: ["#A855F7", "#06B6D4"] },
   { id: "terra", label: "Terra Earth", colors: ["#2D5A27", "#A64B2A"] },
+  { id: "admiral", label: "Admiral Navy", colors: ["#192231", "#490E0E"] },
+  { id: "energy", label: "Vibrant Energy", colors: ["#FF4E00", "#00BFFF"] },
 ];
 
 export function Sidebar() {

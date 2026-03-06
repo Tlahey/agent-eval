@@ -124,6 +124,8 @@ describe("Sidebar", () => {
       expect(screen.getByText("High Contrast")).toBeInTheDocument();
       expect(screen.getByText("Solarized Light")).toBeInTheDocument();
       expect(screen.getByText("Terra Earth")).toBeInTheDocument();
+      expect(screen.getByText("Admiral Navy")).toBeInTheDocument();
+      expect(screen.getByText("Vibrant Energy")).toBeInTheDocument();
       expect(screen.getByText("Nord Frost")).toBeInTheDocument();
     });
 
