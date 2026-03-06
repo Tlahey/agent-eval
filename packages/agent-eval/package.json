@@ -1,5 +1,5 @@
 {
-  "name": "agent-eval",
+  "name": "@tlahey/agent-eval",
   "version": "0.1.0-alpha",
   "description": "AI coding agent evaluation framework with Vitest-like DX",
   "type": "module",

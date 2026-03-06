@@ -73,7 +73,7 @@
 ### Install
 
 ```bash
-pnpm add -D agent-eval
+pnpm add -D @tlahey/agent-eval
 ```
 
 Or install globally to use across projects:
@@ -87,9 +87,9 @@ agenteval --version
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "agent-eval";
-import { CliModel, OpenAIModel } from "agent-eval/llm";
-import { SqliteLedger } from "agent-eval/ledger";
+import { defineConfig } from "@tlahey/agent-eval";
+import { CliModel, OpenAIModel } from "@tlahey/agent-eval/llm";
+import { SqliteLedger } from "@tlahey/agent-eval/ledger";
 
 export default defineConfig({
   runners: [
@@ -106,7 +106,7 @@ export default defineConfig({
 
 ```ts
 // evals/banner.eval.ts
-import { test, expect } from "agent-eval";
+import { test, expect } from "@tlahey/agent-eval";
 
 test("Add a Close button to the Banner", ({ agent, ctx }) => {
   agent.instruct("Add a Close button to the Banner component");
