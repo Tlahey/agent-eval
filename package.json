@@ -5,12 +5,13 @@
   "type": "module",
   "description": "AgentEval – AI coding agent evaluation framework",
   "scripts": {
-    "build": "pnpm --filter agent-eval build",
+    "build": "pnpm build:ui && pnpm build:agent-eval && pnpm bundle-ui",
     "build:ui": "pnpm --filter eval-ui build",
-    "build:all": "pnpm build:ui && pnpm build && pnpm bundle-ui",
+    "build:agent-eval": "pnpm --filter agent-eval build",
     "bundle-ui": "rm -rf packages/agent-eval/dist/ui && mkdir -p packages/agent-eval/dist/ui && cp -r apps/eval-ui/dist/* packages/agent-eval/dist/ui/",
     "dev:docs": "pnpm --filter docs dev",
     "dev:ui": "pnpm --filter eval-ui dev",
+    "ui": "node packages/agent-eval/dist/cli.js ui",
     "docs:build": "pnpm --filter docs build",
     "test": "pnpm --filter agent-eval test && pnpm --filter eval-ui test",
     "lint": "eslint .",
@@ -20,7 +21,7 @@
     "seed": "npx tsx scripts/seed-ledger.ts",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm build:all && changeset publish",
+    "release": "pnpm build && changeset publish",
     "prepare": "husky"
   },
   "lint-staged": {

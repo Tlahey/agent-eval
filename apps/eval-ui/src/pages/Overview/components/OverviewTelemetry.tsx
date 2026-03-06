@@ -21,7 +21,7 @@ export function OverviewTelemetry({
   return (
     <div className="lg:col-span-1 flex flex-col gap-6 min-w-0">
       {/* Threshold Distribution Gauge */}
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
+      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5 flex flex-col">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
             Distribution
@@ -79,32 +79,32 @@ export function OverviewTelemetry({
       </div>
 
       {/* Resource Telemetry Dashboard */}
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 flex flex-col">
+      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5 flex flex-col">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
             Resource Telemetry
           </h3>
         </div>
-
         <div className="flex-1 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          {/* Main Stats Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl bg-surface-2/50 p-4 border">
               <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-1">
                 Total Volume
               </p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black text-txt-base">
+              <div className="flex items-baseline gap-1 flex-wrap">
+                <span className="text-lg sm:text-xl font-black text-txt-base">
                   {formatTokens(totalTokensCount)}
                 </span>
-                <span className="text-[10px] font-bold text-primary">TOKENS</span>
+                <span className="text-[10px] font-bold text-primary shrink-0">TOKENS</span>
               </div>
             </div>
             <div className="rounded-xl bg-surface-2/50 p-4 border">
               <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-1">
                 Avg per run
               </p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black text-txt-base">
+              <div className="flex items-baseline gap-1 flex-wrap">
+                <span className="text-lg sm:text-xl font-black text-txt-base">
                   {totalRunsCount > 0
                     ? formatTokens(Math.round(totalTokensCount / totalRunsCount))
                     : "0"}

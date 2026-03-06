@@ -17,6 +17,7 @@ export default {
           base: "hsl(var(--color-txt-base) / <alpha-value>)",
           secondary: "hsl(var(--color-txt-secondary) / <alpha-value>)",
           muted: "hsl(var(--color-txt-muted) / <alpha-value>)",
+          onprimary: "hsl(var(--color-txt-on-primary) / <alpha-value>)",
         },
         ok: "hsl(var(--color-ok) / <alpha-value>)",
         err: "hsl(var(--color-err) / <alpha-value>)",

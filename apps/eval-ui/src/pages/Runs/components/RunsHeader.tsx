@@ -25,7 +25,7 @@ export function RunsHeader({
         <div className="flex items-center gap-1 rounded-xl bg-surface-1 border p-1 shadow-sm">
           <button
             onClick={() => updateParams({ status: "all" })}
-            className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${statusFilter === "all" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-txt-muted hover:text-txt-secondary"}`}
+            className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${statusFilter === "all" ? "bg-primary text-txt-onprimary shadow-lg shadow-primary/20" : "text-txt-muted hover:text-txt-secondary"}`}
           >
             All
           </button>

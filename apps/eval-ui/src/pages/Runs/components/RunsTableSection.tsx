@@ -21,7 +21,7 @@ export function RunsTableSection({
   updateParams,
 }: RunsTableSectionProps) {
   return (
-    <div className="rounded-2xl border bg-surface-1/40 backdrop-blur-sm card-hover shadow-2xl shadow-black/5 overflow-hidden">
+    <div className="rounded-2xl border bg-surface-1/40 backdrop-blur-sm shadow-2xl shadow-black/5 overflow-hidden">
       <RunsTable runs={runs} onSelect={onSelectRun} />
 
       {totalPages > 1 && (

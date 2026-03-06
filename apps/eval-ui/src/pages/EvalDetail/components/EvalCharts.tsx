@@ -28,7 +28,7 @@ interface EvalChartsProps {
 export function EvalCharts({ runners, trendData, radarData, distributionData }: EvalChartsProps) {
   return (
     <div className="xl:col-span-2 space-y-6">
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5">
+      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
             Historical Performance
@@ -117,7 +117,7 @@ export function EvalCharts({ runners, trendData, radarData, distributionData }: 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5">
+        <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5">
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted mb-6">
             Capabilities Matrix
           </h3>
@@ -170,7 +170,7 @@ export function EvalCharts({ runners, trendData, radarData, distributionData }: 
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5 overflow-hidden">
+        <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5 overflow-hidden">
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted mb-6">
             Score Distribution
           </h3>

@@ -1,3 +1,5 @@
+import * as mocks from "../test/fixtures";
+
 export interface CommandResult {
   name: string;
   command: string;
@@ -74,33 +76,6 @@ export interface RunnerStats {
   passRate: number;
 }
 
-const BASE = "/api";
-
-export async function fetchRuns(testId?: string): Promise<LedgerRun[]> {
-  const url = testId ? `${BASE}/runs?testId=${encodeURIComponent(testId)}` : `${BASE}/runs`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch runs: ${res.statusText}`);
-  return res.json();
-}
-
-export async function fetchRun(id: number): Promise<LedgerRun> {
-  const res = await fetch(`${BASE}/runs/${id}`);
-  if (!res.ok) throw new Error(`Failed to fetch run: ${res.statusText}`);
-  return res.json();
-}
-
-export async function fetchTestIds(): Promise<string[]> {
-  const res = await fetch(`${BASE}/tests`);
-  if (!res.ok) throw new Error(`Failed to fetch tests: ${res.statusText}`);
-  return res.json();
-}
-
-export async function fetchTags(): Promise<string[]> {
-  const res = await fetch(`${BASE}/tags`);
-  if (!res.ok) throw new Error(`Failed to fetch tags: ${res.statusText}`);
-  return res.json();
-}
-
 /** A tree node representing a suite or test in the hierarchy */
 export interface TestTreeNode {
   name: string;
@@ -110,16 +85,68 @@ export interface TestTreeNode {
   children?: TestTreeNode[];
 }
 
+const BASE = "/api";
+
+// Helper to wrap fetch with a mock fallback in development
+async function fetchWithFallback<T>(
+  url: string,
+  mockData: T | (() => T),
+  errorMessage: string,
+): Promise<T> {
+  try {
+    const res = await fetch(url);
+    if (res.ok) return await res.json();
+    throw new Error(`${errorMessage}: ${res.statusText || res.status || "Unknown error"}`);
+  } catch (err) {
+    // In development AND not in Vitest tests, if server is unreachable, use mock data
+    const isDev = import.meta.env.DEV;
+    const isTest =
+      typeof (window as any).process?.env?.VITEST !== "undefined" ||
+      (typeof process !== "undefined" && process.env.NODE_ENV === "test");
+
+    if (isDev && !isTest) {
+      console.warn(`API unavailable at ${url}, using mock data.`, err);
+      return typeof mockData === "function" ? (mockData as () => T)() : mockData;
+    }
+    throw err;
+  }
+}
+
+export async function fetchRuns(testId?: string): Promise<LedgerRun[]> {
+  const url = testId ? `${BASE}/runs?testId=${encodeURIComponent(testId)}` : `${BASE}/runs`;
+  return fetchWithFallback(url, () => mocks.createMockRuns(20), "Failed to fetch runs");
+}
+
+export async function fetchRun(id: number): Promise<LedgerRun> {
+  return fetchWithFallback(
+    `${BASE}/runs/${id}`,
+    () => mocks.createMockRun({ id }),
+    "Failed to fetch run",
+  );
+}
+
+export async function fetchTestIds(): Promise<string[]> {
+  return fetchWithFallback(
+    `${BASE}/tests`,
+    ["add close button to Banner", "implement search with debounce"],
+    "Failed to fetch tests",
+  );
+}
+
+export async function fetchTags(): Promise<string[]> {
+  return fetchWithFallback(`${BASE}/tags`, ["ui", "core", "agent", "bug"], "Failed to fetch tags");
+}
+
 export async function fetchTestTree(): Promise<TestTreeNode[]> {
-  const res = await fetch(`${BASE}/tree`);
-  if (!res.ok) throw new Error(`Failed to fetch test tree: ${res.statusText}`);
-  return res.json();
+  return fetchWithFallback(
+    `${BASE}/tree`,
+    () => mocks.createMockTree(),
+    "Failed to fetch test tree",
+  );
 }
 
 export async function fetchStats(): Promise<RunnerStats[]> {
-  const res = await fetch(`${BASE}/stats`);
-  if (!res.ok) throw new Error(`Failed to fetch stats: ${res.statusText}`);
-  return res.json();
+  return fetchWithFallback(`${BASE}/stats`, () => mocks.createMockStats(), "Failed to fetch stats");
 }
 
 export async function overrideScore(
@@ -137,4 +164,18 @@ export async function overrideScore(
     throw new Error(body.error ?? `Failed to override score: ${res.statusText}`);
   }
   return res.json();
+}
+
+export async function deleteTest(testId: string): Promise<void> {
+  const res = await fetch(`${BASE}/tests?testId=${encodeURIComponent(testId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete test: ${res.statusText}`);
+}
+
+export async function deleteSuite(path: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/suites?path=${encodeURIComponent(path.join(","))}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete suite: ${res.statusText}`);
 }

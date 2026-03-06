@@ -1,4 +1,4 @@
-import { useExplorer } from "./useExplorer";
+import { useExplorer, type TestMetrics } from "./useExplorer";
 import {
   Folder,
   FlaskConical,
@@ -10,10 +10,14 @@ import {
   FilterX,
   PlusSquare,
   MinusSquare,
+  Trophy,
+  Activity,
+  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { type TestTreeNode } from "../../lib/api";
+import { getRunnerColor } from "../../components/RunsTable";
 
 export function Explorer() {
   const {
@@ -28,12 +32,16 @@ export function Explorer() {
     collapseAll,
     forceExpand,
     treeKey,
+    metricsMap,
   } = useExplorer();
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent shadow-lg shadow-primary/20" />
+        <p className="text-xs font-bold text-txt-muted uppercase tracking-widest animate-pulse">
+          Loading Test Repository...
+        </p>
       </div>
     );
   }
@@ -41,12 +49,12 @@ export function Explorer() {
   const hasFilters = !!(search || tagFilter);
 
   return (
-    <div className="p-8 space-y-8 max-w-[1600px] mx-auto animate-fade-in">
+    <div className="p-8 space-y-8 max-w-[1600px] mx-auto animate-fade-in text-txt-base">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-txt-base tracking-tight mb-1">Evaluations</h1>
+          <h1 className="text-3xl font-black tracking-tight mb-1">Evaluations</h1>
           <p className="text-sm text-txt-muted font-bold uppercase tracking-wider">
-            Repository Explorer & Result Analysis
+            Repository Explorer
           </p>
         </div>
 
@@ -94,7 +102,7 @@ export function Explorer() {
                     onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
                     className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
                       tagFilter === tag
-                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                        ? "bg-primary text-txt-onprimary border-primary shadow-lg shadow-primary/20"
                         : "bg-surface-2 text-txt-muted border-transparent hover:border-txt-muted/30"
                     }`}
                   >
@@ -117,13 +125,13 @@ export function Explorer() {
                 <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-1">
                   Total Tests
                 </p>
-                <p className="text-xl font-black text-txt-base">{countTests(tree)}</p>
+                <p className="text-xl font-black">{countTests(tree)}</p>
               </div>
               <div className="p-3 rounded-xl bg-surface-2/50 border">
                 <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-1">
                   Total Suites
                 </p>
-                <p className="text-xl font-black text-txt-base">{countSuites(tree)}</p>
+                <p className="text-xl font-black">{countSuites(tree)}</p>
               </div>
             </div>
           </div>
@@ -166,7 +174,7 @@ export function Explorer() {
               )}
             </div>
 
-            <div className="p-2" key={treeKey}>
+            <div className="p-2 min-h-[400px]" key={treeKey}>
               {tree.length > 0 ? (
                 <div className="py-2">
                   {tree.map((node, i) => (
@@ -175,6 +183,7 @@ export function Explorer() {
                       node={node}
                       depth={0}
                       defaultExpanded={hasFilters || forceExpand === true}
+                      metricsMap={metricsMap}
                     />
                   ))}
                 </div>
@@ -183,7 +192,7 @@ export function Explorer() {
                   <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2 text-txt-muted mb-4">
                     <FilterX size={32} />
                   </div>
-                  <p className="text-txt-base font-black uppercase tracking-widest">
+                  <p className="font-black uppercase tracking-widest">
                     No results matched your filters
                   </p>
                   <button
@@ -209,14 +218,14 @@ function RecursiveTreeNode({
   node,
   depth,
   defaultExpanded,
+  metricsMap,
 }: {
   node: TestTreeNode;
   depth: number;
   defaultExpanded: boolean;
+  metricsMap: Map<string, TestMetrics>;
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-  // Use a local variable to determine the actual expanded state
   const expanded = defaultExpanded || isExpanded;
 
   if (node.type === "suite") {
@@ -224,7 +233,7 @@ function RecursiveTreeNode({
       <div className="select-none">
         <div
           onClick={() => setIsExpanded(!expanded)}
-          className="group flex items-center gap-3 py-2 px-4 rounded-lg hover:bg-surface-2/50 cursor-pointer transition-colors"
+          className="group flex items-center gap-3 py-2.5 px-4 rounded-lg hover:bg-surface-2/50 cursor-pointer transition-colors"
           style={{ paddingLeft: `${depth * 24 + 16}px` }}
         >
           <ChevronRight
@@ -236,9 +245,7 @@ function RecursiveTreeNode({
             className={`shrink-0 transition-colors ${expanded ? "text-primary" : "text-txt-muted group-hover:text-txt-base"}`}
           />
           <div className="flex-1 min-w-0">
-            <h4 className="text-xs font-bold text-txt-base uppercase tracking-tight truncate">
-              {node.name}
-            </h4>
+            <h4 className="text-xs font-bold uppercase tracking-tight truncate">{node.name}</h4>
           </div>
           <span className="text-[9px] font-black text-txt-muted/40 uppercase tracking-widest bg-surface-3/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
             {node.children?.length ?? 0} items
@@ -247,7 +254,6 @@ function RecursiveTreeNode({
 
         {expanded && node.children && (
           <div className="relative">
-            {/* Hierarchy vertical line */}
             <div
               className="absolute left-0 top-0 bottom-0 w-px bg-line/10 group-hover:bg-line/20 transition-colors"
               style={{ marginLeft: `${depth * 24 + 23}px` }}
@@ -258,6 +264,7 @@ function RecursiveTreeNode({
                 node={child}
                 depth={depth + 1}
                 defaultExpanded={defaultExpanded}
+                metricsMap={metricsMap}
               />
             ))}
           </div>
@@ -266,35 +273,96 @@ function RecursiveTreeNode({
     );
   }
 
+  const metrics = node.testId ? metricsMap.get(node.testId) : null;
+
   return (
     <Link
       to={`/evals/${encodeURIComponent(node.testId ?? node.name)}`}
-      className="group flex items-center gap-3 py-2 px-4 rounded-lg hover:bg-surface-2 transition-colors"
+      className="group flex flex-col lg:flex-row lg:items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all"
       style={{ paddingLeft: `${depth * 24 + 43}px` }}
     >
-      <FlaskConical
-        size={14}
-        className="shrink-0 text-accent group-hover:scale-110 transition-transform"
-      />
-      <div className="flex-1 min-w-0">
-        <h4 className="text-xs font-bold text-txt-base uppercase tracking-tight truncate group-hover:text-accent transition-colors">
-          {node.name}
-        </h4>
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div className="mt-1">
+          <FlaskConical
+            size={14}
+            className="shrink-0 text-accent group-hover:scale-110 transition-transform"
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-bold uppercase tracking-tight truncate group-hover:text-accent transition-colors leading-none mb-1.5">
+            {node.name}
+          </h4>
+
+          {/* Metadata Row */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {metrics && (
+              <div className="flex items-center gap-1.5 text-[9px] font-black text-primary uppercase bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10">
+                <Trophy size={10} />
+                Rank #{metrics.rank}
+              </div>
+            )}
+
+            {metrics && (
+              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
+                <Activity size={10} />
+                {metrics.runCount} runs
+              </div>
+            )}
+
+            {metrics && (
+              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
+                <Users size={10} />
+                {metrics.agentCount} agents
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-1">
+              {node.tags && node.tags.length > 0
+                ? node.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-[8px] font-black text-txt-muted/40 uppercase tracking-widest px-1 py-0.5 rounded border border-line/10"
+                    >
+                      {tag}
+                    </span>
+                  ))
+                : null}
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {node.tags && node.tags.length > 0
-          ? node.tags.map((tag) => (
-              <span
-                key={tag}
-                className="text-[8px] font-black text-txt-muted/60 uppercase tracking-widest px-1.5 py-0.5 rounded-md border border-line/10 bg-surface-2 group-hover:border-accent/20 transition-colors"
-              >
-                {tag}
+
+      {metrics && (
+        <div className="hidden sm:flex items-center gap-2 pr-4 shrink-0">
+          {metrics.topRunners.map((runner, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 px-2.5 py-1 rounded-lg border bg-surface-3/50 group-hover:bg-surface-3 transition-colors"
+              style={{ borderColor: `${getRunnerColor(runner.name)}33` }}
+            >
+              <div
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: getRunnerColor(runner.name) }}
+              />
+              <span className="text-[9px] font-black uppercase text-txt-secondary tracking-tighter">
+                {runner.name}
               </span>
-            ))
-          : null}
-      </div>
-      <div className="opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 ml-2">
-        <ArrowRight size={14} className="text-accent" />
+              <span
+                className="text-[9px] font-black tabular-nums"
+                style={{ color: getRunnerColor(runner.name) }}
+              >
+                {(runner.avgScore * 100).toFixed(0)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="w-6 flex items-center justify-center shrink-0">
+        <ArrowRight
+          size={14}
+          className="text-accent opacity-0 group-hover:opacity-100 transition-opacity"
+        />
       </div>
     </Link>
   );

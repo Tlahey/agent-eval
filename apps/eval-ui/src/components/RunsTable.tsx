@@ -85,12 +85,12 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
             <tr
               key={run.id}
               onClick={() => onSelect(run)}
-              className="group cursor-pointer transition-colors hover:bg-surface-2/40"
+              className="group cursor-pointer transition-all duration-200 hover:bg-surface-2/60"
             >
               {!compact && (
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="text-xs font-black text-txt-base group-hover:text-primary transition-colors">
+                    <span className="text-xs font-black text-txt-base group-hover:text-primary transition-colors duration-200">
                       {run.testId}
                     </span>
                     <span className="text-[9px] font-bold text-txt-muted uppercase tracking-tighter mt-0.5">

@@ -105,4 +105,42 @@ describe("Sidebar", () => {
     renderWithRouter(<Sidebar />);
     expect(screen.getByText(/v\d+\.\d+\.\d+/)).toBeInTheDocument();
   });
+
+  describe("Theme Selection", () => {
+    it("shows the current theme label in the button", () => {
+      renderWithRouter(<Sidebar />);
+      // Default theme is Nebula Midnight
+      expect(screen.getByText(/Nebula Midnight/i)).toBeInTheDocument();
+    });
+
+    it("opens the theme menu on click", async () => {
+      const user = userEvent.setup();
+      renderWithRouter(<Sidebar />);
+
+      const themeBtn = screen.getByRole("button", { name: /Nebula Midnight/i });
+      await user.click(themeBtn);
+
+      expect(screen.getByText("Pure Light")).toBeInTheDocument();
+      expect(screen.getByText("High Contrast")).toBeInTheDocument();
+      expect(screen.getByText("Solarized Light")).toBeInTheDocument();
+      expect(screen.getByText("Nord Frost")).toBeInTheDocument();
+    });
+
+    it("changes the document theme and localStorage on selection", async () => {
+      const user = userEvent.setup();
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+      renderWithRouter(<Sidebar />);
+
+      const themeBtn = screen.getByRole("button", { name: /Nebula Midnight/i });
+      await user.click(themeBtn);
+
+      const highContrastBtn = screen.getByText("High Contrast");
+      await user.click(highContrastBtn);
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("high-contrast");
+      expect(setItemSpy).toHaveBeenCalledWith("agent-eval-theme", "high-contrast");
+      expect(screen.getByText(/High Contrast/i)).toBeInTheDocument();
+    });
+  });
 });

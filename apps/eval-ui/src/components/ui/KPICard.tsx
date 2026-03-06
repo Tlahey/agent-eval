@@ -31,8 +31,8 @@ export function KPICard({ icon, label, value, accent, sub, trend }: KPICardProps
         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-txt-muted mb-1">
           {label}
         </p>
-        <div className="flex items-baseline gap-2">
-          <p className="text-3xl font-black text-txt-base tracking-tight">{value}</p>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <p className="text-2xl sm:text-3xl font-black text-txt-base tracking-tight">{value}</p>
         </div>
         {sub && <p className="mt-1 text-xs font-bold text-txt-muted/70">{sub}</p>}
       </div>

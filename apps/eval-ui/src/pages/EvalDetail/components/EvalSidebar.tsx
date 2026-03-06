@@ -17,7 +17,7 @@ interface EvalSidebarProps {
 export function EvalSidebar({ runnerStats, bestWorst, setSelectedRun }: EvalSidebarProps) {
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-xl shadow-black/5">
+      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5">
         <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted mb-6">
           Runner Breakdown
         </h3>
@@ -61,7 +61,7 @@ export function EvalSidebar({ runnerStats, bestWorst, setSelectedRun }: EvalSide
         {bestWorst.map((run, i) => (
           <div
             key={i}
-            className="rounded-2xl border bg-surface-1/40 p-5 backdrop-blur-sm card-hover shadow-lg"
+            className="rounded-2xl border bg-surface-1/40 p-5 backdrop-blur-sm shadow-lg"
           >
             <p className="text-[9px] font-black text-txt-muted uppercase tracking-widest mb-3">
               {i === 0 ? "Optimal Performance" : "Critical Failure"}

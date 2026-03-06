@@ -18,12 +18,15 @@ const NAV = [
   { to: "/runs", icon: ListChecks, label: "All Runs", end: false },
 ] as const;
 
-type Theme = "nebula" | "nord" | "clean-blue";
+type Theme = "nebula" | "nord" | "clean-blue" | "light" | "high-contrast" | "solarized-light";
 
 const THEMES: { id: Theme; label: string; colors: string[] }[] = [
-  { id: "nebula", label: "Nebula Midnight", colors: ["#a855f7", "#03040a"] },
-  { id: "nord", label: "Nord Frost", colors: ["#88C0D0", "#2E3440"] },
-  { id: "clean-blue", label: "Clean Blue", colors: ["#3F72AF", "#F9F7F7"] },
+  { id: "nebula", label: "Nebula Midnight", colors: ["#BD93F9", "#FF79C6"] },
+  { id: "nord", label: "Nord Frost", colors: ["#88C0D0", "#81A1C1"] },
+  { id: "clean-blue", label: "Clean Blue", colors: ["#3F72AF", "#112D4E"] },
+  { id: "light", label: "Pure Light", colors: ["#007ACC", "#FFFFFF"] },
+  { id: "high-contrast", label: "High Contrast", colors: ["#FFFF00", "#00FFFF"] },
+  { id: "solarized-light", label: "Solarized Light", colors: ["#fdf6e3", "#268bd2"] },
 ];
 
 export function Sidebar() {
@@ -74,7 +77,7 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `group relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-300 ${
                   isActive
-                    ? "bg-primary text-white shadow-lg shadow-primary/20"
+                    ? "bg-primary text-txt-onprimary shadow-lg shadow-primary/20"
                     : "text-txt-secondary hover:bg-surface-2 hover:text-txt-base"
                 }`
               }
@@ -123,7 +126,7 @@ export function Sidebar() {
                     }}
                     className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-all ${
                       currentTheme === t.id
-                        ? "bg-primary text-white shadow-lg shadow-primary/20"
+                        ? "bg-primary text-txt-onprimary shadow-lg shadow-primary/20"
                         : "text-txt-secondary hover:bg-surface-3 hover:text-txt-base"
                     }`}
                   >

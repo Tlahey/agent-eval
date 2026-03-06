@@ -19,6 +19,7 @@
   --color-txt-base: 220 40% 98%;
   --color-txt-secondary: 225 20% 75%;
   --color-txt-muted: 225 15% 55%;
+  --color-txt-on-primary: 230 45% 4%; /* Dark on light primary */
   --color-line: 230 45% 18%;
   --color-scheme: dark;
   --panel-width: 95vw;
@@ -39,6 +40,7 @@
   --color-txt-base: 218 27% 92%;
   --color-txt-secondary: 218 27% 85%;
   --color-txt-muted: 218 13% 65%;
+  --color-txt-on-primary: 220 16% 22%;
   --color-line: 220 16% 40%;
   --color-scheme: dark;
 }
@@ -56,13 +58,70 @@
   --color-err: 0 84% 60%;
   --color-txt-base: 213 64% 10%;
   --color-txt-secondary: 213 30% 30%;
-  --color-txt-muted: 213 20% 35%; /* Darkened from 50% to 35% for contrast */
+  --color-txt-muted: 213 20% 35%;
+  --color-txt-on-primary: 0 0% 100%;
   --color-line: 213 47% 30%;
   --color-scheme: light;
 }
 
-/* ─── Base Styles ─── */
+[data-theme="light"] {
+  --color-surface-0: 0 0% 100%;
+  --color-surface-1: 0 0% 98%;
+  --color-surface-2: 0 0% 95%;
+  --color-surface-3: 0 0% 92%;
+  --color-surface-4: 0 0% 88%;
+  --color-primary: 201 100% 40%;
+  --color-accent: 265 90% 60%;
+  --color-ok: 142 71% 45%;
+  --color-warn: 38 92% 50%;
+  --color-err: 0 84% 60%;
+  --color-txt-base: 213 64% 10%;
+  --color-txt-secondary: 213 30% 30%;
+  --color-txt-muted: 213 20% 45%;
+  --color-txt-on-primary: 0 0% 100%;
+  --color-line: 213 20% 85%;
+  --color-scheme: light;
+}
 
+[data-theme="high-contrast"] {
+  --color-surface-0: 0 0% 0%;
+  --color-surface-1: 0 0% 5%;
+  --color-surface-2: 0 0% 10%;
+  --color-surface-3: 0 0% 15%;
+  --color-surface-4: 0 0% 20%;
+  --color-primary: 60 100% 50%; /* Pure Yellow */
+  --color-accent: 180 100% 50%; /* Pure Cyan */
+  --color-ok: 120 100% 50%;
+  --color-warn: 45 100% 50%;
+  --color-err: 0 100% 60%;
+  --color-txt-base: 0 0% 100%;
+  --color-txt-secondary: 0 0% 95%;
+  --color-txt-muted: 0 0% 85%;
+  --color-txt-on-primary: 0 0% 0%; /* BLACK on yellow */
+  --color-line: 0 0% 100% / 0.3;
+  --color-scheme: dark;
+}
+
+[data-theme="solarized-light"] {
+  --color-surface-0: 44 87% 94%; /* #fdf6e3 */
+  --color-surface-1: 44 87% 90%;
+  --color-surface-2: 44 87% 85%;
+  --color-surface-3: 44 87% 80%;
+  --color-surface-4: 44 87% 75%;
+  --color-primary: 205 82% 43%; /* Blue */
+  --color-accent: 175 59% 40%; /* Cyan */
+  --color-ok: 68 100% 30%; /* Green */
+  --color-warn: 18 80% 44%; /* Orange */
+  --color-err: 1 71% 52%; /* Red */
+  --color-txt-base: 192 10% 20%; /* #073642 */
+  --color-txt-secondary: 192 10% 35%;
+  --color-txt-muted: 192 10% 45%;
+  --color-txt-on-primary: 0 0% 100%;
+  --color-line: 192 10% 20% / 0.1;
+  --color-scheme: light;
+}
+
+/* ... reste du fichier inchangé ... */
 @layer base {
   body {
     background-color: hsl(var(--color-surface-0));
@@ -98,7 +157,7 @@
   }
 
   .card-hover {
-    @apply transition-all duration-500 hover:-translate-y-1;
+    @apply transition-all duration-500;
   }
   .card-hover:hover {
     border-color: hsl(var(--color-primary) / 0.4);
