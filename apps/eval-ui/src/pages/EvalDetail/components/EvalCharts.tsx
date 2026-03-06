@@ -14,6 +14,7 @@ import {
   BarChart,
   Bar,
   Cell,
+  Legend,
 } from "recharts";
 import { getRunnerColor } from "../../../components/RunsTable";
 
@@ -120,9 +121,9 @@ export function EvalCharts({ runners, trendData, radarData, distributionData }: 
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted mb-6">
             Capabilities Matrix
           </h3>
-          <div className="h-[280px]">
+          <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData}>
+              <RadarChart data={radarData} margin={{ top: 0, right: 30, bottom: 0, left: 30 }}>
                 <PolarGrid stroke="hsl(var(--color-line) / 0.2)" />
                 <PolarAngleAxis
                   dataKey="subject"
@@ -153,6 +154,15 @@ export function EvalCharts({ runners, trendData, radarData, distributionData }: 
                     color: "hsl(var(--color-txt-base))",
                     fontWeight: 700,
                     marginBottom: 8,
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{
+                    paddingTop: "20px",
+                    fontSize: "9px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
                   }}
                 />
               </RadarChart>
