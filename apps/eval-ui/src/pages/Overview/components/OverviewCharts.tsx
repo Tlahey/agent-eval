@@ -27,7 +27,7 @@ export function OverviewCharts({
   return (
     <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
       {/* Score trend - Main Chart */}
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5 flex flex-col">
+      <div className="rounded-2xl glass-card p-6 flex flex-col">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
             Score Trend
@@ -126,7 +126,7 @@ export function OverviewCharts({
       </div>
 
       {/* Token Usage Chart per Runner */}
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5 flex flex-col">
+      <div className="rounded-2xl glass-card p-6 flex flex-col">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">
@@ -241,7 +241,7 @@ export function OverviewCharts({
       </div>
 
       {/* Performance Ranking */}
-      <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5">
+      <div className="rounded-2xl glass-card p-6">
         <h3 className="mb-5 text-sm font-bold uppercase tracking-widest text-txt-muted">
           Performance Ranking
         </h3>

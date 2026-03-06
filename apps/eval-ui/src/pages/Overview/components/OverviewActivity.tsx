@@ -10,7 +10,7 @@ interface OverviewActivityProps {
 
 export function OverviewActivity({ recentRuns, setSelectedRun }: OverviewActivityProps) {
   return (
-    <div className="rounded-2xl border bg-surface-1/40 backdrop-blur-sm shadow-xl shadow-black/5 overflow-hidden">
+    <div className="rounded-2xl glass-card overflow-hidden">
       <div className="flex items-center justify-between border-b p-6">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-widest text-txt-muted">

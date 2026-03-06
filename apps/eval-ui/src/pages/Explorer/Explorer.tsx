@@ -10,14 +10,10 @@ import {
   FilterX,
   PlusSquare,
   MinusSquare,
-  Trophy,
-  Activity,
-  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { type TestTreeNode } from "../../lib/api";
-import { getRunnerColor } from "../../components/RunsTable";
 
 export function Explorer() {
   const {
@@ -78,7 +74,7 @@ export function Explorer() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         {/* Sidebar: Filters & Tags */}
         <div className="space-y-6 lg:sticky lg:top-8">
-          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5">
+          <div className="rounded-2xl glass-card p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xs font-black uppercase tracking-[0.2em] text-txt-muted flex items-center gap-2">
                 <Tag size={14} className="text-primary" />
@@ -115,7 +111,7 @@ export function Explorer() {
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-surface-1/40 p-6 backdrop-blur-sm shadow-xl shadow-black/5">
+          <div className="rounded-2xl glass-card p-6">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-txt-muted mb-4 flex items-center gap-2">
               <BarChart3 size={14} className="text-accent" />
               Hierarchy Stats
@@ -139,7 +135,7 @@ export function Explorer() {
 
         {/* Main Content: Full Tree List */}
         <div className="lg:col-span-3">
-          <div className="rounded-3xl border bg-surface-1/40 backdrop-blur-sm shadow-2xl shadow-black/5 overflow-hidden">
+          <div className="rounded-3xl glass-card overflow-hidden">
             <div className="bg-surface-2/50 border-b px-8 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
@@ -278,7 +274,7 @@ function RecursiveTreeNode({
   return (
     <Link
       to={`/evals/${encodeURIComponent(node.testId ?? node.name)}`}
-      className="group flex flex-col lg:flex-row lg:items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all"
+      className="group flex items-center gap-4 py-3.5 px-4 rounded-xl hover:bg-surface-2 transition-all relative"
       style={{ paddingLeft: `${depth * 24 + 43}px` }}
     >
       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -289,70 +285,46 @@ function RecursiveTreeNode({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-bold uppercase tracking-tight truncate group-hover:text-accent transition-colors leading-none mb-1.5">
+          <h4 className="text-sm font-bold uppercase tracking-tight truncate group-hover:text-accent transition-colors leading-none mb-2">
             {node.name}
           </h4>
 
-          {/* Metadata Row */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {metrics && (
-              <div className="flex items-center gap-1.5 text-[9px] font-black text-primary uppercase bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10">
-                <Trophy size={10} />
+              <span className="text-[9px] font-black text-primary uppercase">
                 Rank #{metrics.rank}
-              </div>
+              </span>
             )}
 
             {metrics && (
               <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
-                <Activity size={10} />
-                {metrics.runCount} runs
-              </div>
-            )}
-
-            {metrics && (
-              <div className="flex items-center gap-1 text-[9px] font-bold text-txt-muted uppercase">
-                <Users size={10} />
-                {metrics.agentCount} agents
+                {metrics.runCount} runs • {metrics.agentCount} agents
               </div>
             )}
 
             <div className="flex flex-wrap gap-1">
-              {node.tags && node.tags.length > 0
-                ? node.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-[8px] font-black text-txt-muted/40 uppercase tracking-widest px-1 py-0.5 rounded border border-line/10"
-                    >
-                      {tag}
-                    </span>
-                  ))
-                : null}
+              {node.tags?.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[8px] font-black text-primary uppercase tracking-widest px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5"
+                >
+                  {tag}
+                </span>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
       {metrics && (
-        <div className="hidden sm:flex items-center gap-2 pr-4 shrink-0">
+        <div className="flex items-center gap-3 pr-4 shrink-0">
           {metrics.topRunners.map((runner, i) => (
             <div
               key={i}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-lg border bg-surface-3/50 group-hover:bg-surface-3 transition-colors"
-              style={{ borderColor: `${getRunnerColor(runner.name)}33` }}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-3/50 text-[9px] font-black uppercase text-txt-secondary border"
             >
-              <div
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: getRunnerColor(runner.name) }}
-              />
-              <span className="text-[9px] font-black uppercase text-txt-secondary tracking-tighter">
-                {runner.name}
-              </span>
-              <span
-                className="text-[9px] font-black tabular-nums"
-                style={{ color: getRunnerColor(runner.name) }}
-              >
-                {(runner.avgScore * 100).toFixed(0)}%
-              </span>
+              <span>{runner.name}</span>
+              <span className="text-primary opacity-80">{(runner.avgScore * 100).toFixed(0)}%</span>
             </div>
           ))}
         </div>

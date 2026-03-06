@@ -18,7 +18,14 @@ const NAV = [
   { to: "/runs", icon: ListChecks, label: "All Runs", end: false },
 ] as const;
 
-type Theme = "nebula" | "nord" | "clean-blue" | "light" | "high-contrast" | "solarized-light";
+type Theme =
+  | "nebula"
+  | "nord"
+  | "clean-blue"
+  | "light"
+  | "high-contrast"
+  | "solarized-light"
+  | "cyber-neon";
 
 const THEMES: { id: Theme; label: string; colors: string[] }[] = [
   { id: "nebula", label: "Nebula Midnight", colors: ["#BD93F9", "#FF79C6"] },
@@ -27,6 +34,7 @@ const THEMES: { id: Theme; label: string; colors: string[] }[] = [
   { id: "light", label: "Pure Light", colors: ["#007ACC", "#FFFFFF"] },
   { id: "high-contrast", label: "High Contrast", colors: ["#FFFF00", "#00FFFF"] },
   { id: "solarized-light", label: "Solarized Light", colors: ["#fdf6e3", "#268bd2"] },
+  { id: "cyber-neon", label: "Cyber Neon", colors: ["#A855F7", "#06B6D4"] },
 ];
 
 export function Sidebar() {
@@ -135,7 +143,7 @@ export function Sidebar() {
                         {t.colors.map((c, i) => (
                           <div
                             key={i}
-                            className="h-3 w-3 rounded-full border border-white/10"
+                            className="h-3 w-3 rounded-full border border-line/20"
                             style={{ backgroundColor: c }}
                           />
                         ))}

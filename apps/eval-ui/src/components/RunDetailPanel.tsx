@@ -525,7 +525,7 @@ function TokenCard({
               </p>
             </div>
           </div>
-          <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+          <div className="pt-4 border-t border-line/10 flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
               Total Load
             </span>
@@ -594,7 +594,7 @@ function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
             </span>
           </div>
         ))}
-        <div className="col-span-2 mt-2 pt-4 border-t border-white/5 flex items-center justify-between">
+        <div className="col-span-2 mt-2 pt-4 border-t border-line/10 flex items-center justify-between">
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
             Cumulative Time
           </span>

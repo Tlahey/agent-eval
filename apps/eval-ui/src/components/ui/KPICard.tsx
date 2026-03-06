@@ -17,10 +17,11 @@ export function KPICard({ icon, label, value, accent, sub, trend }: KPICardProps
   const c = colorMap[accent];
 
   return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl border ${c.border} bg-surface-1/40 p-6 backdrop-blur-sm card-hover shadow-lg shadow-black/5`}
-    >
-      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br from-white/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+    <div className={`group relative overflow-hidden rounded-2xl glass-card p-6`}>
+      <div
+        className="absolute -right-4 -top-4 h-24 w-24 rounded-full opacity-0 transition-opacity group-hover:opacity-20 blur-2xl"
+        style={{ backgroundColor: `hsl(var(--color-${accent}))` }}
+      />
       <div className="flex items-start justify-between">
         <div className={`rounded-xl p-2.5 ${c.bg} ${c.text} shadow-inner`}>{icon}</div>
         {trend && (

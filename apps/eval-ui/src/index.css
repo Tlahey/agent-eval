@@ -19,9 +19,12 @@
   --color-txt-base: 220 40% 98%;
   --color-txt-secondary: 225 20% 75%;
   --color-txt-muted: 225 15% 55%;
-  --color-txt-on-primary: 230 45% 4%; /* Dark on light primary */
+  --color-txt-on-primary: 230 45% 4%;
   --color-line: 230 45% 18%;
   --color-scheme: dark;
+  --glass-bg: hsl(230 45% 7% / 0.6);
+  --glass-border: hsl(230 45% 18% / 0.5);
+  --glow-primary: 265 90% 70% / 0.2;
   --panel-width: 95vw;
   --sidebar-width: 280px;
 }
@@ -43,16 +46,19 @@
   --color-txt-on-primary: 220 16% 22%;
   --color-line: 220 16% 40%;
   --color-scheme: dark;
+  --glass-bg: hsl(220 16% 28% / 0.7);
+  --glass-border: hsl(220 16% 40% / 0.4);
+  --glow-primary: 193 43% 67% / 0.15;
 }
 
 [data-theme="clean-blue"] {
-  --color-surface-0: 0 0% 98%; /* #F9F7F7 */
+  --color-surface-0: 0 0% 98%;
   --color-surface-1: 218 41% 94%;
-  --color-surface-2: 218 41% 90%; /* #DBE2EF */
+  --color-surface-2: 218 41% 90%;
   --color-surface-3: 218 41% 85%;
   --color-surface-4: 218 41% 80%;
-  --color-primary: 213 47% 47%; /* #3F72AF */
-  --color-accent: 213 64% 18%; /* #112D4E */
+  --color-primary: 213 47% 47%;
+  --color-accent: 213 64% 18%;
   --color-ok: 160 84% 39%;
   --color-warn: 38 92% 50%;
   --color-err: 0 84% 60%;
@@ -62,25 +68,31 @@
   --color-txt-on-primary: 0 0% 100%;
   --color-line: 213 47% 30%;
   --color-scheme: light;
+  --glass-bg: hsl(218 41% 94% / 0.8);
+  --glass-border: hsl(213 47% 30% / 0.1);
+  --glow-primary: 213 47% 47% / 0.1;
 }
 
-[data-theme="light"] {
-  --color-surface-0: 0 0% 100%;
-  --color-surface-1: 0 0% 98%;
-  --color-surface-2: 0 0% 95%;
-  --color-surface-3: 0 0% 92%;
-  --color-surface-4: 0 0% 88%;
-  --color-primary: 201 100% 40%;
-  --color-accent: 265 90% 60%;
-  --color-ok: 142 71% 45%;
-  --color-warn: 38 92% 50%;
-  --color-err: 0 84% 60%;
-  --color-txt-base: 213 64% 10%;
-  --color-txt-secondary: 213 30% 30%;
-  --color-txt-muted: 213 20% 45%;
-  --color-txt-on-primary: 0 0% 100%;
-  --color-line: 213 20% 85%;
-  --color-scheme: light;
+[data-theme="cyber-neon"] {
+  --color-surface-0: 260 40% 2%;
+  --color-surface-1: 260 40% 4%;
+  --color-surface-2: 260 40% 6%;
+  --color-surface-3: 260 40% 10%;
+  --color-surface-4: 260 40% 15%;
+  --color-primary: 280 100% 65%; /* Neon Purple */
+  --color-accent: 190 100% 50%; /* Electric Cyan */
+  --color-ok: 150 100% 50%;
+  --color-warn: 40 100% 60%;
+  --color-err: 340 100% 60%;
+  --color-txt-base: 0 0% 100%;
+  --color-txt-secondary: 260 20% 85%;
+  --color-txt-muted: 260 15% 65%;
+  --color-txt-on-primary: 260 40% 2%;
+  --color-line: 280 100% 65%; /* Replaced with pure HSL */
+  --color-scheme: dark;
+  --glass-bg: hsl(260 40% 4% / 0.4);
+  --glass-border: hsl(280 100% 65% / 0.25);
+  --glow-primary: 280 100% 65% / 0.4;
 }
 
 [data-theme="high-contrast"] {
@@ -89,78 +101,90 @@
   --color-surface-2: 0 0% 10%;
   --color-surface-3: 0 0% 15%;
   --color-surface-4: 0 0% 20%;
-  --color-primary: 60 100% 50%; /* Pure Yellow */
-  --color-accent: 180 100% 50%; /* Pure Cyan */
+  --color-primary: 60 100% 50%;
+  --color-accent: 180 100% 50%;
   --color-ok: 120 100% 50%;
   --color-warn: 45 100% 50%;
   --color-err: 0 100% 60%;
   --color-txt-base: 0 0% 100%;
   --color-txt-secondary: 0 0% 95%;
   --color-txt-muted: 0 0% 85%;
-  --color-txt-on-primary: 0 0% 0%; /* BLACK on yellow */
-  --color-line: 0 0% 100% / 0.3;
+  --color-txt-on-primary: 0 0% 0%;
+  --color-line: 0 0% 100%;
   --color-scheme: dark;
+  --glass-bg: black;
+  --glass-border: white;
+  --glow-primary: 60 100% 50% / 0.1;
 }
 
 [data-theme="solarized-light"] {
-  --color-surface-0: 44 87% 94%; /* #fdf6e3 */
+  --color-surface-0: 44 87% 94%;
   --color-surface-1: 44 87% 90%;
   --color-surface-2: 44 87% 85%;
   --color-surface-3: 44 87% 80%;
   --color-surface-4: 44 87% 75%;
-  --color-primary: 205 82% 43%; /* Blue */
-  --color-accent: 175 59% 40%; /* Cyan */
-  --color-ok: 68 100% 30%; /* Green */
-  --color-warn: 18 80% 44%; /* Orange */
-  --color-err: 1 71% 52%; /* Red */
-  --color-txt-base: 192 10% 20%; /* #073642 */
+  --color-primary: 205 82% 43%;
+  --color-accent: 175 59% 40%;
+  --color-ok: 68 100% 30%;
+  --color-warn: 18 80% 44%;
+  --color-err: 1 71% 52%;
+  --color-txt-base: 192 10% 20%;
   --color-txt-secondary: 192 10% 35%;
   --color-txt-muted: 192 10% 45%;
   --color-txt-on-primary: 0 0% 100%;
-  --color-line: 192 10% 20% / 0.1;
+  --color-line: 192 10% 20%;
   --color-scheme: light;
+  --glass-bg: hsl(44 87% 90% / 0.8);
+  --glass-border: hsl(192 10% 20% / 0.1);
+  --glow-primary: 205 82% 43% / 0.1;
 }
 
-/* ... reste du fichier inchangé ... */
+/* ─── Base Styles ─── */
+
 @layer base {
   body {
     background-color: hsl(var(--color-surface-0));
     color: hsl(var(--color-txt-base));
     -webkit-font-smoothing: antialiased;
     color-scheme: var(--color-scheme);
-    font-family:
-      "Inter Variable",
-      "Inter",
-      system-ui,
-      -apple-system,
-      sans-serif;
-
+    font-family: "Inter Variable", "Inter", system-ui, sans-serif;
     background-image:
-      radial-gradient(at 0% 0%, hsl(var(--color-primary) / 0.05) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsl(var(--color-accent) / 0.05) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, hsl(var(--color-surface-3) / 0.1) 0px, transparent 80%);
+      radial-gradient(at 0% 0%, hsl(var(--color-primary) / 0.08) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsl(var(--color-accent) / 0.08) 0px, transparent 50%);
     background-attachment: fixed;
   }
 
   *,
   ::before,
   ::after {
-    border-color: hsl(var(--color-line) / 0.3);
+    border-color: currentColor; /* Use currentColor to inherit color */
+    @apply border-line/20; /* Default border style */
   }
 }
 
 @layer components {
-  .glass-panel {
-    background-color: hsl(var(--color-surface-2) / 0.75);
-    border: 1px solid hsl(var(--color-line) / 0.25);
-    @apply backdrop-blur-2xl shadow-2xl;
+  .glass-card {
+    background-color: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
   }
 
-  .card-hover {
-    @apply transition-all duration-500;
+  .glow-border {
+    position: relative;
   }
-  .card-hover:hover {
-    border-color: hsl(var(--color-primary) / 0.4);
+  .glow-border::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(45deg, hsl(var(--color-primary)), hsl(var(--color-accent)));
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    z-index: -1;
+    border-radius: inherit;
+    opacity: 0.3;
   }
 }
 
@@ -169,18 +193,19 @@
   width: 6px;
   height: 6px;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
 ::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--color-txt-muted) / 0.3);
+  background-color: hsl(var(--color-primary) / 0.3);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--color-primary));
 }
 
-/* ─── Diff Styles ─── */
+.score-ring {
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Diff Styles (CRITICAL: DO NOT MODIFY COLORS - GH STYLE) ─── */
 .diff-file-header {
   display: flex;
   align-items: center;
@@ -201,40 +226,21 @@
   border-right: 1px solid hsl(var(--color-line) / 0.2);
   background-color: hsl(var(--color-surface-0) / 0.3);
 }
+/* GitHub-like green for additions */
 .diff-add {
-  background-color: hsl(var(--color-ok) / 0.08);
+  background-color: hsla(142, 71%, 45%, 0.15) !important;
 }
 .diff-add .diff-code {
-  color: hsl(var(--color-ok));
+  color: hsl(var(--color-ok)) !important;
 }
+/* GitHub-like red for deletions */
 .diff-del {
-  background-color: hsl(var(--color-err) / 0.08);
+  background-color: hsla(0, 84%, 60%, 0.15) !important;
 }
 .diff-del .diff-code {
-  color: hsl(var(--color-err));
+  color: hsl(var(--color-err)) !important;
 }
 .diff-hunk {
   background-color: hsl(var(--color-primary) / 0.15);
   @apply text-primary font-black py-1 text-[10px];
-}
-
-/* ─── Animations ─── */
-@keyframes nebula-pulse {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.05);
-  }
-}
-.animate-nebula {
-  animation: nebula-pulse 10s infinite ease-in-out;
-}
-
-/* ─── Score ring ─── */
-.score-ring {
-  transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

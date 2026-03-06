@@ -23,10 +23,10 @@ export default {
         err: "hsl(var(--color-err) / <alpha-value>)",
         warn: "hsl(var(--color-warn) / <alpha-value>)",
         info: "hsl(var(--color-info) / <alpha-value>)",
-        divider: "hsl(var(--color-line) / <alpha-value>)",
+        line: "hsl(var(--color-line) / <alpha-value>)",
       },
       borderColor: {
-        DEFAULT: "hsl(var(--color-line) / 0.3)",
+        DEFAULT: "hsl(var(--color-line) / 0.2)",
       },
       fontFamily: {
         mono: ["SF Mono", "Fira Code", "Cascadia Code", "monospace"],

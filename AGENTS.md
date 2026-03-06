@@ -500,6 +500,14 @@ The framework uses Dependency Inversion for all extensible operations:
 
 ## 📝 Coding Conventions
 
+### UI & Styling
+
+- **CSS variables only**: NEVER use hardcoded Tailwind color classes (e.g., `text-white`, `bg-zinc-800`, `border-gray-200`). Use semantic theme variables instead:
+  - Colors: `text-txt-base`, `text-txt-muted`, `bg-surface-1`, `border-line`, `text-primary`.
+  - Special: Use `.glass-card` for translucent containers and `text-txt-onprimary` for text on primary backgrounds.
+- **Translucency**: Favor glassmorphism (`backdrop-blur`) for a modern feel.
+- **Responsiveness**: Always use `flex-wrap` and grid adjustments for small screens.
+
 ### TypeScript
 
 - **Strict mode** enabled. No `any` types.
