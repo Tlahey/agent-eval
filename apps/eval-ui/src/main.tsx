@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { App } from "./App";
-import { Overview } from "./pages/Overview";
+import { Overview } from "./pages/Overview/Overview";
 import { Runs } from "./pages/Runs";
 import { EvalDetail } from "./pages/EvalDetail/EvalDetail";
 import "./index.css";

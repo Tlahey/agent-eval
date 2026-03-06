@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
-import { renderPage } from "../test/render";
+import { renderPage } from "../../test/render";
 import { Overview } from "./Overview";
-import { createMockRuns, createMockStats } from "../test/fixtures";
+import { createMockRuns, createMockStats } from "../../test/fixtures";
 
 // Mock recharts to avoid SVG measurement issues in jsdom
 vi.mock("recharts", async () => {
@@ -15,12 +15,12 @@ vi.mock("recharts", async () => {
   };
 });
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   fetchRuns: vi.fn(),
   fetchStats: vi.fn(),
 }));
 
-import { fetchRuns, fetchStats } from "../lib/api";
+import { fetchRuns, fetchStats } from "../../lib/api";
 
 const mockFetchRuns = vi.mocked(fetchRuns);
 const mockFetchStats = vi.mocked(fetchStats);
