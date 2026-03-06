@@ -43,7 +43,7 @@ export function Sidebar() {
   }, [currentTheme]);
 
   return (
-    <aside className="relative flex h-full w-[var(--sidebar-width)] flex-col bg-surface-0 p-4">
+    <aside className="relative flex h-full w-[var(--sidebar-width)] flex-shrink-0 flex-col bg-surface-0 p-4">
       <div className="flex h-full flex-col overflow-hidden rounded-2xl border bg-surface-1/50 backdrop-blur-xl shadow-2xl shadow-black/20">
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-8">
@@ -187,6 +187,7 @@ function TreeNode({
     return (
       <NavLink
         to={to}
+        title={node.name}
         className={`group flex items-center gap-2 rounded-lg py-1.5 text-xs font-medium transition-all ${
           isActive
             ? "bg-primary/10 text-primary"
@@ -194,23 +195,30 @@ function TreeNode({
         }`}
         style={{ paddingLeft: `${depth * 12 + 12}px` }}
       >
-        <FlaskConical size={13} className={isActive ? "text-primary" : "text-txt-muted"} />
-        <span className="truncate">{node.name}</span>
+        <FlaskConical
+          size={13}
+          className={`shrink-0 ${isActive ? "text-primary" : "text-txt-muted"}`}
+        />
+        <span className="truncate flex-1 min-w-0">{node.name}</span>
       </NavLink>
     );
   }
 
   // Suite node
   return (
-    <div>
+    <div className="min-w-0">
       <button
         onClick={() => setExpanded(!expanded)}
+        title={node.name}
         className="group flex w-full items-center gap-2 rounded-lg py-1.5 text-xs font-semibold text-txt-muted transition-all hover:bg-surface-3 hover:text-txt-base"
         style={{ paddingLeft: `${depth * 12 + 12}px` }}
       >
-        <ChevronRight size={12} className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
-        <Folder size={13} />
-        <span className="truncate">{node.name}</span>
+        <ChevronRight
+          size={12}
+          className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+        <Folder size={13} className="shrink-0" />
+        <span className="truncate flex-1 text-left min-w-0">{node.name}</span>
       </button>
       {expanded && node.children && (
         <div>

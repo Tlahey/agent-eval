@@ -8,7 +8,7 @@ interface Props {
 
 export function Markdown({ content, className = "" }: Props) {
   return (
-    <div className={`prose-sm prose-invert max-w-none ${className}`}>
+    <div className={`prose-sm max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -27,8 +27,14 @@ export function Markdown({ content, className = "" }: Props) {
           p: ({ children }) => (
             <p className="mb-3 text-sm leading-relaxed text-txt-secondary">{children}</p>
           ),
-          ul: ({ children }) => <ul className="mb-4 ml-4 list-disc space-y-1">{children}</ul>,
-          ol: ({ children }) => <ol className="mb-4 ml-4 list-decimal space-y-1">{children}</ol>,
+          strong: ({ children }) => <strong className="font-bold text-txt-base">{children}</strong>,
+          em: ({ children }) => <em className="italic text-txt-base">{children}</em>,
+          ul: ({ children }) => (
+            <ul className="mb-4 ml-4 list-disc space-y-1 text-txt-secondary">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="mb-4 ml-4 list-decimal space-y-1 text-txt-secondary">{children}</ol>
+          ),
           li: ({ children }) => <li className="text-sm text-txt-secondary">{children}</li>,
           code: ({ children, className }) => {
             const isInline = !className;

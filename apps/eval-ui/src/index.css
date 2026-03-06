@@ -22,6 +22,7 @@
   --color-line: 230 45% 18%;
   --color-scheme: dark;
   --panel-width: 95vw;
+  --sidebar-width: 280px;
 }
 
 [data-theme="nord"] {
@@ -55,7 +56,7 @@
   --color-err: 0 84% 60%;
   --color-txt-base: 213 64% 10%;
   --color-txt-secondary: 213 30% 30%;
-  --color-txt-muted: 213 20% 50%;
+  --color-txt-muted: 213 20% 35%; /* Darkened from 50% to 35% for contrast */
   --color-line: 213 47% 30%;
   --color-scheme: light;
 }

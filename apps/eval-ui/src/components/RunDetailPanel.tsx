@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   X,
   MessageSquareText,
@@ -17,11 +18,10 @@ import {
   Zap,
   CheckCircle2,
   XCircle,
-  Info,
+  BarChart3,
 } from "lucide-react";
-import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import type { LedgerRun, TokenUsage } from "../lib/api";
-import { overrideScore, fetchRuns } from "../lib/api";
+import { overrideScore } from "../lib/api";
 import { ScoreRing } from "./ScoreRing";
 import { DiffViewer } from "./DiffViewer";
 import { OverrideScoreModal } from "./OverrideScoreModal";
@@ -36,6 +36,7 @@ interface Props {
 }
 
 export function RunDetailPanel({ run, onClose, onOverride }: Props) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("summary");
   const [showOverrideModal, setShowOverrideModal] = useState(false);
 
@@ -49,6 +50,11 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
     await overrideScore(run.id, score, reason);
     setShowOverrideModal(false);
     onOverride?.();
+  };
+
+  const handleViewAnalytics = () => {
+    onClose();
+    navigate(`/evals/${encodeURIComponent(run.testId)}`);
   };
 
   return (
@@ -99,6 +105,14 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleViewAnalytics}
+                className="flex h-10 gap-2 items-center px-4 rounded-xl border bg-surface-2 text-txt-muted transition-all hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/20"
+                title="View detailed analytics"
+              >
+                <BarChart3 size={18} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Analytics</span>
+              </button>
               <button
                 onClick={() => setShowOverrideModal(true)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border bg-surface-2 text-txt-muted transition-all hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/20"
@@ -311,13 +325,13 @@ function TasksViewer({ run }: { run: LedgerRun }) {
             </div>
 
             {(tr.result.stdout || tr.result.stderr) && (
-              <div className="relative overflow-hidden rounded-xl border bg-black/40">
-                <div className="flex items-center justify-between bg-surface-3 px-4 py-2">
+              <div className="relative overflow-hidden rounded-xl border bg-surface-4/20">
+                <div className="flex items-center justify-between bg-surface-3/50 px-4 py-2 border-b">
                   <span className="text-[9px] font-black uppercase tracking-[0.2em] text-txt-muted">
                     Console Output
                   </span>
                 </div>
-                <pre className="max-h-64 overflow-auto p-4 font-mono text-[11px] leading-relaxed text-zinc-400 custom-scrollbar">
+                <pre className="max-h-64 overflow-auto p-4 font-mono text-[11px] leading-relaxed text-txt-secondary custom-scrollbar">
                   {tr.result.stdout}
                   {tr.result.stderr && <span className="text-err">{tr.result.stderr}</span>}
                 </pre>
@@ -331,32 +345,10 @@ function TasksViewer({ run }: { run: LedgerRun }) {
 }
 
 function MetricsViewer({ run }: { run: LedgerRun }) {
-  const [history, setHistory] = useState<LedgerRun[]>([]);
   const agentTokens = run.agentTokenUsage;
   const judgeTokens = run.judgeTokenUsage;
   const totalTokens = (agentTokens?.totalTokens ?? 0) + (judgeTokens?.totalTokens ?? 0);
   const timing = run.timing;
-
-  useEffect(() => {
-    fetchRuns(run.testId)
-      .then((runs) => {
-        const filtered = runs
-          .filter((r) => r.agentRunner === run.agentRunner)
-          .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-        setHistory(filtered);
-      })
-      .catch(() => {});
-  }, [run.testId, run.agentRunner]);
-
-  const trendData = history.map((r) => ({
-    value: r.agentTokenUsage?.totalTokens ?? 0,
-  }));
-
-  const lastTokens =
-    history.length > 1 ? (history[history.length - 2].agentTokenUsage?.totalTokens ?? 0) : 0;
-  const currentTokens = agentTokens?.totalTokens ?? 0;
-  const diff = currentTokens - lastTokens;
-  const percentChange = lastTokens > 0 ? ((diff / lastTokens) * 100).toFixed(0) : null;
 
   return (
     <div className="space-y-8 pb-8">
@@ -388,11 +380,6 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
             icon={<Bot size={16} />}
             tokens={agentTokens}
             accent="primary"
-            trend={
-              percentChange !== null
-                ? { value: Math.abs(Number(percentChange)), positive: diff < 0 }
-                : undefined
-            }
           />
 
           {/* Judge Token Card */}
@@ -403,69 +390,6 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
             accent="accent"
           />
         </div>
-
-        {trendData.length > 1 && (
-          <div className="mt-6 rounded-2xl border bg-surface-1/50 p-6 relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
-                  Token Consumption Velocity
-                </span>
-                <div className="group relative flex items-center justify-center">
-                  <Info
-                    size={12}
-                    className="text-txt-muted cursor-help transition-colors hover:text-primary"
-                  />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-48 rounded-lg border bg-surface-2 p-2 text-center text-[10px] font-medium leading-relaxed text-txt-secondary shadow-xl group-hover:block z-10">
-                    Tracks the agent's total token consumption over recent executions of this
-                    specific evaluation.
-                  </div>
-                </div>
-              </div>
-              <TrendingUp size={14} className="text-primary opacity-40" />
-            </div>{" "}
-            <div className="h-32 w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="panelColorTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--color-primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--color-primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip
-                    cursor={{
-                      stroke: "hsl(var(--color-primary))",
-                      strokeWidth: 1,
-                      strokeDasharray: "4 4",
-                    }}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--color-surface-2))",
-                      border: "1px solid hsl(var(--color-line) / 0.12)",
-                      borderRadius: "8px",
-                      fontSize: 11,
-                    }}
-                    itemStyle={{ color: "hsl(var(--color-primary))", fontWeight: 700 }}
-                    labelStyle={{ display: "none" }}
-                    formatter={(value: number) => [`${value.toLocaleString()} tokens`, "Usage"]}
-                  />
-                  <YAxis hide domain={["dataMin - 100", "dataMax + 100"]} />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="hsl(var(--color-primary))"
-                    fillOpacity={1}
-                    fill="url(#panelColorTokens)"
-                    strokeWidth={3}
-                    dot={{ r: 3, fill: "hsl(var(--color-primary))", strokeWidth: 0 }}
-                    activeDot={{ r: 5, strokeWidth: 0 }}
-                    animationDuration={1500}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
       </section>
 
       {/* Latency Analysis */}
@@ -480,7 +404,6 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
         </div>
         <TimingAnalysis timing={timing} />
       </section>
-
       {/* File System Modifications */}
       {run.changedFiles && run.changedFiles.length > 0 && (
         <section className="space-y-4">
