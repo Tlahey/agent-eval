@@ -1,6 +1,6 @@
 {
   "name": "agent-eval-monorepo",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha",
   "private": true,
   "type": "module",
   "description": "AgentEval – AI coding agent evaluation framework",
