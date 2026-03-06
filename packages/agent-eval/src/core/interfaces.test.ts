@@ -32,6 +32,7 @@ describe("Plugin Interfaces", () => {
           timestamp: new Date().toISOString(),
         }),
         getRunOverrides: () => [],
+        getTags: () => [],
       };
       expect(mockLedger.name).toBe("mock-ledger");
       expect(typeof mockLedger.initialize).toBe("function");
@@ -44,6 +45,7 @@ describe("Plugin Interfaces", () => {
       expect(typeof mockLedger.getStats).toBe("function");
       expect(typeof mockLedger.overrideRunScore).toBe("function");
       expect(typeof mockLedger.getRunOverrides).toBe("function");
+      expect(typeof mockLedger.getTags).toBe("function");
     });
 
     it("allows optional close method", () => {
@@ -65,6 +67,7 @@ describe("Plugin Interfaces", () => {
           timestamp: new Date().toISOString(),
         }),
         getRunOverrides: () => [],
+        getTags: () => [],
         close: () => {},
       };
       expect(typeof withClose.close).toBe("function");
