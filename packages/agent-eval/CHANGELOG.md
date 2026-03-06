@@ -1,4 +1,10 @@
-# agent-eval
+# @tlahey/agent-eval
+
+## 0.1.1-alpha
+
+### Patch Changes
+
+- Maintenance release 0.1.1-alpha. Fixed assets synchronization in npm package, corrected GitHub-style diff background colors, and refined the analytical explorer's agent ranking display.
 
 ## 0.1.0-alpha
 
