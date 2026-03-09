@@ -80,6 +80,7 @@ describe("Plugin Interfaces", () => {
         name: "mock-judge",
         judge: async () => ({
           pass: true,
+          status: "PASS" as const,
           score: 0.85,
           reason: "Looks good",
           improvement: "Minor cleanup",

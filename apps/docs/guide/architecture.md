@@ -107,15 +107,15 @@ flowchart TB
 
 ## Architecture Decisions
 
-| ADR                                                                | Decision                                                   |
-| :----------------------------------------------------------------- | :--------------------------------------------------------- |
-| [ADR-001](./001-why-custom-framework.md)                           | Why a custom framework (not Vitest / Promptfoo / Langfuse) |
-| [ADR-002](./002-sqlite-over-jsonl.md)                              | SQLite over JSONL for the ledger                           |
-| [ADR-003](./003-sequential-execution.md)                           | **Superseded by ADR-010**                                  |
-| [ADR-004](./004-llm-as-judge.md)                                   | LLM-as-a-Judge with Vercel AI SDK                          |
-| [ADR-005](./005-monorepo-layout.md)                                | Monorepo layout (apps/ + packages/)                        |
-| [ADR-006](./006-code-quality-gates.md)                             | Code quality gates (ESLint + Prettier + Husky)             |
-| [ADR-007](./007-solid-architecture.md)                             | SOLID architecture principles                              |
-| [ADR-008](./008-experimentation-and-unified-test-format.md)        | Unified mission-based testing and A/B Experiments          |
-| [ADR-009](./009-explicit-runner-selection-and-unified-variants.md) | Mandatory variants and Zero-Magic philosophy               |
-| [ADR-010](./010-isolated-parallel-execution.md)                    | Isolated parallel execution via Docker/Tmp dirs            |
+| ADR                                                                      | Decision                                                   |
+| :----------------------------------------------------------------------- | :--------------------------------------------------------- |
+| [ADR-001](../adrs/001-why-custom-framework.md)                           | Why a custom framework (not Vitest / Promptfoo / Langfuse) |
+| [ADR-002](../adrs/002-sqlite-over-jsonl.md)                              | SQLite over JSONL for the ledger                           |
+| [ADR-003](../adrs/003-sequential-execution.md)                           | **Superseded by ADR-010**                                  |
+| [ADR-004](../adrs/004-llm-as-judge.md)                                   | LLM-as-a-Judge with Vercel AI SDK                          |
+| [ADR-005](../adrs/005-monorepo-layout.md)                                | Monorepo layout (apps/ + packages/)                        |
+| [ADR-006](../adrs/006-code-quality-gates.md)                             | Code quality gates (ESLint + Prettier + Husky)             |
+| [ADR-007](../adrs/007-solid-architecture.md)                             | SOLID architecture principles                              |
+| [ADR-008](../adrs/008-experimentation-and-unified-test-format.md)        | Unified mission-based testing and A/B Experiments          |
+| [ADR-009](../adrs/009-explicit-runner-selection-and-unified-variants.md) | Mandatory variants and Zero-Magic philosophy               |
+| [ADR-010](../adrs/010-isolated-parallel-execution.md)                    | Isolated parallel execution via Docker/Tmp dirs            |

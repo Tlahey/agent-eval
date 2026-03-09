@@ -26,9 +26,10 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 /** Get the model identifier from an LlmConfig (IModelPlugin or ICliModel). */
-function resolveModelId(llm: LlmConfig | undefined): string {
+function resolveModelId(llm: LlmConfig | import("./interfaces.js").ICliModel | undefined): string {
   if (!llm) return "unknown";
-  return isCliModel(llm) ? llm.name : (llm.modelId ?? "unknown");
+  if (isCliModel(llm)) return llm.name;
+  return (llm as LlmConfig).modelId || "unknown";
 }
 
 /**
