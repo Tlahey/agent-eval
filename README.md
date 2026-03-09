@@ -21,12 +21,28 @@
 
 ## Dashboard
 
+### Overview & Global KPIs
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/overview.png" alt="Overview — KPIs, score trends, and resource telemetry" width="100%" />
 </p>
 
+### A/B Testing & Delta Analysis
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/eval-detail.png" alt="Explorer — hierarchical tree view with top agent rankings" width="100%" />
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/eval-detail.png" alt="Eval Detail — A/B comparison grid and delta analysis" width="100%" />
+</p>
+
+### Runs Ledger & History
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/all-runs.png" alt="All Runs — historical ledger of all evaluation iterations" width="100%" />
+</p>
+
+### Deep Run Inspection
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Tlahey/agent-eval/main/assets/screenshots/run-detail.png" alt="Run Detail — judge reasoning, diff viewer and telemetry" width="100%" />
 </p>
 
 ---
@@ -135,8 +151,6 @@ test(
   },
 );
 ```
-
-For examples it's possible to compare different models, a model against itself with skills.
 
 ---
 
