@@ -112,6 +112,11 @@ export function useEvalDetail() {
     };
   }, [variantStats, compareA, compareB]);
 
+  // Data for EvalCharts
+  const trendData = useMemo(() => buildTrendData(allRuns, runners), [allRuns, runners]);
+  const radarData = useMemo(() => buildRadarData(allRuns, runners), [allRuns, runners]);
+  const distributionData = useMemo(() => buildDistributionData(allRuns), [allRuns]);
+
   const updateParams = (updates: Record<string, string | null>) => {
     const newParams = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
@@ -143,6 +148,9 @@ export function useEvalDetail() {
     comparison,
     compareA,
     compareB,
+    trendData,
+    radarData,
+    distributionData,
     variantFilter,
     runnerFilter,
     statusFilter,
@@ -184,4 +192,85 @@ function buildVariantStats(runs: LedgerRun[]): VariantStats[] {
       };
     })
     .sort((a, b) => b.avgScore - a.avgScore);
+}
+
+function buildTrendData(runs: LedgerRun[], runners: string[]) {
+  const byDate = new Map<string, Record<string, number[]>>();
+
+  runs.forEach((r) => {
+    const date = new Date(r.timestamp).toLocaleDateString();
+    if (!byDate.has(date)) byDate.set(date, {});
+    const day = byDate.get(date)!;
+    if (!day[r.agentRunner]) day[r.agentRunner] = [];
+    day[r.agentRunner].push(r.score);
+  });
+
+  return Array.from(byDate.entries())
+    .map(([date, dayRunners]) => {
+      const entry: any = { date };
+      runners.forEach((runner) => {
+        if (dayRunners[runner]) {
+          entry[runner] = dayRunners[runner].reduce((a, b) => a + b, 0) / dayRunners[runner].length;
+        }
+      });
+      return entry;
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+function buildRadarData(runs: LedgerRun[], runners: string[]) {
+  const metrics = [
+    { subject: "Score", key: "score", scale: 100 },
+    { subject: "Success", key: "pass", scale: 100 },
+    { subject: "Stability", key: "stability", scale: 100 },
+    { subject: "Efficiency", key: "efficiency", scale: 100 },
+    { subject: "Speed", key: "speed", scale: 100 },
+  ];
+
+  return metrics.map((m) => {
+    const entry: any = { subject: m.subject };
+    runners.forEach((runner) => {
+      const rRuns = runs.filter((r) => r.agentRunner === runner);
+      if (rRuns.length === 0) {
+        entry[runner] = 0;
+        return;
+      }
+
+      if (m.key === "score") {
+        entry[runner] = (rRuns.reduce((s, r) => s + r.score, 0) / rRuns.length) * 100;
+      } else if (m.key === "pass") {
+        entry[runner] = (rRuns.filter((r) => r.pass).length / rRuns.length) * 100;
+      } else if (m.key === "stability") {
+        const scores = rRuns.map((r) => r.score);
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const variance = scores.reduce((s, x) => s + Math.pow(x - avg, 2), 0) / scores.length;
+        entry[runner] = Math.max(0, 1 - Math.sqrt(variance)) * 100;
+      } else if (m.key === "efficiency") {
+        const avgTokens =
+          rRuns.reduce((s, r) => s + (r.agentTokenUsage?.totalTokens || 5000), 0) / rRuns.length;
+        entry[runner] = Math.max(0, 1 - avgTokens / 10000) * 100;
+      } else if (m.key === "speed") {
+        const avgMs = rRuns.reduce((s, r) => s + r.durationMs, 0) / rRuns.length;
+        entry[runner] = Math.max(0, 1 - avgMs / 60000) * 100;
+      }
+    });
+    return entry;
+  });
+}
+
+function buildDistributionData(runs: LedgerRun[]) {
+  const buckets = [
+    { range: "0-20%", min: 0, max: 0.2 },
+    { range: "20-40%", min: 0.2, max: 0.4 },
+    { range: "40-60%", min: 0.4, max: 0.6 },
+    { range: "60-80%", min: 0.6, max: 0.8 },
+    { range: "80-100%", min: 0.8, max: 1.0 },
+  ];
+
+  return buckets.map((b) => ({
+    range: b.range,
+    midpoint: (b.min + b.max) / 2,
+    count: runs.filter((r) => r.score >= b.min && r.score < b.max + (b.max === 1 ? 0.01 : 0))
+      .length,
+  }));
 }

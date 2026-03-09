@@ -3,6 +3,7 @@ import { EvalHeader } from "./components/EvalHeader";
 import { EvalHistory } from "./components/EvalHistory";
 import { VariantGrid } from "./components/VariantGrid";
 import { ComparisonPanel } from "./components/ComparisonPanel";
+import { EvalCharts } from "./components/EvalCharts";
 import { FlaskConical } from "lucide-react";
 
 export function EvalDetail() {
@@ -11,6 +12,7 @@ export function EvalDetail() {
     loading,
     allRuns,
     variants,
+    runners,
     currentRuns,
     totalRunsCount,
     totalPages,
@@ -19,6 +21,9 @@ export function EvalDetail() {
     comparison,
     compareA,
     compareB,
+    trendData,
+    radarData,
+    distributionData,
     variantFilter,
     runnerFilter,
     statusFilter,
@@ -60,7 +65,6 @@ export function EvalDetail() {
     } else if (!compareB) {
       updateParams({ compareB: variant });
     } else {
-      // Both full, replace B
       updateParams({ compareB: variant });
     }
   };
@@ -103,6 +107,23 @@ export function EvalDetail() {
         </section>
       )}
 
+      {/* Re-integrated Analytics Section */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xs font-black text-txt-muted uppercase tracking-[0.2em]">
+            Deep Analytics
+          </h2>
+          <div className="h-px flex-1 bg-gradient-to-r from-line/30 to-transparent" />
+        </div>
+
+        <EvalCharts
+          runners={runners}
+          trendData={trendData}
+          radarData={radarData}
+          distributionData={distributionData}
+        />
+      </section>
+
       <section className="space-y-6">
         <div className="flex items-center gap-3">
           <h2 className="text-xs font-black text-txt-muted uppercase tracking-[0.2em]">
@@ -116,7 +137,7 @@ export function EvalDetail() {
           totalRunsCount={totalRunsCount}
           totalPages={totalPages}
           currentPage={currentPage}
-          runners={[...new Set(allRuns.map((r) => r.agentRunner))]}
+          runners={runners}
           runnerFilter={runnerFilter}
           statusFilter={statusFilter}
           sortField={sortField}

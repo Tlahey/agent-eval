@@ -15,13 +15,30 @@ vi.mock("../../lib/api", async () => {
   };
 });
 
+// Mock Recharts to avoid SVG errors in JSDOM
+vi.mock("recharts", async () => {
+  const actual = await vi.importActual("recharts");
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: any) => (
+      <div style={{ width: 800, height: 400 }}>{children}</div>
+    ),
+  };
+});
+
 const mockFetchRuns = vi.mocked(api.fetchRuns);
 
 describe("EvalDetail", () => {
   const testId = "create dark mode toggle";
   const mockRuns = [
-    createMockRun({ id: 1, testId, agentRunner: "copilot", variantName: "Baseline" }),
-    createMockRun({ id: 2, testId, agentRunner: "cursor", variantName: "Expert" }),
+    createMockRun({ id: 1, testId, agentRunner: "gpt-4o", variantName: "Baseline", score: 0.8 }),
+    createMockRun({
+      id: 2,
+      testId,
+      agentRunner: "claude-3-5-sonnet",
+      variantName: "Expert",
+      score: 0.9,
+    }),
   ];
 
   beforeEach(() => {
@@ -48,9 +65,18 @@ describe("EvalDetail", () => {
     renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
     await waitFor(() => {
       expect(screen.getByText("Experiment Variations")).toBeInTheDocument();
-      // Look for headings level 3 for variant names to avoid table cell matches
       expect(screen.getByRole("heading", { level: 3, name: "Baseline" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { level: 3, name: "Expert" })).toBeInTheDocument();
+    });
+  });
+
+  it("renders the analytics section", async () => {
+    renderPage(<EvalDetail />, { path: `/evals/${encodeURIComponent(testId)}` });
+    await waitFor(() => {
+      expect(screen.getByText("Deep Analytics")).toBeInTheDocument();
+      expect(screen.getByText("Historical Performance")).toBeInTheDocument();
+      expect(screen.getByText("Capabilities Matrix")).toBeInTheDocument();
+      expect(screen.getByText("Score Distribution")).toBeInTheDocument();
     });
   });
 
