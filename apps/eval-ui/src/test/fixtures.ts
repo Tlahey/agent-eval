@@ -1,4 +1,4 @@
-import type { LedgerRun, CommandResult, RunnerStats, TestStatus } from "../lib/api";
+import type { LedgerRun, RunnerStats, TestStatus } from "../lib/api";
 import type { TestTreeNode } from "../lib/api";
 
 function computeStatus(score: number, thresholds = { warn: 0.8, fail: 0.5 }): TestStatus {
@@ -13,159 +13,70 @@ export function createMockRun(overrides: Partial<LedgerRun> = {}): LedgerRun {
   const status = overrides.status ?? computeStatus(score, thresholds);
   return {
     id: 1,
-    testId: "add close button to Banner",
-    suitePath: ["UI Components", "Banner"],
-    timestamp: "2026-02-20T10:00:00.000Z",
-    variantName: "Baseline",
-    basePrompt: "Add a close button to the Banner component",
-    agentRunner: "copilot",
-    instruction: "Add a close button to the Banner component",
-    diff: `diff --git a/src/Banner.tsx b/src/Banner.tsx
-index 1234567..abcdefg 100644
---- a/src/Banner.tsx
-+++ b/src/Banner.tsx
-@@ -1,4 +1,8 @@
- import React from "react";
-+import { IoClose } from "react-icons/io5";
- 
- export const Banner = ({ text }) => {
--  return <div className="banner">{text}</div>;
-+  return (
-+    <div className="banner">
-+      {text}
-+      <button onClick={() => {}} aria-label="Close"><IoClose /></button>
-+    </div>
-+  );
- };`,
-    changedFiles: ["src/Banner.tsx"],
-    commands: [
-      {
-        name: "unit tests",
-        command: "pnpm test",
-        stdout: "Tests: 5 passed",
-        stderr: "",
-        exitCode: 0,
-        durationMs: 4200,
-      },
-      {
-        name: "type check",
-        command: "tsc --noEmit",
-        stdout: "",
-        stderr: "error TS2345: Argument of type...",
-        exitCode: 1,
-        durationMs: 3100,
-      },
-    ],
-    taskResults: [
-      {
-        task: { name: "unit tests", criteria: "All unit tests should pass", weight: 1 },
-        result: {
-          name: "unit tests",
-          command: "pnpm test",
-          stdout: "Tests: 5 passed",
-          stderr: "",
-          exitCode: 0,
-          durationMs: 4200,
-        },
-      },
-    ],
-    agentTokenUsage: { inputTokens: 1500, outputTokens: 800, totalTokens: 2300 },
-    judgeTokenUsage: { inputTokens: 2200, outputTokens: 350, totalTokens: 2550 },
-    timing: { totalMs: 45000, setupMs: 500, agentMs: 30000, tasksMs: 7300, judgeMs: 7200 },
+    testId: "complex-refactoring-task",
+    suitePath: ["AB Tests"],
+    timestamp: new Date().toISOString(),
+    variantName: "baseline",
+    basePrompt: "Refactor this legacy code",
+    agentRunner: "gpt-4o",
+    instruction: "Refactor this legacy code",
+    diff: "diff content",
+    changedFiles: ["src/main.ts"],
+    commands: [],
+    taskResults: [],
+    agentTokenUsage: { inputTokens: 2000, outputTokens: 1000, totalTokens: 3000 },
+    judgeTokenUsage: { inputTokens: 1500, outputTokens: 300, totalTokens: 1800 },
+    timing: { totalMs: 30000, agentMs: 25000, judgeMs: 5000 },
     logs: "",
     judgeModel: "gpt-4o",
     score,
     pass: status !== "FAIL",
     status,
-    reason: "The close button was added correctly with proper event handling.",
-    improvement: "Consider adding an aria-label for accessibility.",
-    criteria: "The close button should dismiss the banner and be accessible",
-    expectedFiles: ["src/Banner.tsx"],
-    durationMs: 45000,
+    reason: "Reasoning",
+    improvement: "Improvement",
+    criteria: "Criteria",
+    expectedFiles: ["src/main.ts"],
+    durationMs: 30000,
     thresholds,
     ...overrides,
   };
 }
 
 export function createMockRuns(count = 5): LedgerRun[] {
-  const runners = ["copilot", "cursor", "claude-code", "aider"];
-  const testIds = ["add close button to Banner", "implement search with debounce"];
-  const variants = ["Baseline", "Expert Persona", "Detailed Specs"];
+  const variants = ["baseline", "with skills", "with MCP", "skill-v2-optimized"];
+  const runners = ["gpt-4o", "claude-3-5-sonnet"];
 
   return Array.from({ length: count }, (_, i) => {
-    const score = 0.5 + Math.random() * 0.5;
+    const variantName = variants[i % variants.length];
+    const scoreBoost = variantName === "baseline" ? 0 : 0.1 + (i % 3) * 0.05;
+    const score = Math.min(1, 0.6 + scoreBoost);
+
     return createMockRun({
       id: i + 1,
-      testId: testIds[i % testIds.length],
+      variantName,
       agentRunner: runners[i % runners.length],
-      variantName: variants[i % variants.length],
       score,
-      timestamp: new Date(Date.now() - i * 86400000).toISOString(),
-      durationMs: 20000 + i * 10000,
+      timestamp: new Date(Date.now() - i * 3600000).toISOString(),
     });
   });
 }
 
 export function createMockStats(): RunnerStats[] {
   return [
-    { agentRunner: "copilot", totalRuns: 20, avgScore: 0.85, passRate: 0.9 },
-    { agentRunner: "cursor", totalRuns: 18, avgScore: 0.74, passRate: 0.72 },
-    { agentRunner: "claude-code", totalRuns: 17, avgScore: 0.86, passRate: 0.88 },
-    { agentRunner: "aider", totalRuns: 17, avgScore: 0.67, passRate: 0.59 },
-  ];
-}
-
-export function createMockCommands(): CommandResult[] {
-  return [
-    {
-      name: "unit tests",
-      command: "pnpm test",
-      stdout: "Tests: 10 passed (10)",
-      stderr: "",
-      exitCode: 0,
-      durationMs: 5000,
-    },
-    {
-      name: "lint",
-      command: "pnpm lint",
-      stdout: "",
-      stderr: "2 errors found",
-      exitCode: 1,
-      durationMs: 2000,
-    },
+    { agentRunner: "gpt-4o", totalRuns: 50, avgScore: 0.82, passRate: 0.85 },
+    { agentRunner: "claude-3-5-sonnet", totalRuns: 45, avgScore: 0.88, passRate: 0.92 },
   ];
 }
 
 export function createMockTree(): TestTreeNode[] {
   return [
     {
-      name: "UI Components",
+      name: "AB Tests",
       type: "suite",
       children: [
-        {
-          name: "Banner",
-          type: "suite",
-          children: [
-            {
-              name: "add close button to Banner",
-              type: "test",
-              testId: "add close button to Banner",
-            },
-          ],
-        },
-        {
-          name: "Search",
-          type: "suite",
-          children: [
-            {
-              name: "implement search with debounce",
-              type: "test",
-              testId: "implement search with debounce",
-            },
-          ],
-        },
+        { name: "complex-refactoring-task", type: "test", testId: "complex-refactoring-task" },
+        { name: "bug-fix-edge-case", type: "test", testId: "bug-fix-edge-case" },
       ],
     },
-    { name: "refactor API service layer", type: "test", testId: "refactor API service layer" },
   ];
 }

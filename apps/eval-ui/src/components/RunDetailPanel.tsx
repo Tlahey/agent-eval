@@ -12,49 +12,50 @@ import {
   Clock,
   FileText,
   ListChecks,
-  TrendingUp,
-  TrendingDown,
-  ChevronRight,
-  Zap,
   CheckCircle2,
   XCircle,
   BarChart3,
+  Zap,
+  FlaskConical,
 } from "lucide-react";
-import type { LedgerRun, TokenUsage } from "../lib/api";
-import { overrideScore } from "../lib/api";
+import type { LedgerRun } from "../lib/api";
 import { ScoreRing } from "./ScoreRing";
+import { Markdown } from "./Markdown";
 import { DiffViewer } from "./DiffViewer";
 import { OverrideScoreModal } from "./OverrideScoreModal";
-import { Markdown } from "./Markdown";
-
-type Tab = "summary" | "diff" | "tasks" | "metrics";
+import { overrideScore } from "../lib/api";
+import { computeStatus } from "../lib/api";
 
 interface Props {
   run: LedgerRun;
   onClose: () => void;
-  onOverride?: () => void;
 }
 
-export function RunDetailPanel({ run, onClose, onOverride }: Props) {
-  const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("summary");
+type TabKey = "summary" | "diff" | "tasks" | "metrics";
+
+export function RunDetailPanel({ run, onClose }: Props) {
+  const [tab, setTab] = useState<TabKey>("summary");
   const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const navigate = useNavigate();
+
+  const effectiveScore = run.override?.score ?? run.score;
+  const effectiveStatus = computeStatus(effectiveScore, run.thresholds);
 
   const taskCount = run.taskResults?.length ?? 0;
   const changedFilesCount = run.changedFiles?.length ?? 0;
-  const effectiveScore = run.override?.score ?? run.score;
-  const effectiveStatus = run.override?.status ?? run.status ?? (run.pass ? "PASS" : "FAIL");
 
   const handleOverrideSubmit = async (score: number, reason: string) => {
-    if (run.id == null) return;
-    await overrideScore(run.id, score, reason);
-    setShowOverrideModal(false);
-    onOverride?.();
+    try {
+      await overrideScore(run.id!, score, reason);
+      window.location.reload();
+    } catch (err) {
+      alert("Failed to override score");
+    }
   };
 
   const handleViewAnalytics = () => {
+    navigate(`/evals/${encodeURIComponent(run.testId)}?id=${run.id}`);
     onClose();
-    navigate(`/evals/${encodeURIComponent(run.testId)}`);
   };
 
   return (
@@ -65,14 +66,11 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
         onClick={onClose}
       />
 
-      {/* Panel */}
+      {/* Side Panel */}
       <div className="fixed right-4 top-4 bottom-4 z-50 flex h-[calc(100vh-32px)] w-[var(--panel-width)] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-3xl border bg-surface-1 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-slide-in">
-        {/* Modern Header */}
+        {/* Header */}
         <div className="relative overflow-hidden border-b border bg-surface-2/50 px-8 py-8 backdrop-blur-xl">
-          {/* Background Accent */}
-          <div
-            className={`absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-10 blur-3xl ${effectiveStatus === "PASS" ? "bg-ok" : effectiveStatus === "WARN" ? "bg-warn" : "bg-err"}`}
-          />
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-10 blur-3xl bg-ok" />
 
           <div className="relative flex items-center justify-between gap-6">
             <div className="flex items-center gap-6">
@@ -87,7 +85,13 @@ export function RunDetailPanel({ run, onClose, onOverride }: Props) {
                   </h2>
                   <StatusBadge status={effectiveStatus} adjusted={!!run.override} />
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-txt-muted">
+                <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-widest text-txt-muted">
+                  {run.variantName && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                      <FlaskConical size={12} />
+                      {run.variantName}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-3">
                     <Bot size={12} className="text-primary" />
                     {run.agentRunner}
@@ -298,45 +302,31 @@ function TasksViewer({ run }: { run: LedgerRun }) {
                   {tr.task.name}
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-txt-muted">
-                    Verification Task
+                  <span className="text-[10px] font-bold text-txt-muted italic uppercase">
+                    {tr.task.criteria}
                   </span>
-                  {tr.task.weight && (
-                    <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[8px] font-black text-primary uppercase">
-                      Weight ×{tr.task.weight}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 rounded-lg bg-surface-3 px-3 py-1.5">
-              <Clock size={12} className="text-txt-muted" />
-              <span className="text-[10px] font-black text-txt-secondary">
+            <div className="text-right">
+              <p className="text-[10px] font-black text-txt-muted uppercase tracking-widest">
+                Duration
+              </p>
+              <p className="text-xs font-bold text-txt-base">
                 {(tr.result.durationMs / 1000).toFixed(2)}s
-              </span>
-            </div>
-          </div>
-          <div className="px-6 py-4 bg-surface-1">
-            <div className="flex items-start gap-3 mb-4">
-              <ChevronRight size={14} className="mt-0.5 text-primary" />
-              <p className="text-xs font-bold leading-relaxed text-txt-secondary">
-                {tr.task.criteria}
               </p>
             </div>
-
-            {(tr.result.stdout || tr.result.stderr) && (
-              <div className="relative overflow-hidden rounded-xl border bg-surface-4/20">
-                <div className="flex items-center justify-between bg-surface-3/50 px-4 py-2 border-b">
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-txt-muted">
-                    Console Output
-                  </span>
-                </div>
-                <pre className="max-h-64 overflow-auto p-4 font-mono text-[11px] leading-relaxed text-txt-secondary custom-scrollbar">
-                  {tr.result.stdout}
-                  {tr.result.stderr && <span className="text-err">{tr.result.stderr}</span>}
-                </pre>
+          </div>
+          <div className="p-6">
+            <div className="relative rounded-xl bg-surface-0 p-4 border border-line/10 group-hover:border-primary/10 transition-colors">
+              <div className="absolute top-3 right-4 flex items-center gap-2 text-[9px] font-black text-txt-muted uppercase tracking-widest opacity-40">
+                <FileText size={12} />
+                Execution Log
               </div>
-            )}
+              <pre className="font-mono text-[11px] leading-relaxed text-txt-secondary overflow-x-auto">
+                <code>{tr.result.stdout || tr.result.stderr || "(No output captured)"}</code>
+              </pre>
+            </div>
           </div>
         </div>
       ))}
@@ -347,286 +337,126 @@ function TasksViewer({ run }: { run: LedgerRun }) {
 function MetricsViewer({ run }: { run: LedgerRun }) {
   const agentTokens = run.agentTokenUsage;
   const judgeTokens = run.judgeTokenUsage;
-  const totalTokens = (agentTokens?.totalTokens ?? 0) + (judgeTokens?.totalTokens ?? 0);
-  const timing = run.timing;
 
   return (
-    <div className="space-y-8 pb-8">
-      {/* Resource Consumption Grid */}
-      <section>
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
-              <Coins size={18} />
-            </div>
-            <h3 className="text-sm font-black uppercase tracking-widest text-txt-base">
-              Resource Utilization
-            </h3>
-          </div>
-          <div className="rounded-full bg-surface-2 border px-4 py-1.5 shadow-sm">
-            <span className="text-[10px] font-black uppercase tracking-widest text-txt-muted">
-              Accumulated:{" "}
-            </span>
-            <span className="text-[10px] font-black text-primary">
-              {totalTokens.toLocaleString()} TOKENS
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Agent Token Card */}
-          <TokenCard
-            label="Agent Runner"
-            icon={<Bot size={16} />}
-            tokens={agentTokens}
-            accent="primary"
-          />
-
-          {/* Judge Token Card */}
-          <TokenCard
-            label="Judge Evaluation"
-            icon={<ListChecks size={16} />}
-            tokens={judgeTokens}
-            accent="accent"
-          />
-        </div>
-      </section>
-
-      {/* Latency Analysis */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-warn/10 text-warn">
-            <Clock size={18} />
-          </div>
-          <h3 className="text-sm font-black uppercase tracking-widest text-txt-base">
-            Latency Breakdown
-          </h3>
-        </div>
-        <TimingAnalysis timing={timing} />
-      </section>
-      {/* File System Modifications */}
-      {run.changedFiles && run.changedFiles.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <FileText size={18} />
-            </div>
-            <h3 className="text-sm font-black uppercase tracking-widest text-txt-base">
-              Filesystem Impact
-            </h3>
-          </div>
-          <div className="overflow-hidden rounded-2xl border bg-surface-2/30 backdrop-blur-md">
-            <div className="divide-y divide-slate-800/50">
-              {run.changedFiles.map((f, i) => {
-                const isExpected = run.expectedFiles?.includes(f);
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between px-6 py-3.5 group hover:bg-surface-3 transition-colors"
-                  >
-                    <div className="flex items-center gap-4 overflow-hidden">
-                      <div
-                        className={`flex h-6 w-6 items-center justify-center rounded-lg ${isExpected ? "bg-ok/10 text-ok" : "bg-surface-4 text-txt-muted"}`}
-                      >
-                        <FileText size={12} />
-                      </div>
-                      <span className="truncate font-mono text-xs font-bold text-txt-secondary group-hover:text-txt-base transition-colors">
-                        {f}
-                      </span>
-                    </div>
-                    {isExpected && (
-                      <span className="rounded-full bg-ok/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-ok">
-                        Expected
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-function TokenCard({
-  label,
-  icon,
-  tokens,
-  accent,
-  trend,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  tokens?: TokenUsage;
-  accent: "primary" | "accent";
-  trend?: { value: number; positive: boolean };
-}) {
-  const colors =
-    accent === "primary"
-      ? {
-          bg: "bg-primary/5",
-          border: "border-primary/20",
-          icon: "bg-primary/10 text-primary",
-          main: "text-primary",
-        }
-      : {
-          bg: "bg-accent/5",
-          border: "border-accent/20",
-          icon: "bg-accent/10 text-accent",
-          main: "text-accent",
-        };
-
-  return (
-    <div
-      className={`relative overflow-hidden rounded-2xl border ${colors.border} ${colors.bg} p-6 transition-all hover:scale-[1.02] hover:shadow-xl`}
-    >
-      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white opacity-5 blur-2xl" />
-
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div
-            className={`flex h-8 w-8 items-center justify-center rounded-xl ${colors.icon} shadow-inner`}
-          >
-            {icon}
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-txt-muted">
-            {label}
-          </span>
-        </div>
-        {trend && (
-          <div
-            className={`flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black tracking-widest uppercase ${trend.positive ? "bg-ok/10 text-ok" : "bg-err/10 text-err"}`}
-          >
-            {trend.positive ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
-            {trend.value}%
-          </div>
-        )}
-      </div>
-
-      {tokens ? (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
+      {/* Time Metrics */}
+      <MetricCard title="Time Profile" icon={Clock} color="text-warn">
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[9px] font-black uppercase tracking-widest text-txt-muted opacity-60">
-                Input
-              </p>
-              <p className="text-xl font-black text-txt-base tabular-nums tracking-tight">
-                {tokens.inputTokens.toLocaleString()}
-              </p>
-            </div>
-            <div className="text-right space-y-1">
-              <p className="text-[9px] font-black uppercase tracking-widest text-txt-muted opacity-60">
-                Output
-              </p>
-              <p className="text-xl font-black text-txt-base tabular-nums tracking-tight">
-                {tokens.outputTokens.toLocaleString()}
-              </p>
-            </div>
+          <MetricRow label="Total Session" value={`${(run.durationMs / 1000).toFixed(1)}s`} />
+          <MetricRow
+            label="Agent Synthesis"
+            value={`${(run.timing.agentMs! / 1000).toFixed(1)}s`}
+            percent={(run.timing.agentMs! / run.durationMs) * 100}
+          />
+          <MetricRow
+            label="Evaluation Audit"
+            value={`${(run.timing.judgeMs! / 1000).toFixed(1)}s`}
+            percent={(run.timing.judgeMs! / run.durationMs) * 100}
+          />
+        </div>
+      </MetricCard>
+
+      {/* Token Metrics */}
+      <MetricCard title="Intelligence Cost" icon={Coins} color="text-accent">
+        <div className="space-y-4">
+          <div className="pb-2 border-b border/30">
+            <p className="text-[10px] font-black text-txt-muted uppercase tracking-widest mb-3">
+              Agent Consumption
+            </p>
+            <MetricRow
+              label="Input Context"
+              value={agentTokens?.inputTokens.toLocaleString() ?? "0"}
+            />
+            <MetricRow
+              label="Output Generation"
+              value={agentTokens?.outputTokens.toLocaleString() ?? "0"}
+            />
           </div>
-          <div className="pt-4 border-t border-line/10 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
-              Total Load
-            </span>
-            <span className={`text-2xl font-black tabular-nums ${colors.main} tracking-tighter`}>
-              {tokens.totalTokens.toLocaleString()}
-            </span>
+          <div>
+            <p className="text-[10px] font-black text-txt-muted uppercase tracking-widest mb-3">
+              Judge Consumption
+            </p>
+            <MetricRow
+              label="Input Context"
+              value={judgeTokens?.inputTokens.toLocaleString() ?? "0"}
+            />
+            <MetricRow
+              label="Output Generation"
+              value={judgeTokens?.outputTokens.toLocaleString() ?? "0"}
+            />
           </div>
         </div>
-      ) : (
-        <div className="flex h-24 items-center justify-center">
-          <p className="text-[10px] font-black uppercase tracking-widest text-txt-muted italic opacity-40">
-            No Telemetry Recorded
-          </p>
+      </MetricCard>
+    </div>
+  );
+}
+
+function MetricCard({
+  title,
+  icon: Icon,
+  color,
+  children,
+}: {
+  title: string;
+  icon: any;
+  color: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border bg-surface-1 p-6 shadow-sm overflow-hidden relative">
+      <div className="flex items-center gap-3 mb-6 relative z-10">
+        <div
+          className={`flex h-8 w-8 items-center justify-center rounded-xl bg-surface-2 ${color}`}
+        >
+          <Icon size={18} />
+        </div>
+        <h3 className="text-sm font-black uppercase tracking-widest text-txt-base">{title}</h3>
+      </div>
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
+}
+
+function MetricRow({ label, value, percent }: { label: string; value: string; percent?: number }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-center">
+        <span className="text-[11px] font-bold text-txt-muted">{label}</span>
+        <span className="text-xs font-black text-txt-base tabular-nums tracking-tight">
+          {value}
+        </span>
+      </div>
+      {percent !== undefined && (
+        <div className="h-1 w-full bg-surface-3 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-1000"
+            style={{ width: `${percent}%` }}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function TimingAnalysis({ timing }: { timing: LedgerRun["timing"] }) {
-  const phases = [
-    {
-      key: "setup",
-      label: "Initialization",
-      color: "hsl(var(--color-primary))",
-      value: timing.setupMs,
-    },
-    {
-      key: "agent",
-      label: "Agent Reasoning",
-      color: "hsl(var(--color-warn))",
-      value: timing.agentMs,
-    },
-    { key: "tasks", label: "Verification", color: "hsl(var(--color-ok))", value: timing.tasksMs },
-    { key: "judge", label: "Judgment", color: "hsl(var(--color-accent))", value: timing.judgeMs },
-  ].filter((p) => p.value && p.value > 0);
+function StatusBadge({ status, adjusted }: { status: string; adjusted?: boolean }) {
+  const styles: Record<string, { bg: string; text: string; label: string }> = {
+    PASS: { bg: "bg-ok/10 border-ok/20", text: "text-ok", label: "Success" },
+    WARN: { bg: "bg-warn/10 border-warn/20", text: "text-warn", label: "Caution" },
+    FAIL: { bg: "bg-err/10 border-err/20", text: "text-err", label: "Failed" },
+  };
 
-  const total = timing.totalMs || 1;
-
-  return (
-    <div className="rounded-2xl border bg-surface-2/40 p-6 backdrop-blur-sm">
-      <div className="mb-6 flex h-3 overflow-hidden rounded-full bg-surface-4 shadow-inner">
-        {phases.map((p) => (
-          <div
-            key={p.key}
-            style={{ width: `${((p.value! / total) * 100).toFixed(1)}%`, backgroundColor: p.color }}
-            className="h-full transition-all duration-700 ease-out shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)]"
-          />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        {phases.map((p) => (
-          <div key={p.key} className="flex flex-col gap-1 rounded-xl bg-surface-3/50 p-3 border/50">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: p.color, boxShadow: `0 0 8px ${p.color}` }}
-              />
-              <span className="text-[9px] font-black uppercase tracking-widest text-txt-muted">
-                {p.label}
-              </span>
-            </div>
-            <span className="text-sm font-black text-txt-base tabular-nums">
-              {(p.value! / 1000).toFixed(2)}s
-            </span>
-          </div>
-        ))}
-        <div className="col-span-2 mt-2 pt-4 border-t border-line/10 flex items-center justify-between">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-txt-muted">
-            Cumulative Time
-          </span>
-          <span className="text-xl font-black text-txt-base tracking-tighter">
-            {(total / 1000).toFixed(2)}s
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status, adjusted }: { status: string; adjusted: boolean }) {
-  const styles =
-    status === "PASS"
-      ? "bg-ok/10 text-ok border-ok/20"
-      : status === "WARN"
-        ? "bg-warn/10 text-warn border-warn/20"
-        : "bg-err/10 text-err border-err/20";
-
-  const label =
-    status === "PASS" ? "Above Threshold" : status === "WARN" ? "Needs Review" : "Below Threshold";
+  const style = styles[status] || styles.FAIL;
 
   return (
     <div className="flex items-center gap-2">
       <span
-        className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${styles}`}
+        className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${style.bg} ${style.text}`}
       >
-        {label}
+        {style.label}
       </span>
       {adjusted && (
-        <span className="rounded-lg bg-amber-500/10 border-amber-500/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-500">
+        <span className="rounded-lg border border-accent/20 bg-accent/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-accent shadow-sm">
           Adjusted
         </span>
       )}
@@ -634,7 +464,7 @@ function StatusBadge({ status, adjusted }: { status: string; adjusted: boolean }
   );
 }
 
-const TABS: { key: Tab; icon: React.ElementType; label: string }[] = [
+const TABS: { key: TabKey; icon: any; label: string }[] = [
   { key: "summary", icon: ClipboardCheck, label: "Analysis" },
   { key: "diff", icon: GitBranch, label: "Modifications" },
   { key: "tasks", icon: ListChecks, label: "Verifications" },

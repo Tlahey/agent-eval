@@ -25,15 +25,7 @@ export function MainLayout() {
         </div>
       </main>
 
-      {selectedRun && (
-        <RunDetailPanel
-          run={selectedRun}
-          onClose={closeRunDetail}
-          onOverride={() => {
-            // Re-fetching logic could be triggered here if needed via an EventEmitter or similar
-          }}
-        />
-      )}
+      {selectedRun && <RunDetailPanel run={selectedRun} onClose={closeRunDetail} />}
     </div>
   );
 }

@@ -181,3 +181,12 @@ export async function deleteSuite(path: string[]): Promise<void> {
   });
   if (!res.ok) throw new Error(`Failed to delete suite: ${res.statusText}`);
 }
+
+export function computeStatus(
+  score: number,
+  thresholds: { warn: number; fail: number } = { warn: 0.8, fail: 0.5 },
+): TestStatus {
+  if (score >= thresholds.warn) return "PASS";
+  if (score >= thresholds.fail) return "WARN";
+  return "FAIL";
+}

@@ -91,10 +91,10 @@ describe("Runs", () => {
     });
 
     const search = screen.getByPlaceholderText("Search test ID or agent...");
-    await user.type(search, "Banner");
+    await user.type(search, "complex");
 
     await waitFor(() => {
-      // Only Banner-related runs should show
+      // Only complex-refactoring-task related runs should show
       expect(screen.getByText(/of/)).toBeInTheDocument();
     });
   });
