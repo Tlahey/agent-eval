@@ -73,7 +73,7 @@ export function Sidebar() {
           <div>
             <h1 className="text-base font-bold text-txt-base tracking-tight">AgentEval</h1>
             <p className="text-[10px] font-black uppercase tracking-widest text-primary opacity-80">
-              v0.1.0
+              v{__APP_VERSION__}
             </p>
           </div>
         </div>
