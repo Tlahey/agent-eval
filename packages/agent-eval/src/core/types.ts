@@ -196,6 +196,8 @@ export interface LedgerEntry {
 export interface ScoreOverride {
   timestamp: string;
   score: number;
+  pass: boolean;
+  status: TestStatus;
   reason: string;
   author?: string;
 }

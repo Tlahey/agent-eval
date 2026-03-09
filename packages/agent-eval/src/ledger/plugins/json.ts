@@ -1,89 +1,80 @@
-/**
- * JSON Ledger Plugin — stores evaluation runs as newline-delimited JSON (JSONL).
- *
- * This is the lightweight fallback ledger that works everywhere without
- * requiring Node 22's experimental node:sqlite module.
- */
-
-import { mkdirSync, readFileSync, appendFileSync, existsSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { LedgerEntry, ScoreOverride } from "../../core/types.js";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../../core/interfaces.js";
+import type { LedgerEntry, ScoreOverride } from "../../core/types.js";
+import { computeStatus, DEFAULT_THRESHOLDS } from "../../core/types.js";
 
-export interface JsonLedgerOptions {
-  /** Directory where ledger.jsonl is stored (defaults to ".agenteval") */
+interface JsonLedgerOptions {
   outputDir?: string;
 }
 
-/** Internal entry shape stored in JSONL (includes auto-assigned id) */
-interface StoredEntry extends LedgerEntry {
-  id: number;
-}
-
 export class JsonLedger implements ILedgerPlugin {
-  readonly name = "json";
+  readonly name = "json-ledger";
   private outputDir: string;
-  private runsFile: string;
-  private nextId = 1;
+  private filePath: string;
 
-  constructor(options?: JsonLedgerOptions) {
-    this.outputDir = options?.outputDir ?? ".agenteval";
-    this.runsFile = join(this.outputDir, "ledger.jsonl");
+  constructor(options: JsonLedgerOptions = {}) {
+    this.outputDir = options.outputDir ?? ".agenteval";
+    this.filePath = resolve(process.cwd(), this.outputDir, "ledger.jsonl");
   }
 
-  initialize(): void {
-    mkdirSync(this.outputDir, { recursive: true });
-    // Compute next ID from existing entries
-    if (existsSync(this.runsFile)) {
-      const entries = this.readAllRuns();
-      if (entries.length > 0) {
-        this.nextId = Math.max(...entries.map((e) => e.id)) + 1;
-      }
+  async initialize(): Promise<void> {
+    const dir = resolve(process.cwd(), this.outputDir);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
     }
   }
 
-  recordRun(entry: LedgerEntry): void {
-    const stored: StoredEntry = { ...entry, id: this.nextId++ };
-    appendFileSync(this.runsFile, JSON.stringify(stored) + "\n", "utf-8");
+  async recordRun(entry: LedgerEntry): Promise<void> {
+    const line = JSON.stringify(entry) + "\n";
+    writeFileSync(this.filePath, line, { flag: "a" });
   }
 
-  getRuns(testId?: string): LedgerEntry[] {
-    const entries = this.readAllRuns();
-    return testId ? entries.filter((e) => e.testId === testId) : entries;
+  async getRuns(testId?: string): Promise<LedgerEntry[]> {
+    if (!existsSync(this.filePath)) return [];
+    const content = readFileSync(this.filePath, "utf-8");
+    const lines = content.split("\n").filter((l) => l.trim() !== "");
+    const entries = lines.map((l) => JSON.parse(l) as LedgerEntry);
+    if (testId) {
+      return entries.filter((e) => e.testId === testId);
+    }
+    return entries;
   }
 
-  getRunById(id: number): LedgerEntry | undefined {
-    return this.readAllRuns().find((r) => r.id === id);
+  async getRunById(id: number): Promise<LedgerEntry | undefined> {
+    const runs = await this.getRuns();
+    // For JSONL, we use the 1-based line index as ID
+    return runs[id - 1];
   }
 
-  getTestIds(): string[] {
-    return [...new Set(this.readAllRuns().map((r) => r.testId))].sort();
+  async getTestIds(): Promise<string[]> {
+    const runs = await this.getRuns();
+    const ids = new Set(runs.map((r) => r.testId));
+    return Array.from(ids).sort();
   }
 
-  getTags(): string[] {
-    const runs = this.readAllRuns();
-    const allTags = new Set<string>();
+  async getTags(): Promise<string[]> {
+    const runs = await this.getRuns();
+    const tags = new Set<string>();
     for (const run of runs) {
-      if (run.tags) {
-        run.tags.forEach((t) => allTags.add(t));
-      }
+      if (run.tags) run.tags.forEach((t) => tags.add(t));
     }
-    return Array.from(allTags).sort();
+    return Array.from(tags).sort();
   }
 
-  getTestTree(): TestTreeNode[] {
-    const runs = this.readAllRuns();
+  async getTestTree(): Promise<TestTreeNode[]> {
+    const entries = await this.getRuns();
     const seen = new Map<string, string[]>();
 
-    for (const run of runs) {
-      if (!seen.has(run.testId)) {
-        seen.set(run.testId, run.suitePath ?? []);
+    for (const entry of entries) {
+      if (!seen.has(entry.testId)) {
+        seen.set(entry.testId, entry.suitePath);
       }
     }
 
     const root: TestTreeNode[] = [];
     for (const [testId, suitePath] of seen) {
-      if (suitePath.length === 0) {
+      if (!suitePath || suitePath.length === 0) {
         root.push({ name: testId, type: "test", testId });
         continue;
       }
@@ -102,80 +93,67 @@ export class JsonLedger implements ILedgerPlugin {
     return root;
   }
 
-  getLatestEntries(): Map<string, LedgerEntry> {
-    const runs = this.readAllRuns();
-    const result = new Map<string, LedgerEntry>();
+  async getLatestEntries(): Promise<Map<string, LedgerEntry>> {
+    const runs = await this.getRuns();
+    const latest = new Map<string, LedgerEntry>();
     for (const run of runs) {
-      const existing = result.get(run.testId);
-      if (!existing || run.timestamp >= existing.timestamp) {
-        result.set(run.testId, run);
-      }
+      latest.set(run.testId, run); // overwrites with later entries
     }
-    return result;
+    return latest;
   }
 
-  getStats(testId?: string): RunnerStats[] {
-    const runs = this.getRuns(testId);
+  async getStats(testId?: string): Promise<RunnerStats[]> {
+    const entries = await this.getRuns(testId);
     const byRunner = new Map<string, { scores: number[]; passes: number }>();
 
-    for (const run of runs) {
-      const key = run.agentRunner;
+    for (const entry of entries) {
+      const key = entry.agentRunner;
       if (!byRunner.has(key)) byRunner.set(key, { scores: [], passes: 0 });
       const bucket = byRunner.get(key)!;
 
-      const effectiveScore = run.override ? run.override.score : run.score;
-      const effectivePass = run.pass; // ScoreOverride doesn't store pass anymore, it's computed
+      const effectiveScore = entry.override ? entry.override.score : entry.score;
+      const effectivePass = entry.override
+        ? computeStatus(entry.override.score, entry.thresholds) !== "FAIL"
+        : entry.pass;
+
       bucket.scores.push(effectiveScore);
       if (effectivePass) bucket.passes++;
     }
 
-    return [...byRunner.entries()]
-      .map(([agentRunner, { scores, passes }]) => ({
-        agentRunner,
-        avgScore: scores.reduce((a, b) => a + b, 0) / scores.length,
-        totalRuns: scores.length,
-        passRate: passes / scores.length,
-      }))
-      .sort((a, b) => b.avgScore - a.avgScore);
+    return Array.from(byRunner.entries()).map(([agentRunner, data]) => ({
+      agentRunner,
+      avgScore: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
+      totalRuns: data.scores.length,
+      passRate: data.passes / data.scores.length,
+    }));
   }
 
-  overrideRunScore(runId: number, score: number, reason: string): ScoreOverride {
-    if (score < 0 || score > 1) throw new Error("Score must be between 0 and 1");
-    if (!reason.trim()) throw new Error("Reason is required");
-
-    const runs = this.readAllRuns();
-    const index = runs.findIndex((r) => r.id === runId);
-    if (index === -1) throw new Error(`Run #${runId} not found`);
+  async overrideRunScore(runId: number, score: number, reason: string): Promise<ScoreOverride> {
+    const runs = await this.getRuns();
+    const index = runId - 1;
+    if (!runs[index]) throw new Error(`Run ID ${runId} not found`);
 
     const timestamp = new Date().toISOString();
-
+    const status = computeStatus(score, runs[index].thresholds ?? DEFAULT_THRESHOLDS);
     const override: ScoreOverride = {
       score,
-      reason: reason.trim(),
+      reason,
       timestamp,
+      pass: status !== "FAIL",
+      status,
     };
 
-    // Update the run in place
     runs[index].override = override;
 
-    // Rewrite the entire JSONL file to persist the update
+    // Rewrite entire file
     const content = runs.map((r) => JSON.stringify(r)).join("\n") + "\n";
-    writeFileSync(this.runsFile, content, "utf-8");
+    writeFileSync(this.filePath, content);
 
     return override;
   }
 
-  getRunOverrides(runId: number): ScoreOverride[] {
-    const run = this.getRunById(runId);
+  async getRunOverrides(runId: number): Promise<ScoreOverride[]> {
+    const run = await this.getRunById(runId);
     return run?.override ? [run.override] : [];
-  }
-
-  // ─── Private helpers ───
-
-  private readAllRuns(): StoredEntry[] {
-    if (!existsSync(this.runsFile)) return [];
-    const content = readFileSync(this.runsFile, "utf-8").trim();
-    if (!content) return [];
-    return content.split("\n").map((line) => JSON.parse(line) as StoredEntry);
   }
 }

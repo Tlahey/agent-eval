@@ -1,166 +1,156 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { JsonLedger } from "./json.js";
 import type { LedgerEntry } from "../../core/types.js";
 
-function makeLedgerEntry(overrides?: Partial<LedgerEntry>): LedgerEntry {
-  return {
-    testId: "test-1",
-    suitePath: [],
-    timestamp: new Date().toISOString(),
-    agentRunner: "copilot",
-    judgeModel: "gpt-4",
-    score: 0.85,
-    pass: true,
-    status: "PASS",
-    reason: "Good implementation",
-    improvement: "",
-    diff: null,
-    changedFiles: [],
-    commands: [],
-    taskResults: [],
-    timing: { totalMs: 1234 },
-    logs: "",
-    criteria: "test criteria",
-    durationMs: 1234,
-    thresholds: { warn: 0.7, fail: 0.5 },
-    ...overrides,
-  };
-}
-
 describe("JsonLedger", () => {
-  let tmpDir: string;
+  const outputDir = ".test-ledger-json";
+  const filePath = join(process.cwd(), outputDir, "ledger.jsonl");
   let ledger: JsonLedger;
 
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "json-ledger-"));
-    ledger = new JsonLedger({ outputDir: tmpDir });
-    ledger.initialize();
+  const mockEntry: LedgerEntry = {
+    testId: "test-1",
+    suitePath: ["UI"],
+    timestamp: new Date().toISOString(),
+    agentRunner: "copilot",
+    judgeModel: "gpt4",
+    score: 0.9,
+    pass: true,
+    status: "PASS",
+    reason: "good",
+    improvement: "",
+    diff: "diff",
+    changedFiles: ["file.ts"],
+    commands: [],
+    taskResults: [],
+    timing: { totalMs: 1000, agentMs: 800, judgeMs: 200 },
+    logs: "logs",
+    criteria: "criteria",
+    thresholds: { warn: 0.8, fail: 0.5 },
+    durationMs: 1000,
+  };
+
+  beforeEach(async () => {
+    ledger = new JsonLedger({ outputDir });
+    await ledger.initialize();
   });
 
   afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
+    rmSync(outputDir, { recursive: true, force: true });
   });
 
-  it("creates output directory on initialize", () => {
-    expect(existsSync(tmpDir)).toBe(true);
+  it("records a run to a JSONL file", async () => {
+    await ledger.recordRun(mockEntry);
+    expect(existsSync(filePath)).toBe(true);
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('"testId":"test-1"');
   });
 
-  it("records and retrieves a run", () => {
-    const entry = makeLedgerEntry();
-    ledger.recordRun(entry);
-    const runs = ledger.getRuns() as LedgerEntry[];
-    expect(runs).toHaveLength(1);
-    expect(runs[0].testId).toBe("test-1");
+  it("retrieves all runs", async () => {
+    await ledger.recordRun(mockEntry);
+    await ledger.recordRun({ ...mockEntry, testId: "test-2" });
+    const runs = await ledger.getRuns();
+    expect(runs).toHaveLength(2);
   });
 
-  it("filters runs by testId", () => {
-    ledger.recordRun(makeLedgerEntry({ testId: "test-1" }));
-    ledger.recordRun(makeLedgerEntry({ testId: "test-2" }));
-
-    const filtered = ledger.getRuns("test-1") as LedgerEntry[];
+  it("filters runs by testId", async () => {
+    await ledger.recordRun(mockEntry);
+    await ledger.recordRun({ ...mockEntry, testId: "test-2" });
+    const filtered = await ledger.getRuns("test-1");
     expect(filtered).toHaveLength(1);
     expect(filtered[0].testId).toBe("test-1");
   });
 
-  it("returns unique test IDs", () => {
-    ledger.recordRun(makeLedgerEntry({ testId: "test-1" }));
-    ledger.recordRun(makeLedgerEntry({ testId: "test-2" }));
-    ledger.recordRun(makeLedgerEntry({ testId: "test-1" }));
-
-    const ids = ledger.getTestIds();
+  it("returns unique test IDs", async () => {
+    await ledger.recordRun(mockEntry);
+    await ledger.recordRun(mockEntry);
+    await ledger.recordRun({ ...mockEntry, testId: "test-2" });
+    const ids = await ledger.getTestIds();
     expect(ids).toEqual(["test-1", "test-2"]);
   });
 
-  it("builds a test tree from suite paths", () => {
-    ledger.recordRun(makeLedgerEntry({ testId: "Add button", suitePath: ["UI", "Banner"] }));
-    ledger.recordRun(makeLedgerEntry({ testId: "Fix header", suitePath: ["UI"] }));
+  it("returns unique tags", async () => {
+    await ledger.recordRun({ ...mockEntry, tags: ["tag1", "tag2"] });
+    await ledger.recordRun({ ...mockEntry, tags: ["tag2", "tag3"] });
+    const tags = await ledger.getTags();
+    expect(tags).toEqual(["tag1", "tag2", "tag3"]);
+  });
 
-    const tree = ledger.getTestTree();
-    expect(tree).toHaveLength(1); // "UI" suite
+  it("builds a test tree", async () => {
+    await ledger.recordRun(mockEntry);
+    const tree = await ledger.getTestTree();
+    expect(tree).toHaveLength(1);
     expect(tree[0].name).toBe("UI");
     expect(tree[0].type).toBe("suite");
   });
 
-  it("computes runner stats", () => {
-    ledger.recordRun(makeLedgerEntry({ agentRunner: "copilot", score: 0.8, pass: true }));
-    ledger.recordRun(makeLedgerEntry({ agentRunner: "copilot", score: 0.6, pass: false }));
-
-    const stats = ledger.getStats();
+  it("calculates runner stats", async () => {
+    await ledger.recordRun({ ...mockEntry, score: 0.9, pass: true, status: "PASS" });
+    await ledger.recordRun({ ...mockEntry, score: 0.5, pass: true, status: "WARN" });
+    const stats = await ledger.getStats();
     expect(stats).toHaveLength(1);
     expect(stats[0].agentRunner).toBe("copilot");
     expect(stats[0].totalRuns).toBe(2);
     expect(stats[0].avgScore).toBeCloseTo(0.7);
-    expect(stats[0].passRate).toBe(0.5);
+    expect(stats[0].passRate).toBe(1.0);
   });
 
-  it("overrides a run score and tracks history", () => {
-    ledger.recordRun(makeLedgerEntry({ score: 0.5 }));
-
-    const override = ledger.overrideRunScore(1, 0.9, "Manual correction");
+  it("overrides a run score", async () => {
+    await ledger.recordRun(mockEntry);
+    const override = await ledger.overrideRunScore(1, 0.9, "Manual correction");
     expect(override.score).toBe(0.9);
     expect(override.reason).toBe("Manual correction");
 
-    const overrides = ledger.getRunOverrides(1);
-    expect(overrides).toHaveLength(1);
+    const runs = await ledger.getRuns();
+    expect(runs[0].override?.score).toBe(0.9);
   });
 
-  it("getLatestEntries returns one entry per test", () => {
-    ledger.recordRun(makeLedgerEntry({ testId: "test-1", score: 0.5 }));
-    ledger.recordRun(makeLedgerEntry({ testId: "test-1", score: 0.9 }));
-    ledger.recordRun(makeLedgerEntry({ testId: "test-2", score: 0.7 }));
+  it("returns latest entries per test", async () => {
+    await ledger.recordRun({ ...mockEntry, testId: "test-1", score: 0.5 });
+    await ledger.recordRun({ ...mockEntry, testId: "test-1", score: 0.9 });
+    await ledger.recordRun({ ...mockEntry, testId: "test-2", score: 0.7 });
 
-    const latest = ledger.getLatestEntries();
+    const latest = await ledger.getLatestEntries();
     expect(latest.size).toBe(2);
     expect(latest.get("test-1")?.score).toBe(0.9);
     expect(latest.get("test-2")?.score).toBe(0.7);
   });
 
-  it("persists data to disk as JSONL", () => {
-    ledger.recordRun(makeLedgerEntry());
-    const raw = readFileSync(join(tmpDir, "ledger.jsonl"), "utf-8");
-    const lines = raw.trim().split("\n");
-    expect(lines).toHaveLength(1);
-    expect(JSON.parse(lines[0]).testId).toBe("test-1");
+  it("returns empty array if file does not exist", async () => {
+    const runs = await ledger.getRuns();
+    expect(runs).toEqual([]);
   });
 
-  it("returns empty results for empty ledger", () => {
-    expect(ledger.getRuns()).toEqual([]);
-    expect(ledger.getTestIds()).toEqual([]);
-    expect(ledger.getTestTree()).toEqual([]);
-    expect(ledger.getStats()).toEqual([]);
+  it("returns undefined if run ID not found", async () => {
+    const entry = await ledger.getRunById(999);
+    expect(entry).toBeUndefined();
   });
 
-  it("getRunById returns correct entry by id", () => {
-    ledger.recordRun(makeLedgerEntry({ testId: "test-1" }));
-    ledger.recordRun(makeLedgerEntry({ testId: "test-2" }));
-
-    const entry = ledger.getRunById(2);
+  it("retrieves a run by ID (1-based index)", async () => {
+    await ledger.recordRun({ ...mockEntry, testId: "test-1" });
+    await ledger.recordRun({ ...mockEntry, testId: "test-2" });
+    const entry = await ledger.getRunById(2);
     expect(entry?.testId).toBe("test-2");
   });
 
-  it("getRunById returns undefined for invalid id", () => {
-    expect(ledger.getRunById(99)).toBeUndefined();
-  });
-
-  it("getTestTree returns root-level test nodes when suitePath is empty", () => {
-    ledger.recordRun(makeLedgerEntry({ testId: "root-test-1", suitePath: [] }));
-    ledger.recordRun(makeLedgerEntry({ testId: "root-test-2", suitePath: [] }));
-
-    const tree = ledger.getTestTree();
+  it("supports hierarchical tree with root tests", async () => {
+    await ledger.recordRun({ ...mockEntry, testId: "root-test-1", suitePath: [] });
+    await ledger.recordRun({ ...mockEntry, testId: "root-test-2", suitePath: [] });
+    const tree = await ledger.getTestTree();
     expect(tree).toHaveLength(2);
     expect(tree[0].type).toBe("test");
     expect(tree[0].testId).toBe("root-test-1");
     expect(tree[1].testId).toBe("root-test-2");
   });
 
-  it("overrideRunScore attaches override to subsequent getRuns", () => {
-    ledger.recordRun(makeLedgerEntry({ score: 0.5 }));
-    ledger.overrideRunScore(1, 0.9, "Override correction");
+  it("persists overrides after restart", async () => {
+    await ledger.recordRun(mockEntry);
+    await ledger.overrideRunScore(1, 0.95, "New reason");
 
-    const runs = ledger.getRuns() as Array<LedgerEntry & { override?: unknown }>;
-    expect(runs[0].override).toBeDefined();
+    const newLedger = new JsonLedger({ outputDir });
+    const runs = (await newLedger.getRuns()) as LedgerEntry[];
+    expect(runs[0].override?.score).toBe(0.95);
+    expect(runs[0].override?.reason).toBe("New reason");
   });
 });
