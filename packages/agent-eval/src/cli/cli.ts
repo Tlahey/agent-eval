@@ -41,6 +41,9 @@ program.name("agenteval").description("AI coding agent evaluation framework").ve
 async function runAction(opts: any): Promise<void> {
   const runStart = Date.now();
   const config = await loadConfig(process.cwd(), opts.config);
+  if (opts.runs) {
+    config.runs = parseInt(opts.runs, 10);
+  }
   assertValidPlugins(config);
   validateRunnerNames(config.runners);
 
@@ -101,7 +104,7 @@ async function runAction(opts: any): Promise<void> {
         for (const testDef of tests) {
           const plan = await dryRunTest(testDef, config);
           console.log(pc.bold(`\n  🧪 ${pc.yellow(plan.testId)}`));
-          console.log(`    Mode:        ${pc.cyan(plan.mode)}`);
+          console.log(`    Iterations:  ${pc.magenta(plan.runs)}`);
           if (plan.instruction) {
             console.log(`    Instruction: ${pc.green(`"${plan.instruction}"`)}`);
           }
@@ -113,20 +116,14 @@ async function runAction(opts: any): Promise<void> {
               );
             }
           }
-          console.log(
-            `    Runners: ${plan.runners.map((r: { id: string; model: string }) => `${r.id} (${r.model})`).join(", ")}`,
-          );
           if (plan.variants && plan.variants.length > 0) {
             console.log(pc.cyan(`    Variants (A/B Test):`));
             for (const v of plan.variants) {
-              console.log(`      - [${v.id}] ${v.name} (Runner: ${v.runnerId})`);
+              console.log(`      - ${v.name} (Runner: ${pc.bold(v.runner)})`);
             }
           }
           if (plan.beforeEachHooks > 0) {
-            console.log(`    beforeEach hooks: ${plan.beforeEachHooks}`);
-          }
-          if (plan.afterEachHooks > 0) {
-            console.log(`    afterEach hooks: ${plan.afterEachHooks}`);
+            console.log(`    Hooks:       ${plan.beforeEachHooks} beforeEach registered`);
           }
         }
         continue;
@@ -177,6 +174,7 @@ program
   .option("-f, --filter <pattern>", "Filter tests by title (substring match)")
   .option("-t, --tag <tag>", "Filter tests by tag")
   .option("-o, --output <dir>", "Override output directory for the ledger database")
+  .option("--runs <number>", "Number of times to run each test variant")
   .option("--dry-run", "Preview execution plan without running agents")
   .option("-s, --silent", "Suppress all output except errors")
   .option("-v, --verbose", "Show detailed output including judge reasoning")

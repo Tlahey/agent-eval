@@ -70,6 +70,7 @@ export interface AgentEvalConfig {
   judge: JudgeConfig;
   outputDir?: string;
   timeout?: number;
+  runs?: number;
   beforeEach?: (args: { ctx: TestContext }) => void | Promise<void>;
   thresholds?: Thresholds;
   ledger?: import("./interfaces.js").ILedgerPlugin;

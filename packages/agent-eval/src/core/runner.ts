@@ -190,6 +190,7 @@ export async function runTest(
   const outputDir = config.outputDir ?? ".agenteval";
   const ledger: ILedgerPlugin | null = config.ledger ?? null;
   const env: IEnvironmentPlugin = config.environment ?? new LocalEnvironment();
+  const iterations = config.runs ?? 1;
   validateRunnerNames(config.runners);
 
   const record = (entry: LedgerEntry): void | Promise<void> => {
@@ -197,21 +198,32 @@ export async function runTest(
     appendLedgerEntry(outputDir, entry);
   };
 
-  const runSingle = async (variant: TestVariant) => {
+  const runVariant = async (variant: TestVariant) => {
     const runner = config.runners.find((r) => r.id === variant.runner);
     if (!runner)
       throw new Error(`Runner "${variant.runner}" not found for variant "${variant.name}"`);
-    const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd, variant);
-    await record(entry);
-    return { testId: testDef.title, runner: runner.id, entries: [entry], passed: entry.pass };
+
+    const entries: LedgerEntry[] = [];
+    for (let i = 0; i < iterations; i++) {
+      const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd, variant, i);
+      await record(entry);
+      entries.push(entry);
+    }
+
+    return {
+      testId: testDef.title,
+      runner: runner.id,
+      entries,
+      passed: entries.every((e) => e.pass),
+    };
   };
 
   if (env.supportsConcurrency) {
-    return Promise.all(testDef.variants.map(runSingle));
+    return Promise.all(testDef.variants.map(runVariant));
   } else {
     const results: RunResult[] = [];
     for (const variant of testDef.variants) {
-      results.push(await runSingle(variant));
+      results.push(await runVariant(variant));
     }
     return results;
   }
@@ -225,6 +237,7 @@ async function runSingleIteration(
   env: IEnvironmentPlugin,
   cwd: string,
   variant: TestVariant,
+  iteration: number = 0,
 ): Promise<LedgerEntry> {
   clearLastJudgeOptions();
 
@@ -243,7 +256,7 @@ async function runSingleIteration(
   let cleanupRun: (() => Promise<void>) | undefined;
 
   if (env.prepareRun) {
-    const prepared = await env.prepareRun(cwd, `${testDef.title}-${variant.name}`);
+    const prepared = await env.prepareRun(cwd, `${testDef.title}-${variant.name}-${iteration}`);
     workingDir = prepared.workingDir;
     cleanupRun = prepared.cleanup;
   } else {
@@ -437,5 +450,38 @@ export function clearJudgeReporterContext() {
 }
 
 export async function dryRunTest(testDef: TestDefinition, config: AgentEvalConfig): Promise<any> {
-  return { testId: testDef.title, variants: testDef.variants };
+  const env = config.environment ?? new LocalEnvironment();
+  const ctx = new EvalContext(process.cwd(), env);
+
+  // Register hooks info
+  const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
+
+  const agent: AgentHandle = {
+    id: "dry-run",
+    model: "dry-run",
+    variant: { name: "dry-run" },
+    run: async () => {},
+    instruct: () => {},
+  };
+
+  // Execute function logic to capture prompt() and addTask() calls
+  try {
+    await testDef.fn({
+      agent,
+      ctx,
+      judge: config.judge,
+      variant: testDef.variants[0], // Use first variant for dry run metadata
+    });
+  } catch {
+    // Ignore errors during dry run capture
+  }
+
+  return {
+    testId: testDef.title,
+    variants: testDef.variants,
+    runs: config.runs ?? 1,
+    instruction: ctx.instruction,
+    tasks: ctx.tasks.map((t) => ({ name: t.name, criteria: t.criteria, weight: t.weight ?? 1 })),
+    beforeEachHooks: beforeEachHooks.length,
+  };
 }

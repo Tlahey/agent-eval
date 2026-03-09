@@ -10,6 +10,7 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
   testFiles: "**/*.{eval,agent-eval}.{ts,js,mts,mjs}",
   outputDir: ".agenteval",
   timeout: 300_000,
+  runs: 1,
 };
 
 /**
