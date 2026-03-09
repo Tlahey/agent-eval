@@ -31,18 +31,35 @@ export function VariantGrid({ stats, compareA, compareB, onCompare }: Props) {
   // Update active bullet based on scroll position
   const handleScroll = () => {
     if (!scrollRef.current) return;
-    const { scrollLeft, clientWidth } = scrollRef.current;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
 
-    // Calculate index based on how many full pages (clientWidth) we've scrolled
-    const index = Math.round(scrollLeft / clientWidth);
+    // Total scrollable distance
+    const maxScrollLeft = scrollWidth - clientWidth;
+    if (maxScrollLeft <= 0) {
+      setActiveIndex(0);
+      return;
+    }
+
+    const pageCount = Math.ceil(stats.length / itemsPerPage);
+
+    // Calculate index based on scroll percentage
+    // This is more robust for carousels with multiple items
+    const scrollPercentage = scrollLeft / maxScrollLeft;
+    const index = Math.round(scrollPercentage * (pageCount - 1));
+
     setActiveIndex(index);
   };
 
   const scrollTo = (index: number) => {
     if (!scrollRef.current) return;
-    const { clientWidth } = scrollRef.current;
+    const { scrollWidth, clientWidth } = scrollRef.current;
+    const maxScrollLeft = scrollWidth - clientWidth;
+    const pageCount = Math.ceil(stats.length / itemsPerPage);
+
+    const targetScroll = (index / (pageCount - 1)) * maxScrollLeft;
+
     scrollRef.current.scrollTo({
-      left: index * clientWidth,
+      left: targetScroll,
       behavior: "smooth",
     });
   };
