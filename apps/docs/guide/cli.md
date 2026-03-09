@@ -36,6 +36,7 @@ agenteval run [options]
 | `-f, --filter <pattern>` | Filter tests by title (substring match)           |
 | `-t, --tag <tag>`        | Filter tests by tag                               |
 | `-o, --output <dir>`     | Override output directory for the ledger database |
+| `--runs <number>`        | Number of iterations per variant                  |
 | `--dry-run`              | Preview execution plan without running agents     |
 | `-s, --silent`           | Suppress all output except errors (for CI)        |
 | `-v, --verbose`          | Show detailed output including judge reasoning    |

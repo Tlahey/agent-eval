@@ -70,6 +70,22 @@ export function expect(ctx: TestContext): ExpectChain {
       // and apply criteria/model/thresholds consistently across modes.
       setLastJudgeOptions(options);
 
+      // Procedural validation: check required commands if in immediate mode (diff is available)
+      if (ctx.diff !== null && options.requiredCommands && options.requiredCommands.length > 0) {
+        const history = ctx.commands.map((c) => c.command);
+        const missing = options.requiredCommands.filter(
+          (req) => !history.some((h) => h.includes(req)),
+        );
+
+        if (missing.length > 0) {
+          const error = new Error(
+            `Procedural validation failed: missing required command(s):\n- ${missing.join("\n- ")}`,
+          );
+          error.name = "JudgeFailure";
+          throw error;
+        }
+      }
+
       // Declarative mode: before agent execution, diff is not captured yet.
       // Defer evaluation to the runner after instruction + tasks have executed.
       if (ctx.diff === null) {

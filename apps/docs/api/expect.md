@@ -23,6 +23,7 @@ interface JudgeOptions {
   criteria: string; // Markdown evaluation criteria
   model?: string; // Optional model override
   expectedFiles?: string[]; // Files that should be changed
+  requiredCommands?: string[]; // CLI commands that MUST be run by the agent
   thresholds?: { warn: number; fail: number }; // Per-test thresholds
 }
 ```
@@ -43,12 +44,13 @@ interface JudgeResult {
 
 ## Options
 
-| Option          | Type                             | Required | Description                                                                                                          |
-| --------------- | -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `criteria`      | `string`                         | ✅       | Markdown criteria for evaluation — defines what the judge should evaluate and how to score                           |
-| `model`         | `string`                         | —        | Override judge model for this call                                                                                   |
-| `expectedFiles` | `string[]`                       | —        | Minimum files that should be changed. Extra changes are evaluated by the judge for relevance (scope creep detection) |
-| `thresholds`    | `{ warn: number; fail: number }` | —        | Per-test scoring thresholds (overrides global)                                                                       |
+| Option             | Type                             | Required | Description                                                                                                          |
+| ------------------ | -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `criteria`         | `string`                         | ✅       | Markdown criteria for evaluation — defines what the judge should evaluate and how to score                           |
+| `model`            | `string`                         | —        | Override judge model for this call                                                                                   |
+| `expectedFiles`    | `string[]`                       | —        | Minimum files that should be changed. Extra changes are evaluated by the judge for relevance (scope creep detection) |
+| `requiredCommands` | `string[]`                       | —        | List of commands the agent **must** have executed (procedural validation).                                           |
+| `thresholds`       | `{ warn: number; fail: number }` | —        | Per-test scoring thresholds (overrides global)                                                                       |
 
 ## Usage
 

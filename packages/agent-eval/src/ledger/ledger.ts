@@ -14,7 +14,7 @@ import type {
   TestStatus,
   ScoreOverride,
 } from "../core/types.js";
-import { computeStatus } from "../core/types.js";
+import { computeStatus, DEFAULT_THRESHOLDS } from "../core/types.js";
 import type { TestTreeNode, RunnerStats } from "../core/interfaces.js";
 
 function dbPath(outputDir: string): string {
@@ -57,7 +57,8 @@ function openDb(outputDir: string): any {
       duration_ms         INTEGER NOT NULL,
       override            TEXT,
       variant_name        TEXT,
-      base_prompt         TEXT
+      base_prompt         TEXT,
+      required_commands   TEXT
     );
   `);
 
@@ -66,6 +67,7 @@ function openDb(outputDir: string): any {
     { name: "tags", type: "TEXT NOT NULL DEFAULT '[]'" },
     { name: "variant_name", type: "TEXT" },
     { name: "base_prompt", type: "TEXT" },
+    { name: "required_commands", type: "TEXT" },
   ];
 
   for (const col of columnsToAdd) {
@@ -112,6 +114,7 @@ interface RunRow {
   override: string | null;
   variant_name: string | null;
   base_prompt: string | null;
+  required_commands: string | null;
 }
 
 function safeJsonParse<T>(json: string | null, fallback: T): T {
@@ -132,6 +135,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
   const judgeTokenUsage = safeJsonParse<TokenUsage | undefined>(row.judge_token_usage, undefined);
   const timing = safeJsonParse<TimingData>(row.timing, { totalMs: row.duration_ms });
   const expectedFiles = safeJsonParse<string[] | undefined>(row.expected_files, undefined);
+  const requiredCommands = safeJsonParse<string[] | undefined>(row.required_commands, undefined);
   const override = safeJsonParse<ScoreOverride | undefined>(row.override, undefined);
 
   return {
@@ -161,6 +165,7 @@ function rowToEntry(row: RunRow): LedgerEntry {
     judgeTokenUsage,
     criteria: row.criteria,
     expectedFiles,
+    requiredCommands,
     thresholds: {
       warn: row.warn_threshold,
       fail: row.fail_threshold,
@@ -184,11 +189,11 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
         diff, changed_files, commands, task_results,
         agent_token_usage, timing, agent_output, logs,
         judge_model, score, pass, status, reason, improvement, tags,
-        judge_token_usage, criteria, expected_files,
+        judge_token_usage, criteria, expected_files, required_commands,
         warn_threshold, fail_threshold, duration_ms, override,
         variant_name, base_prompt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -215,6 +220,7 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.judgeTokenUsage ? JSON.stringify(entry.judgeTokenUsage) : null,
       entry.criteria ?? "",
       entry.expectedFiles ? JSON.stringify(entry.expectedFiles) : null,
+      entry.requiredCommands ? JSON.stringify(entry.requiredCommands) : null,
       entry.thresholds.warn,
       entry.thresholds.fail,
       entry.durationMs,
@@ -344,7 +350,8 @@ export function overrideScore(
   const db = openDb(outputDir);
   try {
     const timestamp = new Date().toISOString();
-    const override: ScoreOverride = { score, reason, timestamp };
+    const status = computeStatus(score, DEFAULT_THRESHOLDS); // Should ideally use the run's specific thresholds
+    const override: ScoreOverride = { score, reason, timestamp, pass: status !== "FAIL", status };
     const stmt = db.prepare("UPDATE runs SET override = ? WHERE id = ?");
     stmt.run(JSON.stringify(override), runId);
     return override;

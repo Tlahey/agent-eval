@@ -76,6 +76,7 @@ interface LedgerEntry {
   judgeTokenUsage?: TokenUsage;
   criteria: string;
   expectedFiles?: string[];
+  requiredCommands?: string[];
   thresholds: Thresholds;
 
   durationMs: number;

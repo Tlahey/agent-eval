@@ -344,6 +344,7 @@ async function runSingleIteration(
       criteria: judgeOptions.criteria,
       execution: executionData,
       expectedFiles: judgeOptions.expectedFiles,
+      requiredCommands: judgeOptions.requiredCommands,
     });
     const { result: judgeResult, tokenUsage: judgeTokenUsage } = await runJudge(
       ctx,
@@ -383,6 +384,7 @@ async function runSingleIteration(
       judgeTokenUsage,
       criteria: judgeOptions.criteria,
       expectedFiles: judgeOptions.expectedFiles,
+      requiredCommands: judgeOptions.requiredCommands,
       thresholds,
       durationMs: Date.now() - start,
     };

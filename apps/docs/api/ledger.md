@@ -98,6 +98,7 @@ erDiagram
         text judge_token_usage "JSON: TokenUsage"
         text criteria "evaluation criteria"
         text expected_files "JSON: string[]"
+        text required_commands "JSON: string[]"
         text thresholds "JSON: {warn, fail}"
     }
 ```

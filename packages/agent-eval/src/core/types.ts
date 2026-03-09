@@ -156,6 +156,7 @@ export interface JudgeResult {
 export interface JudgeOptions {
   criteria: string;
   expectedFiles?: string[];
+  requiredCommands?: string[];
   thresholds?: Thresholds;
 }
 
@@ -186,6 +187,7 @@ export interface LedgerEntry {
   judgeTokenUsage?: TokenUsage;
   criteria: string;
   expectedFiles?: string[];
+  requiredCommands?: string[];
   thresholds: Thresholds;
   durationMs: number;
   override?: ScoreOverride;

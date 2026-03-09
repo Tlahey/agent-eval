@@ -34,10 +34,11 @@
 ## Features
 
 - **Everything is a Variant** — Unified API for single runs and A/B experiments.
+- **Stability Analysis** — Automated multiple iterations per variant to measure consistency.
 - **Isolated Parallel Execution** — Support for Docker and macOS sandbox-exec to run multiple agents simultaneously.
+- **Procedural Command Validation** — Deterministic check of required CLI commands (build, test, lint) without LLM guesswork.
 - **Zero Magic Philosophy** — Explicit runner selection per test for total budget and execution control.
 - **Analytical Explorer** — Hierarchical tree view with analytical metrics and agent rankings.
-- **Git Isolation** — Automatic workspace cleaning or temporary directory cloning.
 - **LLM-as-a-Judge** — Structured evaluation via Anthropic, OpenAI, Ollama, or GitHub Models.
 - **Visual Dashboard** — React dashboard with charts, diff viewer, and delta analysis for experiments.
 
@@ -75,6 +76,8 @@ export default defineConfig({
   judge: {
     model: new OpenAIModel({ model: "gpt-4o" }),
   },
+  // Collect 3 runs per variant to compute stability metrics
+  runs: 3,
   // Enable parallel execution via Docker (optional)
   environment: new DockerEnvironment({ image: "node:22" }),
 });
@@ -82,7 +85,7 @@ export default defineConfig({
 
 ### Write a test (Baseline)
 
-Every test requires an explicit variant array.
+Every test requires an explicit variant array. Use `requiredCommands` for procedural verification.
 
 ```ts
 // evals/banner.eval.ts
@@ -99,6 +102,7 @@ test("Add a Close button", [{ name: "Baseline", runner: "sonnet" }], async ({ ct
 
   await expect(ctx).toPassJudge({
     criteria: "Uses a proper close button, accessibility is respected.",
+    requiredCommands: ["pnpm run build"], // procedural validation
     expectedFiles: ["src/components/Banner.tsx"],
   });
 });
@@ -108,7 +112,7 @@ test("Add a Close button", [{ name: "Baseline", runner: "sonnet" }], async ({ ct
 
 ## A/B Testing (Experiments)
 
-Compare models or prompt engineering strategies by adding more variants.
+Compare models or prompt engineering strategies by adding more variants. The dashboard will automatically show **deltas** and **stability** (variance) between variants.
 
 ```ts
 test(
@@ -124,10 +128,15 @@ test(
   ],
   async ({ ctx }) => {
     ctx.prompt("Refactor the auth middleware to use JWT.");
-    await expect(ctx).toPassJudge({ criteria: "Logic is secure and idiomatic." });
+    await expect(ctx).toPassJudge({
+      criteria: "Logic is secure and idiomatic.",
+      requiredCommands: ["pnpm test"],
+    });
   },
 );
 ```
+
+For examples it's possible to compare different models, a model against itself with skills.
 
 ---
 

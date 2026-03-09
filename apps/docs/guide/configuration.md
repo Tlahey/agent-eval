@@ -81,6 +81,7 @@ export default defineConfig({
 | :------------ | :------------------- | :-------------------------- | :--------------------------------------------------- |
 | `runners`     | `RunnerConfig[]`     | _required_                  | Registry of available AI agents.                     |
 | `judge`       | `JudgeConfig`        | _required_                  | LLM-as-a-Judge configuration.                        |
+| `runs`        | `number`             | `1`                         | Number of iterations per variant (stability).        |
 | `testFiles`   | `string \| string[]` | `**/*.{eval,agent-eval}.ts` | Glob pattern(s) for test discovery.                  |
 | `rootDir`     | `string`             | `process.cwd()`             | Project root directory.                              |
 | `outputDir`   | `string`             | `.agenteval`                | Ledger output directory.                             |

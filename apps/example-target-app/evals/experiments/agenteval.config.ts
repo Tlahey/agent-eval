@@ -35,6 +35,7 @@ export default defineConfig({
     });
   },
 
+  runs: 3,
   testFiles: "evals/experiments/prompt-engineering.eval.ts",
   outputDir: ".agenteval",
   timeout: 60_000,

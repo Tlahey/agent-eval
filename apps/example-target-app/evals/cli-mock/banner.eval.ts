@@ -27,6 +27,7 @@ test(
       - All tests pass
       - Build succeeds
     `,
+      requiredCommands: ["pnpm test", "pnpm build"],
       expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
     });
   },

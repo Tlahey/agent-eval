@@ -37,6 +37,7 @@ test(
         - The button is accessible (aria-label)
         - The code quality meets the ${variant?.name} standards
       `,
+      requiredCommands: ["pnpm build"],
       expectedFiles: ["src/components/Banner.tsx"],
     });
   },

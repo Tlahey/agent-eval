@@ -50,6 +50,7 @@ interface AgentEvalConfig {
   testFiles?: string | string[]; // Glob patterns for test discovery
   runners: RunnerConfig[]; // Global registry of runners
   judge: JudgeConfig; // LLM judge configuration
+  runs?: number; // Number of iterations per variant (default: 1)
   beforeEach?: HookFn; // Config-level hook before each test
   matrix?: { runners?: string[] }; // Filter which runners to execute (standard mode)
   outputDir?: string; // Ledger output dir (default: .agenteval)
@@ -79,6 +80,7 @@ type LlmConfig = IModelPlugin | ICliModel;
 | ------------- | -------------------- | ---------------------------------------- | ----------------------------------------------------------- |
 | `runners`     | `RunnerConfig[]`     | _required_                               | Registry of runner resources (`{ id, model }`)              |
 | `judge`       | `JudgeConfig`        | _required_                               | LLM judge configuration                                     |
+| `runs`        | `number`             | `1`                                      | Number of iterations per variant (stability analysis)       |
 | `testFiles`   | `string \| string[]` | `**/*.{eval,agent-eval}.{ts,js,mts,mjs}` | Glob pattern(s) for test discovery                          |
 | `rootDir`     | `string`             | `process.cwd()`                          | Project root directory                                      |
 | `outputDir`   | `string`             | `.agenteval`                             | Ledger output directory                                     |

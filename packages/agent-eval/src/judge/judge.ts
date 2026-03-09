@@ -177,6 +177,7 @@ export interface JudgePromptOptions {
   criteria: string;
   execution: ExecutionData;
   expectedFiles?: string[];
+  requiredCommands?: string[];
 }
 
 export function buildJudgePrompt(opts: JudgePromptOptions): string {
@@ -213,11 +214,23 @@ ${taskBlocks}\n`;
       ? `\n## File Scope Analysis\nExpected: ${opts.expectedFiles.join(", ")}\nActual: ${changedFiles.join(", ") || "(none)"}`
       : "";
 
+  let commandSection = "";
+  if (opts.requiredCommands && opts.requiredCommands.length > 0) {
+    const history = execution.commands.map((c) => c.command);
+    const analysis = opts.requiredCommands
+      .map((req) => {
+        const found = history.some((h) => h.includes(req));
+        return `- \`${req}\`: ${found ? "✅ Executed" : "❌ MISSED"}`;
+      })
+      .join("\n");
+    commandSection = `\n## Required Commands Analysis\n${analysis}\n`;
+  }
+
   return `You are an expert code reviewer acting as a Judge.
 
 ## Evaluation Criteria
 ${opts.criteria}
-${instructionSection}${taskSection}
+${instructionSection}${taskSection}${commandSection}
 ## Code Changes
 ${filteredDiff || "(no changes captured)"}
 ${fileScopeSection}

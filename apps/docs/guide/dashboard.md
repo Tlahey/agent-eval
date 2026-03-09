@@ -68,6 +68,18 @@ The dashboard supports **9 premium themes**, ranging from high-tech dark modes t
 Themes are saved in `localStorage` and applied instantly via a **zero-flicker** initialization script in `index.html`.
 :::
 
+### Experiment Analysis (A/B Testing)
+
+The Eval Detail page is designed for scientific comparison of variants:
+
+- **Experiment Variations**: A horizontal carousel (snap-scroll) displaying all variants. Each card shows:
+  - **Quality Score** (Avg)
+  - **Execution Speed**
+  - **Token Usage**
+  - **Stability** (1 - score variance): measures how consistent the agent is across multiple runs.
+- **Head-to-Head Comparison**: Select any two variants to trigger a **Delta Analysis**.
+- **Variant Delta Analysis**: A high-density comparison panel showing relative (%) and absolute differences for all key metrics.
+
 ### Run Detail Panel
 
 Click any run to see the full details in a **7-tab panel**:
