@@ -82,7 +82,7 @@ export function VariantGrid({ stats, compareA, compareB, onCompare }: Props) {
           return (
             <div
               key={v.variantName}
-              className={`flex-shrink-0 w-[calc(100%-2rem)] md:w-[calc(33.333%-1rem)] snap-center glass-card p-5 transition-all duration-300 relative overflow-hidden group shadow-none ${
+              className={`flex-shrink-0 w-[calc(100%-2rem)] md:w-[calc(33.333%-1rem)] snap-center glass-card p-5 rounded-2xl transition-all duration-300 relative overflow-hidden group shadow-none ${
                 isSelected
                   ? "ring-2 ring-primary border-primary/50 bg-primary/5"
                   : "hover:border-primary/20"
