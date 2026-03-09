@@ -38,13 +38,13 @@ interface ModelSettings {
 Uses Anthropic's Claude models via `@ai-sdk/anthropic`.
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { AnthropicModel, CliModel } from "agent-eval/llm";
 
 export default defineConfig({
-  runners: [{ name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
+  runners: [{ id: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) }],
   judge: {
-    name: "claude-sonnet",
+    id: "claude-sonnet",
     model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   },
 });
@@ -68,14 +68,14 @@ export default defineConfig({
 Uses OpenAI's GPT models via `@ai-sdk/openai`.
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { OpenAIModel } from "agent-eval/llm";
 
 const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 
 export default defineConfig({
-  runners: [{ name: "gpt-4o", model: gpt4o }],
-  judge: { name: "gpt-4o", model: gpt4o },
+  runners: [{ id: "gpt-4o", model: gpt4o }],
+  judge: { id: "gpt-4o", model: gpt4o },
 });
 ```
 
@@ -111,7 +111,7 @@ new OpenAIModel({
 Run models **locally** with [Ollama](https://ollama.ai/). No API key required.
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { OllamaModel } from "agent-eval/llm";
 
 const llama = new OllamaModel({ model: "llama3" });
@@ -145,7 +145,7 @@ Local models lack the reasoning depth for reliable code evaluation. Use them onl
 Uses GitHub Models inference API (`models.github.ai`). OpenAI-compatible, with **structured JSON output** and **tool calling** support.
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { GitHubModelsModel } from "agent-eval/llm";
 
 export default defineConfig({
@@ -194,7 +194,7 @@ The framework passes tools directly to the [AI SDK](https://ai-sdk.dev/docs/foun
 ### Example: API runner with tools
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { GitHubModelsModel } from "agent-eval/llm";
 import { tool } from "ai";
 import { z } from "zod";
@@ -268,7 +268,7 @@ flowchart LR
 Implement the `IModelPlugin` interface:
 
 ```ts
-import type { IModelPlugin } from "agent-eval";
+import type { IModelPlugin } from "@tlahey/agent-eval";
 
 class MistralModel implements IModelPlugin {
   readonly name = "mistral";

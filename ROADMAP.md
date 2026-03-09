@@ -608,4 +608,6 @@ This file tracks the implementation progress of the AgentEval framework. It is u
 - [ ] Parallel evaluation — Safe concurrent execution with workspace isolation
 - [ ] Notification hooks — Webhooks/Slack alerts on score regressions
 - [ ] Multi-repo support — Evaluate agents across multiple project repositories
-- [ ] Add more informations based on the context token etc ... input tokens and output tokens, latency, cost, etc ...
+- [ ] AB test - On a test, it's possible to run the same test but with a different context (e.g. different prompt, add a model instruction, etc.) and compare the results to see which one performs better. This test("xxxx", () => agent.ab([{ name: "control", fn: (ctx) => { ... } }, { name: "variant", fn: (ctx) => { ... } }])) and the expect is the same. And for the UI, we need to enhancer a bit to compare 2 agents or get the AB test result (need to defined the best approach to show the result in the UI, maybe a new page to show the AB test result with some charts and tables)
+- [ ] Add a validation task to check if the AI have launch iteself the build / test etc ...
+- [ ] Create a sandbox environment (sandbox-exec) for the agent to run, to avoid any problem with the local environment

@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, CliModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, CliModel } from "@tlahey/agent-eval/llm";
 
 /**
  * CLI Runner Example — Mock Agent
@@ -16,7 +16,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "mock-agent",
+      id: "mock-agent",
       model: new CliModel({ command: 'node scripts/mock-agent.mjs "{{prompt}}"' }),
     },
   ],

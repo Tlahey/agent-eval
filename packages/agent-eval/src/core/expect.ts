@@ -1,5 +1,5 @@
 import { judge as runJudge, buildJudgePrompt, extractChangedFiles } from "../judge/judge.js";
-import { setLastJudgeOptions, setLastJudgeResult, getJudgeReporterContext } from "./runner.js";
+import { setLastJudgeOptions, getJudgeReporterContext } from "./runner.js";
 import type {
   ExpectChain,
   JudgeConfig,
@@ -87,7 +87,7 @@ export function expect(ctx: TestContext): ExpectChain {
         criteria: options.criteria,
         execution: {
           instruction: "",
-          runner: { name: "unknown", model: "unknown" },
+          runner: { id: "unknown", model: "unknown" },
           diff: ctx.diff,
           changedFiles: extractChangedFiles(ctx.diff),
           commands: ctx.commands,
@@ -121,9 +121,6 @@ export function expect(ctx: TestContext): ExpectChain {
         pass: status !== "FAIL",
         status,
       };
-
-      // Store result so the runner can capture it
-      setLastJudgeResult(enriched);
 
       if (status === "FAIL") {
         const error = new Error(

@@ -1,182 +1,57 @@
 # Getting Started
 
-## Prerequisites
-
-- **Node.js ≥ 22** (required for `node:sqlite`)
-- **pnpm** (recommended) or npm/yarn
-- An **API key** for your chosen LLM provider (see [Environment Variables](#environment-variables))
-
 ## Installation
 
 ```bash
-pnpm add -D agent-eval
+pnpm add -D @tlahey/agent-eval
 ```
 
 ## Quick Setup
-
-```mermaid
-flowchart LR
-    A["1. Configure"] --> B["2. Write Test"] --> C["3. Run"] --> D["4. View Results"]
-    style A fill:#6366f1,color:#fff
-    style B fill:#f59e0b,color:#000
-    style C fill:#10b981,color:#fff
-    style D fill:#8b5cf6,color:#fff
-```
 
 ### 1. Create a config file
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, CliModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel } from "@tlahey/agent-eval/llm";
 
 export default defineConfig({
-  runners: [
-    {
-      name: "copilot",
-      model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }),
-    },
-  ],
+  runners: [{ id: "sonnet", model: new AnthropicModel({ model: "claude-3-5-sonnet-20241022" }) }],
+  defaultRunner: "sonnet",
   judge: {
-    name: "claude-sonnet",
-    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-  },
-  beforeEach: ({ ctx }) => {
-    ctx.addTask({
-      name: "Tests",
-      action: () => ctx.exec("pnpm test"),
-      criteria: "All tests must pass",
-      weight: 3,
-    });
-    ctx.addTask({
-      name: "Build",
-      action: () => ctx.exec("pnpm build"),
-      criteria: "Build succeeds with zero errors",
-      weight: 2,
-    });
+    model: new AnthropicModel({ model: "claude-3-5-sonnet-20241022" }),
   },
 });
 ```
 
 ### 2. Write your first eval test
 
-Test files use `*.eval.ts` or `*.agent-eval.ts` naming convention:
+Test files use `*.eval.ts` or `*.agent-eval.ts`. Define your mission using `ctx.prompt()`.
 
 ```ts
 // evals/banner.eval.ts
-import { test, expect } from "agent-eval";
+import { test, expect } from "@tlahey/agent-eval";
 
-test("Add a Close button to the Banner", async ({ agent, ctx }) => {
-  // 1. Trigger the agent — storeDiff() runs automatically after this
-  await agent.run("Add a Close button inside the banner component");
+test("Add Close Button", async ({ ctx }) => {
+  ctx.prompt(`
+    Add a close button to the Banner component.
+    It should accept an onClose prop and render an 'x' button.
+  `);
 
-  // 2. Judge the result
   await expect(ctx).toPassJudge({
-    criteria: `
-      - Uses a proper close button component
-      - Has aria-label 'Close'
-      - Tests still pass
-      - Build succeeds
-    `,
+    criteria: "Uses a proper button element with aria-label 'Close'",
   });
 });
 ```
 
-::: tip No boilerplate needed
-`storeDiff()` is called **automatically** after `agent.run()`. Tasks registered via `beforeEach` + `ctx.addTask()` (tests, builds, linters) also run automatically. Your test files only need the prompt and the criteria.
-:::
-
 ### 3. Run the evaluation
 
 ```bash
-# Run all eval tests
 npx agenteval run
-
-# Shorthand — equivalent to `agenteval run`
-npx agenteval .
 ```
 
 ### 4. View the results
 
 ```bash
-# Terminal view (last 20 entries)
-npx agenteval ledger
-
-# Export as JSON
-npx agenteval ledger --json > results.json
-
-# Launch the visual dashboard
-npx agenteval view
+npx agenteval ui
 ```
-
-## What Happens
-
-```mermaid
-sequenceDiagram
-    participant You as You (CLI)
-    participant AE as AgentEval
-    participant Env as Environment Plugin
-    participant Agent as AI Agent
-    participant Judge as LLM Judge
-    participant DB as SQLite Ledger
-
-    You->>AE: agenteval run
-    AE->>AE: Load config + discover test files
-
-    loop For each test × runner
-        AE->>Env: env.setup(cwd)
-        Env-->>AE: Clean working directory
-        AE->>Agent: agent.run(prompt)
-        Agent-->>AE: Files modified on disk
-        AE->>Env: env.getDiff(cwd) (auto storeDiff)
-        Env-->>AE: Diff captured
-        AE->>AE: Run tasks
-        AE->>Judge: Evaluate (criteria + diff + outputs)
-        Judge-->>AE: { score, pass, status, reason, improvement }
-        AE->>DB: Append result
-    end
-
-    AE-->>You: Summary table
-```
-
-1. **Config loaded** — AgentEval reads your `agenteval.config.ts`
-2. **Test files discovered** — Files matching `*.eval.ts` and `*.agent-eval.ts` are found
-3. **Environment setup** — The environment plugin resets the workspace (local git, Docker, etc.)
-4. **Agent executes** — Your configured agent runs the prompt
-5. **Context captured** — Diff is captured via the environment plugin, tasks execute
-6. **Judge evaluates** — An LLM scores the agent's output (0.0–1.0) with three-level status (PASS/WARN/FAIL)
-7. **Ledger updated** — Results are stored in `.agenteval/ledger.sqlite` (SQLite)
-
-## Environment Variables
-
-Set API keys for your LLM providers:
-
-| Variable            | Provider      | Required when using                 |
-| ------------------- | ------------- | ----------------------------------- |
-| `ANTHROPIC_API_KEY` | Anthropic     | Anthropic runners or judges         |
-| `OPENAI_API_KEY`    | OpenAI        | OpenAI runners or judges            |
-| `GH_COPILOT_TOKEN`  | GitHub Models | GitHubModelsModel (`gh auth token`) |
-
-You can also pass `apiKey` directly in the config, but env vars are recommended.
-
-## File Naming Convention
-
-| Pattern            | Example                 |
-| ------------------ | ----------------------- |
-| `*.eval.ts`        | `banner.eval.ts`        |
-| `*.agent-eval.ts`  | `banner.agent-eval.ts`  |
-| `*.eval.js`        | `banner.eval.js`        |
-| `*.agent-eval.mts` | `banner.agent-eval.mts` |
-
-Customize with the `testFiles` config option. See [Configuration](/guide/configuration).
-
-## Database Location
-
-Results are stored in `.agenteval/ledger.sqlite` by default. Override with:
-
-- **Config:** `outputDir: "./custom-output"` in `agenteval.config.ts`
-- **CLI flag:** `agenteval run -o ./my-results`
-
-::: tip
-Add `.agenteval/` to your `.gitignore`.
-:::

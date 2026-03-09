@@ -8,6 +8,7 @@
     "test": "vitest run",
     "eval": "agenteval run",
     "eval:mock": "agenteval run --config evals/cli-mock/agenteval.config.ts",
+    "eval:experiment": "agenteval run --config evals/experiments/agenteval.config.ts",
     "eval:copilot": "agenteval run --config evals/cli-copilot/agenteval.config.ts",
     "eval:aider": "agenteval run --config evals/cli-aider/agenteval.config.ts",
     "eval:anthropic": "agenteval run --config evals/anthropic/agenteval.config.ts",
@@ -25,7 +26,7 @@
     "@testing-library/jest-dom": "^6.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "agent-eval": "workspace:*",
+    "@tlahey/agent-eval": "workspace:*",
     "jsdom": "^25.0.0",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0"

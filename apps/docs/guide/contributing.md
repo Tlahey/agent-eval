@@ -43,7 +43,7 @@ pnpm format     # Prettier auto-format
 ### 2. Test
 
 ```bash
-pnpm test       # Runs both agent-eval (271 tests) and eval-ui (128 tests)
+pnpm test       # Runs both agent-eval and eval-ui tests
 ```
 
 ### 3. Build
@@ -59,130 +59,73 @@ git add -A
 git commit -m "feat(scope): description"
 ```
 
-The pre-commit hook will run all gates automatically. If everything passes, the commit goes through.
-
 ## Available Scripts
 
-| Command             | Description                          |
-| ------------------- | ------------------------------------ |
-| `pnpm test`         | Run all tests (agent-eval + eval-ui) |
-| `pnpm build`        | Build the core package with tsup     |
-| `pnpm lint`         | Run ESLint on the entire codebase    |
-| `pnpm lint:fix`     | ESLint with auto-fix                 |
-| `pnpm format`       | Format all files with Prettier       |
-| `pnpm format:check` | Check formatting without writing     |
-| `pnpm dev:docs`     | Start VitePress docs locally         |
-| `pnpm dev:ui`       | Start the UI site locally            |
+| Command         | Description                           |
+| :-------------- | :------------------------------------ |
+| `pnpm test`     | Run all tests (agent-eval + eval-ui). |
+| `pnpm build`    | Build the entire monorepo.            |
+| `pnpm lint`     | Run ESLint.                           |
+| `pnpm format`   | Format with Prettier.                 |
+| `pnpm dev:docs` | Start VitePress docs locally.         |
+| `pnpm dev:ui`   | Start the UI dashboard locally.       |
 
 ## Commit Convention
 
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-
-| Type       | When                                    |
-| ---------- | --------------------------------------- |
-| `feat`     | New feature or capability               |
-| `fix`      | Bug fix                                 |
-| `test`     | Adding or updating tests                |
-| `refactor` | Code change that neither fixes nor adds |
-| `docs`     | Documentation only                      |
-| `chore`    | Build config, deps, tooling             |
+Use [Conventional Commits](https://www.conventionalcommits.org/): `feat`, `fix`, `test`, `refactor`, `docs`, `chore`.
 
 ## Testing Guidelines
 
-### Core Package (`packages/agent-eval`)
+### Framework (`packages/agent-eval`)
 
-- Tests are **colocated** next to their source file: `git/git.ts` → `git/git.test.ts`
-- Use `describe` / `it` with clear descriptions
-- Mock external dependencies — no real API calls in unit tests
-- The E2E integration tests in `src/e2e/` validate the full pipeline using temp git repos
-- **271 tests** covering types, config, context, runner, expect, git, ledger, plugins, environment
+- Tests are **colocated**: `src/git/git.ts` → `src/git/git.test.ts`.
+- Mock external dependencies (LLM APIs, Git).
+- Every source file must have a corresponding test file.
 
 ### Dashboard (`apps/eval-ui`)
 
-- Tests use **Vitest + React Testing Library** (colocated next to source)
-- **Design Standards**: STRICTLY FORBIDDEN to use hardcoded Tailwind color classes (e.g., `text-white`, `bg-zinc-800`). You **must** use semantic theme variables (e.g., `text-txt-onprimary`, `text-primary`, `bg-surface-1`). This ensures compatibility with all 9 themes.
-- **Translucency**: Use `.glass-card` for translucent, theme-aware panels.
-- **Responsiveness**: Always use `flex-wrap` and grid adjustments for small screens.
-- **Testing**: Mock `fetch` via `vi.fn()`, mock `ResponsiveContainer` from Recharts.
+- Tests use **Vitest + React Testing Library**.
+- **Design Standards**: Use semantic theme variables (e.g., `text-primary`, `bg-surface-1`). Hardcoded Tailwind color classes are forbidden.
+- Use `.glass-card` for panels.
 
 ## Local Development
 
-### Core package
-
 ```bash
+# Framework
 cd packages/agent-eval
-pnpm test         # Run unit tests
-pnpm build        # Build with tsup
-```
+pnpm test
+pnpm build
 
-### Dashboard
-
-```bash
+# Dashboard
 cd apps/eval-ui
-pnpm dev             # Start dev server
-pnpm test            # Run component tests
+pnpm dev
+pnpm test
 ```
 
-### Building the whole project
+## Global Install
 
 ```bash
-pnpm build           # Builds both Framework and UI + bundles them
-```
-
-## Global Install (for testing locally)
-
-You can install `agenteval` globally on your machine so the CLI is available from any project:
-
-```bash
-# First time: setup pnpm global bin directory
-pnpm setup
-source ~/.zshrc   # or ~/.bashrc
-
-# Link the local package globally
+# Link local package globally
 cd packages/agent-eval
 pnpm link --global
+
+# Now use it anywhere
+agenteval run
 ```
-
-Now you can use `agenteval` from **any directory**:
-
-```bash
-agenteval --version   # 0.0.0-alpha
-agenteval run          # Run evals in the current project
-agenteval ledger       # View results
-agenteval ui           # Launch dashboard
-```
-
-::: tip Live development
-Since `pnpm link --global` creates a symlink, any time you rebuild the core package (`pnpm build`), the global CLI is automatically updated — no need to re-link.
-:::
-
-## Versioning
-
-The version in `package.json` is set to `0.0.0-alpha` during development. **Do not manually bump the version.**
-
-Version bumps are handled exclusively through the **release workflow** using [Changesets](https://github.com/changesets/changesets):
-
-```bash
-pnpm changeset          # Create a changeset describing your change
-pnpm changeset version   # Bump versions (CI does this on release)
-```
-
-The `agenteval --version` command reads the version dynamically from `package.json` at runtime.
-
-## Architecture
-
-The framework follows [SOLID principles](/guide/architecture) for modularity and extensibility. Each module has a single responsibility, providers are dynamically imported, and all runners implement the `AgentHandle` interface.
 
 ## Architecture Decisions
 
-All major technical decisions are documented as ADRs in [`docs/adrs/`](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs):
+All major technical decisions are documented as ADRs in `docs/adrs/`:
 
-| ADR                                                                                         | Decision                                               |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| [001](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/001-why-custom-framework.md) | Why a custom framework (not Vitest/Promptfoo/Langfuse) |
-| [002](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/002-sqlite-over-jsonl.md)    | SQLite over JSONL for the ledger                       |
-| [003](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/003-sequential-execution.md) | Sequential execution (no parallelism)                  |
-| [004](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/004-llm-as-judge.md)         | LLM-as-a-Judge with Vercel AI SDK                      |
-| [005](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/005-monorepo-layout.md)      | Monorepo layout (apps/ + packages/)                    |
-| [006](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/006-code-quality-gates.md)   | Code quality gates (ESLint + Prettier + Husky)         |
-| [007](https://github.com/Tlahey/agent-eval/tree/main/docs/adrs/007-solid-architecture.md)   | SOLID architecture principles                          |
+| ADR                                             | Decision                                          |
+| :---------------------------------------------- | :------------------------------------------------ |
+| [001](./architecture.md#architecture-decisions) | Why a custom framework (not Vitest / Promptfoo)   |
+| [002](./architecture.md#architecture-decisions) | SQLite over JSONL for the ledger                  |
+| [003](./architecture.md#architecture-decisions) | Sequential execution (no parallelism)             |
+| [004](./architecture.md#architecture-decisions) | LLM-as-a-Judge with Vercel AI SDK                 |
+| [005](./architecture.md#architecture-decisions) | Monorepo layout (apps/ + packages/)               |
+| [006](./architecture.md#architecture-decisions) | Code quality gates (ESLint + Prettier + Husky)    |
+| [007](./architecture.md#architecture-decisions) | SOLID architecture principles                     |
+| [008](./architecture.md#architecture-decisions) | Unified mission-based testing and A/B Experiments |
+
+> 💡 Links above point to the Architecture summary. Full ADR files are available in the repository at `/docs/adrs/`.

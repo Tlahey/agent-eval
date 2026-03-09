@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, CliModel, OpenAIModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, CliModel, OpenAIModel } from "@tlahey/agent-eval/llm";
 
 /**
  * Multi-Runner — Compare multiple agents on the same eval
@@ -31,10 +31,10 @@ export default defineConfig({
   rootDir: "../..",
 
   runners: [
-    { name: "claude-sonnet", model: claude },
-    { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
+    { id: "claude-sonnet", model: claude },
+    { id: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) },
     {
-      name: "aider",
+      id: "aider",
       model: new CliModel({
         command:
           'aider --model anthropic/claude-sonnet-4-20250514 --message "{{prompt}}" --yes --no-auto-commits',

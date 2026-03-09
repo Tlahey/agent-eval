@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, OpenAIModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, OpenAIModel } from "@tlahey/agent-eval/llm";
 
 /**
  * Runner — OpenAI GPT-4o
@@ -19,7 +19,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "gpt-4o",
+      id: "gpt-4o",
       model: new OpenAIModel({ model: "gpt-4o" }),
     },
   ],

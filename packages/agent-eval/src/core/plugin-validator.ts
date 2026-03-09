@@ -27,6 +27,7 @@ const LEDGER_REQUIRED_METHODS = [
   "getStats",
   "overrideRunScore",
   "getRunOverrides",
+  "getTags",
 ] as const;
 
 const JUDGE_REQUIRED_PROPERTIES = ["name"] as const;
@@ -152,7 +153,7 @@ export function validatePlugins(config: {
     errors.push(...validateEnvironmentPlugin(config.environment));
   }
 
-  // Validate each runner (must be { name, model } objects)
+  // Validate each runner (must be { id, model } objects)
   if (config.runners) {
     for (let i = 0; i < config.runners.length; i++) {
       const runner = config.runners[i] as Record<string, unknown>;
@@ -161,18 +162,18 @@ export function validatePlugins(config: {
           plugin: `Runner[${i}]`,
           member: "(self)",
           expected: "property",
-          message: `Runner[${i}] must be a non-null object { name, model }`,
+          message: `Runner[${i}] must be a non-null object { id, model }`,
         });
         continue;
       }
 
-      // All runners must have a name
-      if (!runner.name || typeof runner.name !== "string") {
+      // All runners must have an ID
+      if (!runner.id || typeof runner.id !== "string") {
         errors.push({
           plugin: `Runner[${i}]`,
-          member: "name",
+          member: "id",
           expected: "property",
-          message: `Runner[${i}] is missing required property 'name' (string)`,
+          message: `Runner[${i}] is missing required property 'id' (string)`,
         });
       }
 

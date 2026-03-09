@@ -23,6 +23,7 @@ function makeLedgerPlugin(overrides: Record<string, unknown> = {}): Record<strin
     getStats: () => [],
     overrideRunScore: () => ({}),
     getRunOverrides: () => [],
+    getTags: () => [],
     ...overrides,
   };
 }
@@ -74,7 +75,8 @@ describe("validateLedgerPlugin", () => {
     expect(missingMethods).toContain("getStats");
     expect(missingMethods).toContain("overrideRunScore");
     expect(missingMethods).toContain("getRunOverrides");
-    expect(missingMethods).toHaveLength(10);
+    expect(missingMethods).toContain("getTags");
+    expect(missingMethods).toHaveLength(11);
   });
 
   it("detects a single missing method", () => {
@@ -205,7 +207,7 @@ describe("validateModelPlugin", () => {
 describe("validatePlugins - runners", () => {
   it("validates runner configs with CLI model", () => {
     const errors = validatePlugins({
-      runners: [{ name: "ok", model: { type: "cli", name: "cli", command: "echo {{prompt}}" } }],
+      runners: [{ id: "ok", model: { type: "cli", name: "cli", command: "echo {{prompt}}" } }],
     });
     expect(errors).toEqual([]);
   });
@@ -213,7 +215,7 @@ describe("validatePlugins - runners", () => {
   it("validates runner configs with API model", () => {
     const errors = validatePlugins({
       runners: [
-        { name: "ok", model: { name: "openai", modelId: "gpt-4o", createModel: () => ({}) } },
+        { id: "ok", model: { name: "openai", modelId: "gpt-4o", createModel: () => ({}) } },
       ],
     });
     expect(errors).toEqual([]);
@@ -235,17 +237,17 @@ describe("validatePlugins - runners", () => {
     expect(errors[0].message).toContain("non-null object");
   });
 
-  it("detects runner missing name property", () => {
+  it("detects runner missing id property", () => {
     const errors = validatePlugins({
       runners: [{ model: { type: "cli", name: "cli", command: "echo" } }],
     });
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].message).toContain("name");
+    expect(errors[0].message).toContain("id");
   });
 
   it("detects runner missing model property", () => {
     const errors = validatePlugins({
-      runners: [{ name: "test" }],
+      runners: [{ id: "test" }],
     });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].message).toContain("model");
@@ -253,7 +255,7 @@ describe("validatePlugins - runners", () => {
 
   it("detects runner with invalid model (neither CLI nor API)", () => {
     const errors = validatePlugins({
-      runners: [{ name: "test", model: { name: "broken" } }],
+      runners: [{ id: "test", model: { name: "broken" } }],
     });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].message).toContain("IModelPlugin");
@@ -263,8 +265,8 @@ describe("validatePlugins - runners", () => {
   it("validates multiple runners", () => {
     const errors = validatePlugins({
       runners: [
-        { name: "a", model: { type: "cli", name: "cli", command: "echo" } },
-        { name: "b", model: { name: "openai", modelId: "gpt-4o", createModel: () => ({}) } },
+        { id: "a", model: { type: "cli", name: "cli", command: "echo" } },
+        { id: "b", model: { name: "openai", modelId: "gpt-4o", createModel: () => ({}) } },
       ],
     });
     expect(errors).toEqual([]);
@@ -281,8 +283,8 @@ describe("validatePlugins - runners", () => {
   it("passes for valid runners array", () => {
     const errors = validatePlugins({
       runners: [
-        { name: "a", model: { type: "cli", name: "cli", command: "echo" } },
-        { name: "b", model: { type: "cli", name: "cli", command: "run" } },
+        { id: "a", model: { type: "cli", name: "cli", command: "echo" } },
+        { id: "b", model: { type: "cli", name: "cli", command: "run" } },
       ],
     });
     expect(errors).toEqual([]);

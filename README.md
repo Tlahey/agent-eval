@@ -92,8 +92,10 @@ import { CliModel, OpenAIModel } from "@tlahey/agent-eval/llm";
 import { SqliteLedger } from "@tlahey/agent-eval/ledger";
 
 export default defineConfig({
+  // Global registry of available runners
   runners: [
-    { name: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
+    { id: "copilot", model: new CliModel({ command: 'gh copilot suggest "{{prompt}}"' }) },
+    { id: "gpt4", model: new OpenAIModel({ model: "gpt-4o" }) },
   ],
   judge: {
     model: new OpenAIModel({ model: "gpt-4o" }),
@@ -125,7 +127,56 @@ test("Add a Close button to the Banner", ({ agent, ctx }) => {
 });
 ```
 
-### Run & View
+---
+
+## A/B Testing (Experiments)
+
+AgentEval allows you to run scientific experiments to compare different configurations (prompts, skills, models) on the same mission.
+
+```ts
+// evals/accessibility.eval.ts
+import { test, expect } from "@tlahey/agent-eval";
+
+test.variants(
+  "Validation Accessibilité",
+  "Crée un composant de menu déroulant (Dropdown).", // COMMON MISSION
+  [
+    { id: "raw", name: "Direct Prompt", runnerId: "gpt4" },
+    {
+      id: "expert",
+      name: "Expert Persona",
+      runnerId: "gpt4",
+      enrichPrompt: "Agis en tant qu'expert en accessibilité WCAG. Mission : {{prompt}}",
+    },
+    {
+      id: "with-skills",
+      name: "GPT-4 + UI Skills",
+      runnerId: "gpt4",
+      metadata: { skills: ["ui"] },
+    },
+  ],
+  async ({ agent, ctx, variant }) => {
+    // metadata is accessible via agent.variant.metadata
+    if (variant.metadata?.skills) {
+      agent.useSkills(variant.metadata.skills);
+    }
+
+    await expect(ctx).toPassJudge({
+      criteria: "Le dropdown est fonctionnel et respecte les contraintes WCAG.",
+    });
+  },
+);
+```
+
+The Dashboard will automatically detect experiments and provide:
+
+- **Comparison Table**: Side-by-side metrics (Score, Duration, Tokens).
+- **Delta Analysis**: Instant calculation of performance gain/loss (e.g., "+15% with Expert Persona").
+- **Prompt Inspector**: View exactly what was sent to the LLM after enrichment.
+
+---
+
+## Architecture
 
 ```bash
 npx agenteval run    # Run evaluations

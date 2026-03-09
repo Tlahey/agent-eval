@@ -39,13 +39,11 @@ interface EnvironmentCommandResult {
 Runs tests directly on the host machine. Uses Git for workspace isolation and `child_process.execSync` for command execution. This is the zero-dependency default.
 
 ```ts
-import { defineConfig } from "agent-eval";
-import { LocalEnvironment } from "agent-eval/environment";
+import { defineConfig } from "@tlahey/agent-eval";
+import { LocalEnvironment } from "@tlahey/agent-eval/environment";
 
 export default defineConfig({
-  // LocalEnvironment is used automatically when no environment is specified
   environment: new LocalEnvironment(),
-  // ...
 });
 ```
 
@@ -56,88 +54,28 @@ export default defineConfig({
 | `getDiff()`  | `git diff --cached` + `git diff`              |
 | `teardown()` | No-op                                         |
 
-::: tip When to use
-Use `LocalEnvironment` when:
-
-- Running evals on your local machine
-- You trust the agents you're testing
-- You want zero configuration overhead
-  :::
-
 ### DockerEnvironment
 
-Runs each test iteration inside a **Docker container** with the project directory mounted as a volume. Provides strong isolation — the agent cannot modify the host filesystem directly.
+Runs each test iteration inside a **Docker container** with the project directory mounted as a volume. Provides strong isolation.
 
 ```ts
-import { defineConfig } from "agent-eval";
-import { DockerEnvironment } from "agent-eval/environment";
+import { defineConfig } from "@tlahey/agent-eval";
+import { DockerEnvironment } from "@tlahey/agent-eval/environment";
 
 export default defineConfig({
   environment: new DockerEnvironment({
     image: "node:22-slim",
     workDir: "/workspace",
   }),
-  // ...
 });
 ```
 
-| Option       | Type       | Default      | Description                                 |
-| ------------ | ---------- | ------------ | ------------------------------------------- |
-| `image`      | `string`   | —            | Docker image to use (e.g., `node:22-slim`)  |
-| `dockerfile` | `string`   | —            | Path to Dockerfile (alternative to `image`) |
-| `workDir`    | `string`   | `/workspace` | Working directory inside the container      |
-| `dockerArgs` | `string[]` | `[]`         | Additional `docker create` arguments        |
-
-| Lifecycle    | Implementation                                     |
-| ------------ | -------------------------------------------------- |
-| `setup()`    | `docker create` with volume mount + `docker start` |
-| `execute()`  | `docker exec` inside the running container         |
-| `getDiff()`  | `docker exec git diff` inside the container        |
-| `teardown()` | `docker rm -f` removes the container               |
-
-#### Using a Dockerfile
-
-```ts
-new DockerEnvironment({
-  dockerfile: "./Dockerfile.eval",
-  workDir: "/app",
-  dockerArgs: ["--memory=2g", "--cpus=2"],
-});
-```
-
-#### Full example with Docker
-
-```ts
-import { defineConfig } from "agent-eval";
-import { DockerEnvironment } from "agent-eval/environment";
-import { AnthropicModel, CliModel } from "agent-eval/llm";
-
-export default defineConfig({
-  environment: new DockerEnvironment({
-    image: "node:22-slim",
-    dockerArgs: ["--memory=4g"],
-  }),
-
-  runners: [
-    {
-      name: "claude-api",
-      model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-    },
-    {
-      name: "claude-code",
-      model: new CliModel({ command: 'claude -p "{{prompt}}" --allowedTools "Edit,Write,Bash"' }),
-    },
-  ],
-  judge: {
-    name: "claude-sonnet",
-    model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
-  },
-});
-```
-
-::: warning Docker required
-Docker must be installed and running on the host machine. The user running AgentEval needs permission to create and manage containers.
-:::
+| Option       | Type       | Default      | Description                                  |
+| :----------- | :--------- | :----------- | :------------------------------------------- |
+| `image`      | `string`   | —            | Docker image to use.                         |
+| `dockerfile` | `string`   | —            | Path to Dockerfile (alternative to `image`). |
+| `workDir`    | `string`   | `/workspace` | Working directory inside the container.      |
+| `dockerArgs` | `string[]` | `[]`         | Additional `docker create` arguments.        |
 
 ## Execution Flow
 
@@ -148,45 +86,21 @@ sequenceDiagram
     participant A as Agent
     participant C as EvalContext
 
-    loop For each test iteration
+    loop For each iteration
         R->>E: setup(cwd)
-        Note over E: LocalEnvironment: git reset --hard<br/>DockerEnvironment: docker create + start
+        Note over E: workspace reset
 
-        R->>A: agent.run(prompt) or agent.instruct(prompt)
+        R->>A: Automatic execution of Mission
         A->>E: execute(command, cwd)
         E-->>A: {stdout, stderr, exitCode}
 
-        R->>C: storeDiff()
+        R->>C: Capture changes
         C->>E: getDiff(cwd)
         E-->>C: diff string
 
         R->>E: teardown?(cwd)
-        Note over E: LocalEnvironment: no-op<br/>DockerEnvironment: docker rm -f
     end
 ```
-
-## Choosing an Environment
-
-```mermaid
-flowchart TD
-    A["Which environment?"] --> B{"Need isolation<br/>from host?"}
-    B -- Yes --> C{"Docker<br/>available?"}
-    C -- Yes --> D["DockerEnvironment"]
-    C -- No --> E["Custom<br/>(SSH, VM, etc.)"]
-    B -- No --> F["LocalEnvironment<br/>(default)"]
-
-    style D fill:#6366f1,color:#fff
-    style E fill:#f59e0b,color:#000
-    style F fill:#10b981,color:#fff
-```
-
-| Feature         | LocalEnvironment | DockerEnvironment  |
-| --------------- | ---------------- | ------------------ |
-| Setup required  | None             | Docker installed   |
-| Host isolation  | None (shared FS) | Full (container)   |
-| Performance     | Fast             | Container overhead |
-| Git integration | Native           | Via mounted volume |
-| Best for        | Local dev, CI    | Untrusted agents   |
 
 ## Creating a Custom Environment
 
@@ -195,7 +109,7 @@ flowchart TD
 Run tests on a remote machine via SSH:
 
 ```ts
-import type { IEnvironmentPlugin, EnvironmentCommandResult } from "agent-eval";
+import type { IEnvironmentPlugin, EnvironmentCommandResult } from "@tlahey/agent-eval";
 
 class SSHEnvironment implements IEnvironmentPlugin {
   readonly name = "ssh";
@@ -223,67 +137,9 @@ class SSHEnvironment implements IEnvironmentPlugin {
     try {
       const stdout = execSync(`ssh ${this.user}@${this.host} '${cmd}'`, { encoding: "utf-8" });
       return { stdout, stderr: "", exitCode: 0 };
-    } catch (err: unknown) {
-      const e = err as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: e.stdout ?? "", stderr: e.stderr ?? "", exitCode: e.status ?? 1 };
+    } catch (err: any) {
+      return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", exitCode: err.status ?? 1 };
     }
   }
 }
-```
-
-### Temporary Clone Environment
-
-Clone the project into a temp directory for each test:
-
-```ts
-import type { IEnvironmentPlugin, EnvironmentCommandResult } from "agent-eval";
-import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-
-class TempCloneEnvironment implements IEnvironmentPlugin {
-  readonly name = "temp-clone";
-  private tempDir?: string;
-
-  setup(cwd: string): void {
-    this.tempDir = mkdtempSync(join(tmpdir(), "agenteval-"));
-    execSync(`git clone ${cwd} ${this.tempDir}`, { stdio: "pipe" });
-  }
-
-  execute(command: string): EnvironmentCommandResult {
-    try {
-      const stdout = execSync(command, { cwd: this.tempDir!, encoding: "utf-8", stdio: "pipe" });
-      return { stdout, stderr: "", exitCode: 0 };
-    } catch (err: unknown) {
-      const e = err as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: e.stdout ?? "", stderr: e.stderr ?? "", exitCode: e.status ?? 1 };
-    }
-  }
-
-  getDiff(): string {
-    const staged = execSync("git diff --cached", { cwd: this.tempDir!, encoding: "utf-8" });
-    const unstaged = execSync("git diff", { cwd: this.tempDir!, encoding: "utf-8" });
-    return [staged, unstaged].filter(Boolean).join("\n");
-  }
-
-  teardown(): void {
-    if (this.tempDir) {
-      rmSync(this.tempDir, { recursive: true, force: true });
-      this.tempDir = undefined;
-    }
-  }
-}
-```
-
-### Usage
-
-```ts
-import { defineConfig } from "agent-eval";
-import { SSHEnvironment } from "./my-plugins/ssh-environment";
-
-export default defineConfig({
-  environment: new SSHEnvironment("build-server.internal", "ci"),
-  // ...
-});
 ```

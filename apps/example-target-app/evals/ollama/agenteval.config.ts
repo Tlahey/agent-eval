@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, OllamaModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, OllamaModel } from "@tlahey/agent-eval/llm";
 
 /**
  * Runner — Ollama (Local)
@@ -21,7 +21,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "ollama-llama3",
+      id: "ollama-llama3",
       model: new OllamaModel({ model: "llama3" }),
     },
   ],

@@ -84,7 +84,7 @@ Requires `ANTHROPIC_API_KEY` environment variable (or `apiKey` in constructor).
 import { OpenAIModel } from "agent-eval/llm";
 
 judge: {
-  name: "gpt-4o",
+  id: "gpt-4o",
   model: new OpenAIModel({ model: "gpt-4o" }),
 }
 ```
@@ -145,7 +145,7 @@ GitHub Models natively supports `response_format: { type: "json_object" }` with 
 Any provider can be used by implementing `IModelPlugin`:
 
 ```ts
-import type { IModelPlugin } from "agent-eval";
+import type { IModelPlugin } from "@tlahey/agent-eval";
 
 class CompanyModel implements IModelPlugin {
   readonly name = "company";
@@ -217,7 +217,7 @@ The judge **must** return valid structured data (`{ pass, score, reason, improve
 
 ```ts
 judge: {
-  name: "claude-sonnet",
+  id: "claude-sonnet",
   model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
   maxRetries: 3, // default: 2
 }

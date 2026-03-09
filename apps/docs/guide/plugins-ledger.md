@@ -33,7 +33,7 @@ interface ILedgerPlugin {
 Uses Node 22's built-in `node:sqlite` for zero-dependency SQL storage. This is the default when no ledger plugin is configured.
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { SqliteLedger } from "agent-eval/ledger";
 
 export default defineConfig({
@@ -95,7 +95,7 @@ erDiagram
 Stores results as JSONL (one JSON object per line). Works with any Node.js version.
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { JsonLedger } from "agent-eval/ledger";
 
 export default defineConfig({
@@ -157,7 +157,7 @@ import type {
   ScoreOverride,
   RunnerStats,
   TestTreeNode,
-} from "agent-eval";
+} from "@tlahey/agent-eval";
 
 class PostgresLedger implements ILedgerPlugin {
   readonly name = "postgres";
@@ -207,7 +207,7 @@ class PostgresLedger implements ILedgerPlugin {
 ### Usage
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { PostgresLedger } from "./my-plugins/postgres-ledger";
 
 export default defineConfig({

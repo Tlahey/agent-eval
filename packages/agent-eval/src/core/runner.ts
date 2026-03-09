@@ -1,33 +1,26 @@
 import { EvalContext } from "./context.js";
-import { getGlobalThresholds } from "./expect.js";
 import { appendLedgerEntry } from "../ledger/ledger.js";
 import { judge as runJudge, buildJudgePrompt } from "../judge/judge.js";
-import {
-  getMatchingHooks,
-  getRegisteredBeforeEachHooks,
-  getRegisteredAfterEachHooks,
-} from "../index.js";
+import { getMatchingHooks, getRegisteredBeforeEachHooks } from "../index.js";
 import type {
   AgentEvalConfig,
   AgentHandle,
   CommandResult,
   JudgeOptions,
-  JudgeResult,
   LedgerEntry,
   LlmConfig,
   RunnerConfig,
-  TaskDefinition,
   TaskResult,
   TestDefinition,
-  TestContext,
   TimingData,
+  TestVariant,
 } from "./types.js";
 import { computeStatus, DEFAULT_THRESHOLDS } from "./types.js";
 import type { ILedgerPlugin, IEnvironmentPlugin, RunnerExecResult } from "./interfaces.js";
 import { isCliModel } from "./interfaces.js";
 import { validateRunnerNames } from "./config.js";
 import { LocalEnvironment } from "../environment/plugins/local.js";
-import type { Reporter, TestResultEvent } from "./reporter.js";
+import type { Reporter } from "./reporter.js";
 import { SilentReporter } from "./reporter.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -40,7 +33,6 @@ function resolveModelId(llm: LlmConfig | undefined): string {
 
 /**
  * Execute a runner config against a prompt.
- * Dispatches to CLI or API execution based on the model type.
  */
 async function executeRunner(
   runner: RunnerConfig,
@@ -51,7 +43,6 @@ async function executeRunner(
   onOutput?: (data: string) => void,
 ): Promise<RunnerExecResult> {
   if (isCliModel(runner.model)) {
-    // CLI execution: replace {{prompt}} and run via environment
     const cmd = runner.model.command.replace("{{prompt}}", prompt);
     const result = await env.execute(cmd, cwd, {
       timeout: timeout ?? 600_000,
@@ -59,7 +50,6 @@ async function executeRunner(
       onStderr: onOutput,
     });
 
-    // If the CLI model has a parseOutput function, use it to extract metrics
     if (runner.model.parseOutput) {
       const metrics = runner.model.parseOutput({
         stdout: result.stdout,
@@ -80,14 +70,11 @@ async function executeRunner(
       exitCode: result.exitCode,
     };
   } else {
-    // Collect model-level settings (temperature, maxTokens, topP)
     const { maxSteps: _maxSteps, ...modelSettings } = runner.model.settings ?? {};
     const model = await runner.model.createModel();
 
-    // ─── Agentic mode: tools present → generateText() with multi-step ───
     if (runner.model.tools && Object.keys(runner.model.tools).length > 0) {
       const { generateText } = await import("ai");
-
       const { text, usage } = await generateText({
         model: model as Parameters<typeof generateText>[0]["model"],
         tools: runner.model.tools as Parameters<typeof generateText>[0]["tools"],
@@ -95,7 +82,6 @@ async function executeRunner(
         prompt,
         ...modelSettings,
       });
-
       const tokenUsage = usage
         ? {
             inputTokens: usage.promptTokens,
@@ -103,46 +89,35 @@ async function executeRunner(
             totalTokens: usage.totalTokens,
           }
         : undefined;
-
       return { tokenUsage, output: text };
     }
 
-    // ─── Standard mode: no tools → generateObject() for file operations ───
     const { generateObject } = await import("ai");
     const { z } = await import("zod");
-
     const FileOperationSchema = z.object({
-      files: z
-        .array(
-          z.object({
-            path: z.string().describe("Relative file path from project root"),
-            content: z.string().describe("Full file content to write"),
-          }),
-        )
-        .describe("Files to create or modify"),
+      files: z.array(
+        z.object({
+          path: z.string().describe("Relative file path from project root"),
+          content: z.string().describe("Full file content to write"),
+        }),
+      ),
     });
 
     const { object, usage } = await generateObject({
       model: model as Parameters<typeof generateObject>[0]["model"],
       schema: FileOperationSchema,
-      prompt: `You are an expert coding agent. You must complete the following task by modifying or creating files in a project.
-
-Task: ${prompt}
-
-Respond with the list of files to create or modify. Each file must include the full content (not a diff). Only include files that need changes.`,
+      prompt: `You are an expert coding agent. Task: ${prompt}`,
       ...modelSettings,
     });
 
     const response = object as { files: Array<{ path: string; content: string }> };
     const filesWritten: string[] = [];
-
     for (const file of response.files) {
       const fullPath = resolve(cwd, file.path);
       mkdirSync(dirname(fullPath), { recursive: true });
       writeFileSync(fullPath, file.content, "utf-8");
       filesWritten.push(file.path);
     }
-
     const tokenUsage = usage
       ? {
           inputTokens: usage.promptTokens,
@@ -150,162 +125,48 @@ Respond with the list of files to create or modify. Each file must include the f
           totalTokens: usage.totalTokens,
         }
       : undefined;
-
     return { filesWritten, tokenUsage };
   }
 }
 
 /** Get the model display string for a runner */
 function getRunnerModelId(runner: RunnerConfig): string {
-  if (isCliModel(runner.model)) {
-    return runner.model.command;
-  }
+  if (isCliModel(runner.model)) return runner.model.command;
   return runner.model.modelId;
 }
 
 /**
- * Create the raw AgentHandle for a given runner config.
- * Dispatches execution to CLI or API based on model type.
+ * Execute the agent for a context.
  */
-function createRawAgent(
+async function executeAgent(
   runner: RunnerConfig,
-  cwd: string,
-  reporter: Reporter,
-  testId: string,
-  env: IEnvironmentPlugin,
-  ctx: EvalContext,
-): Omit<AgentHandle, "instruct"> {
-  return {
-    name: runner.name,
-    model: getRunnerModelId(runner),
-
-    async run(prompt: string) {
-      const onOutput = reporter.onPipelineOutput
-        ? (data: string) =>
-            reporter.onPipelineOutput!({ testId, runner: runner.name }, "agent", data)
-        : undefined;
-
-      const result = await executeRunner(runner, prompt, cwd, env, undefined, onOutput);
-
-      // Capture agent output into context
-      if (result.stdout) {
-        ctx.setAgentOutput(result.stdout);
-      } else if (result.output) {
-        ctx.setAgentOutput(result.output);
-      }
-
-      // Capture token usage (API models)
-      if (result.tokenUsage) {
-        ctx.setAgentTokenUsage(result.tokenUsage);
-      }
-
-      // Report errors from CLI execution
-      if (result.exitCode !== undefined && result.exitCode !== 0 && result.stderr) {
-        reporter.onTestError({ testId, runner: runner.name }, result.stderr.slice(0, 500));
-      }
-
-      // Report files written by API models
-      if (result.filesWritten) {
-        for (const filePath of result.filesWritten) {
-          reporter.onFileWrite({ testId, runner: runner.name }, filePath);
-        }
-      }
-    },
-  };
-}
-
-/**
- * Internal state tracked by the declarative agent handle.
- * Used by the runner to determine which pipeline to execute.
- */
-interface AgentState {
-  instruction: string | null;
-  isDeclarative: boolean;
-  isImperative: boolean;
-}
-
-/**
- * Create an AgentHandle that supports both imperative (run) and declarative (instruct) modes.
- * Enforces the Single-Instruct Policy and mutual exclusivity of the two modes.
- */
-function createAgent(
-  runner: RunnerConfig,
-  cwd: string,
-  ctx: EvalContext,
-  config: AgentEvalConfig,
-  reporter: Reporter,
-  testId: string,
-  env: IEnvironmentPlugin,
-): { agent: AgentHandle; state: AgentState } {
-  const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
-
-  // Store runner info into context
-  ctx.setRunnerInfo({ name: runner.name, model: getRunnerModelId(runner) });
-
-  const state: AgentState = {
-    instruction: null,
-    isDeclarative: false,
-    isImperative: false,
-  };
-
-  const agent: AgentHandle = {
-    name: raw.name,
-    model: raw.model,
-
-    instruct(prompt: string): void {
-      if (state.isImperative) {
-        throw new Error("Cannot use instruct() after run(). Choose one API style per test.");
-      }
-      if (state.instruction !== null) {
-        throw new Error(
-          "Single-Instruct Policy: A test can only have one instruction. Use separate test() blocks for different prompts.",
-        );
-      }
-      state.instruction = prompt;
-      state.isDeclarative = true;
-      ctx.setInstruction(prompt);
-    },
-
-    async run(prompt: string) {
-      if (state.isDeclarative) {
-        throw new Error("Cannot use run() after instruct(). Choose one API style per test.");
-      }
-      state.isImperative = true;
-      ctx.setInstruction(prompt);
-
-      // Signal agent execution start
-      reporter.onPipelineStep({ testId, runner: runner.name }, "agent", "running");
-
-      // Execute the agent
-      await raw.run(prompt);
-
-      reporter.onPipelineStep({ testId, runner: runner.name }, "agent", "done");
-
-      // Auto storeDiff after agent execution (async for env plugins)
-      reporter.onPipelineStep({ testId, runner: runner.name }, "diff", "running");
-      await ctx.storeDiffAsync();
-      reporter.onPipelineStep({ testId, runner: runner.name }, "diff", "done");
-    },
-  };
-
-  return { agent, state };
-}
-
-/**
- * Execute the raw agent instruction (without storeDiff wrapping).
- * Used by the declarative pipeline where the runner controls the full lifecycle.
- */
-async function executeRawAgent(
-  runner: RunnerConfig,
-  cwd: string,
   prompt: string,
-  reporter: Reporter,
-  testId: string,
+  cwd: string,
   env: IEnvironmentPlugin,
   ctx: EvalContext,
+  reporter: Reporter,
+  testId: string,
 ): Promise<void> {
-  const raw = createRawAgent(runner, cwd, reporter, testId, env, ctx);
-  await raw.run(prompt);
+  const onOutput = reporter.onPipelineOutput
+    ? (data: string) => reporter.onPipelineOutput!({ testId, runner: runner.id }, "agent", data)
+    : undefined;
+
+  const result = await executeRunner(runner, prompt, cwd, env, undefined, onOutput);
+
+  if (result.stdout) ctx.setAgentOutput(result.stdout);
+  else if (result.output) ctx.setAgentOutput(result.output);
+
+  if (result.tokenUsage) ctx.setAgentTokenUsage(result.tokenUsage);
+
+  if (result.exitCode !== undefined && result.exitCode !== 0 && result.stderr) {
+    reporter.onTestError({ testId, runner: runner.id }, result.stderr.slice(0, 500));
+  }
+
+  if (result.filesWritten) {
+    for (const filePath of result.filesWritten) {
+      reporter.onFileWrite({ testId, runner: runner.id }, filePath);
+    }
+  }
 }
 
 export interface RunResult {
@@ -316,121 +177,7 @@ export interface RunResult {
 }
 
 /**
- * Information about a test execution plan (for dry-run mode).
- */
-export interface DryRunPlan {
-  testId: string;
-  suitePath?: string[];
-  runners: Array<{
-    name: string;
-    model: string;
-  }>;
-  mode: "declarative" | "imperative" | "unknown";
-  instruction?: string;
-  tasks: Array<{ name: string; criteria: string; weight: number }>;
-  beforeEachHooks: number;
-  afterEachHooks: number;
-}
-
-/**
- * Run a test in dry-run mode: parse and return the execution plan without side effects.
- */
-export async function dryRunTest(
-  testDef: TestDefinition,
-  config: AgentEvalConfig,
-): Promise<DryRunPlan> {
-  validateRunnerNames(config.runners);
-  const runners = config.matrix?.runners
-    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
-    : config.runners;
-
-  // Create a mock context that captures addTask calls but does nothing
-  const tasks: Array<{ name: string; criteria: string; weight: number }> = [];
-  let instruction: string | undefined;
-  let mode: "declarative" | "imperative" | "unknown" = "unknown";
-
-  // Create a mock agent to detect which mode the test uses
-  const mockAgent: AgentHandle = {
-    name: "dry-run",
-    model: "dry-run",
-    instruct(prompt: string) {
-      instruction = prompt;
-      mode = "declarative";
-    },
-    async run(_prompt: string) {
-      mode = "imperative";
-    },
-  };
-
-  // Create a mock context to capture tasks
-  const mockCtx: TestContext = {
-    cwd: config.rootDir ?? process.cwd(),
-    storeDiff: () => {},
-    runCommand: async () => ({
-      name: "",
-      command: "",
-      stdout: "",
-      stderr: "",
-      exitCode: 0,
-      durationMs: 0,
-    }),
-    addTask: (task: TaskDefinition) => {
-      tasks.push({ name: task.name, criteria: task.criteria, weight: task.weight ?? 1 });
-    },
-    get diff() {
-      return null;
-    },
-    get commands() {
-      return [];
-    },
-    get tasks() {
-      return tasks as unknown as ReadonlyArray<TaskDefinition>;
-    },
-    get logs() {
-      return "";
-    },
-  };
-
-  // Run config-level beforeEach to capture tasks
-  if (config.beforeEach) {
-    await config.beforeEach({ ctx: mockCtx });
-  }
-
-  // Run DSL-level beforeEach hooks to capture tasks they register
-  const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
-  for (const hook of beforeEachHooks) {
-    await hook.fn({ ctx: mockCtx });
-  }
-
-  // Execute the test function with mock agent/context
-  try {
-    await testDef.fn({ agent: mockAgent, ctx: mockCtx, judge: config.judge });
-  } catch {
-    // Ignore errors in dry-run mode
-  }
-
-  const afterEachHooks = getMatchingHooks(getRegisteredAfterEachHooks(), testDef.suitePath);
-
-  return {
-    testId: testDef.title,
-    suitePath: testDef.suitePath,
-    runners: runners.map((r) => ({
-      name: r.name,
-      model: getRunnerModelId(r),
-    })),
-    mode,
-    instruction,
-    tasks,
-    beforeEachHooks: beforeEachHooks.length,
-    afterEachHooks: afterEachHooks.length,
-  };
-}
-
-/**
- * Run a single test definition against all configured runners, sequentially.
- * Supports both imperative (agent.run) and declarative (agent.instruct) pipelines.
- * Uses config.ledger (ILedgerPlugin) when provided, otherwise falls back to appendLedgerEntry.
- * Uses config.environment (IEnvironmentPlugin) when provided, otherwise falls back to LocalEnvironment.
+ * Run a single test definition.
  */
 export async function runTest(
   testDef: TestDefinition,
@@ -443,497 +190,256 @@ export async function runTest(
   const ledger: ILedgerPlugin | null = config.ledger ?? null;
   const env: IEnvironmentPlugin = config.environment ?? new LocalEnvironment();
   validateRunnerNames(config.runners);
-  const runners = config.matrix?.runners
-    ? config.runners.filter((r) => config.matrix!.runners!.includes(r.name))
-    : config.runners;
 
-  /** Record entry via plugin or fallback */
   const record = (entry: LedgerEntry): void | Promise<void> => {
     if (ledger) return ledger.recordRun(entry);
     appendLedgerEntry(outputDir, entry);
   };
 
-  // Get matching lifecycle hooks
-  const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
-  const afterEachHooks = getMatchingHooks(getRegisteredAfterEachHooks(), testDef.suitePath);
-
-  const allEvents: TestResultEvent[] = [];
   const results: RunResult[] = [];
 
-  for (const runner of runners) {
-    clearLastJudgeResult();
-    clearLastJudgeOptions();
+  // --- Experiment Mode ---
+  if (testDef.variants && testDef.variants.length > 0) {
+    for (const variant of testDef.variants) {
+      const runner = config.runners.find((r) => r.id === variant.runnerId);
+      if (!runner)
+        throw new Error(`Runner "${variant.runnerId}" not found for variant "${variant.id}"`);
 
-    const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
-    rep.onTestStart(event);
-
-    // Setup workspace via environment plugin (git reset, docker create, etc.)
-    const setupStart = Date.now();
-    rep.onPipelineStep(event, "setup", "running");
-    rep.onGitReset(event);
-    await env.setup(cwd);
-    rep.onPipelineStep(event, "setup", "done");
-    const setupMs = Date.now() - setupStart;
-
-    const ctx = new EvalContext(cwd, env);
-    const { agent, state } = createAgent(runner, cwd, ctx, config, rep, testDef.title, env);
-    const start = Date.now();
-    const thresholds = config.thresholds ?? getGlobalThresholds?.() ?? DEFAULT_THRESHOLDS;
-
-    try {
-      // Run config-level beforeEach (runs before DSL hooks)
-      if (config.beforeEach) {
-        await config.beforeEach({ ctx });
-      }
-
-      // Run beforeEach hooks (DSL-level)
-      for (const hook of beforeEachHooks) {
-        await hook.fn({ ctx });
-      }
-
-      // Set reporter context so expect.ts can emit judge pipeline steps
-      setJudgeReporterContext(rep, event);
-
-      // Execute the test function (registers instruction/tasks or calls run)
-      await testDef.fn({ agent, ctx, judge: config.judge });
-
-      let entry: LedgerEntry;
-
-      if (state.isDeclarative) {
-        // ─── DECLARATIVE PIPELINE ───
-        entry = await executeDeclarativePipeline(
-          state.instruction!,
-          runner,
-          cwd,
-          ctx,
-          config,
-          rep,
-          testDef,
-          env,
-          start,
-          setupMs,
-          thresholds,
-        );
-      } else {
-        // ─── IMPERATIVE PIPELINE (agent.run() was called) ───
-        if (!getLastJudgeResult()) {
-          if (getLastJudgeOptions()) {
-            throw new Error(
-              `Test "${testDef.title}" called expect(ctx).toPassJudge() before agent output was ready.\n` +
-                `In imperative mode, call toPassJudge() after await agent.run(...).`,
-            );
-          }
-          throw new Error(
-            `Test "${testDef.title}" completed without a judge evaluation.\n` +
-              `Every test MUST call expect(ctx).toPassJudge({ criteria: "..." }) to be evaluated.\n` +
-              `Add a toPassJudge() call after agent.run() with your evaluation criteria.`,
-          );
-        }
-        entry = buildImperativeEntry(testDef, runner, ctx, config, start, setupMs, thresholds);
-      }
-
+      const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd, variant);
       await record(entry);
-
-      const resultEvent = { ...event, entry, durationMs: entry.durationMs };
-      if (entry.status === "PASS") {
-        rep.onTestPass(resultEvent);
-      } else if (entry.status === "WARN") {
-        rep.onTestWarn(resultEvent);
-      } else {
-        rep.onTestFail(resultEvent);
-      }
-      allEvents.push(resultEvent);
-
       results.push({
         testId: testDef.title,
-        runner: runner.name,
+        runner: runner.id,
         entries: [entry],
         passed: entry.pass,
       });
-
-      // Run afterEach hooks
-      for (const hook of afterEachHooks) {
-        await hook.fn({ ctx });
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      const judgeResult = getLastJudgeResult();
-      const judgeOptions = getLastJudgeOptions();
-      const durationMs = Date.now() - start;
-
-      let entry: LedgerEntry;
-
-      if (judgeResult) {
-        // The test "failed" because the judge gave it a low score (JudgeFailure)
-        // or something else threw AFTER the judge was already run.
-        // We use the judge result we already have.
-        const effectiveThresholds = judgeOptions?.thresholds ?? thresholds;
-        const timing: TimingData = { totalMs: durationMs, setupMs };
-        const executionData = ctx.buildExecutionData([], timing);
-
-        entry = {
-          testId: testDef.title,
-          suitePath: testDef.suitePath ?? [],
-          timestamp: new Date().toISOString(),
-          tags: testDef.tags ?? [],
-          agentRunner: runner.name,
-          instruction: ctx.instruction || undefined,
-          diff: ctx.diff,
-          changedFiles: executionData.changedFiles,
-          commands: ctx.commands,
-          taskResults: [],
-          agentTokenUsage: ctx.agentTokenUsage,
-          timing,
-          agentOutput: ctx.agentOutput,
-          logs: ctx.logs,
-          judgeModel: resolveModelId(config.judge.model),
-          score: judgeResult.score,
-          pass: judgeResult.pass,
-          status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
-          reason: judgeResult.reason,
-          improvement: judgeResult.improvement,
-          criteria: judgeOptions?.criteria ?? "",
-          thresholds: effectiveThresholds,
-          durationMs,
-        };
-
-        // Signal judge failure to reporter (instead of generic error)
-        if (entry.status === "WARN") {
-          rep.onTestWarn({ ...event, entry, durationMs });
-        } else {
-          rep.onTestFail({ ...event, entry, durationMs });
-        }
-      } else {
-        // Real execution error (crash) before judge was even run
-        rep.onTestError(event, errorMsg);
-
-        entry = {
-          testId: testDef.title,
-          suitePath: testDef.suitePath ?? [],
-          timestamp: new Date().toISOString(),
-          tags: testDef.tags ?? [],
-          agentRunner: runner.name,
-          instruction: ctx.instruction || undefined,
-          diff: ctx.diff,
-          changedFiles: [],
-          commands: ctx.commands,
-          taskResults: [],
-          agentTokenUsage: ctx.agentTokenUsage,
-          timing: { totalMs: durationMs, setupMs },
-          agentOutput: ctx.agentOutput,
-          logs: ctx.logs,
-          judgeModel: resolveModelId(config.judge.model),
-          score: 0,
-          pass: false,
-          status: "FAIL",
-          reason: `Execution error: ${errorMsg}`,
-          improvement: "",
-          criteria: "",
-          thresholds,
-          durationMs,
-        };
-        rep.onTestFail({ ...event, entry, durationMs });
-      }
-
-      await record(entry);
-      allEvents.push({ ...event, entry, durationMs });
-      results.push({
-        testId: testDef.title,
-        runner: runner.name,
-        entries: [entry],
-        passed: entry.pass,
-      });
-
-      // Run afterEach hooks even on error
-      for (const hook of afterEachHooks) {
-        try {
-          await hook.fn({ ctx });
-        } catch {
-          // Swallow hook errors during error handling
-        }
-      }
-    } finally {
-      clearJudgeReporterContext();
-      // Teardown environment (no-op for local, removes container for Docker)
-      if (env.teardown) {
-        await env.teardown(cwd);
-      }
     }
+    return results;
+  }
+
+  // --- Standard Mode (Matrix or Default) ---
+  const runnerIds =
+    config.matrix?.runners ||
+    (config.defaultRunner ? [config.defaultRunner] : config.runners.map((r) => r.id));
+  const runners = config.runners.filter((r) => runnerIds.includes(r.id));
+
+  for (const runner of runners) {
+    const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd);
+    await record(entry);
+    results.push({
+      testId: testDef.title,
+      runner: runner.id,
+      entries: [entry],
+      passed: entry.pass,
+    });
   }
 
   return results;
 }
 
-/**
- * Execute the declarative pipeline:
- * 1. Run the agent instruction
- * 2. Auto storeDiff
- * 3. Execute registered tasks
- * 4. Judge evaluation using required expect(ctx).toPassJudge() criteria
- *
- * Tracks per-phase timing and builds a complete LedgerEntry with all execution + judgment data.
- */
-async function executeDeclarativePipeline(
-  instruction: string,
-  runner: RunnerConfig,
-  cwd: string,
-  ctx: EvalContext,
-  config: AgentEvalConfig,
-  reporter: Reporter,
+async function runSingleIteration(
   testDef: TestDefinition,
+  runner: RunnerConfig,
+  config: AgentEvalConfig,
+  rep: Reporter,
   env: IEnvironmentPlugin,
-  start: number,
-  setupMs: number,
-  thresholds: import("./types.js").Thresholds,
+  cwd: string,
+  variant?: TestVariant,
 ): Promise<LedgerEntry> {
-  const event = { testId: testDef.title, runner: runner.name, suitePath: testDef.suitePath };
-  const judgeOptions = getLastJudgeOptions();
+  clearLastJudgeOptions();
 
-  if (!judgeOptions) {
-    throw new Error(
-      `Test "${testDef.title}" completed without judge criteria.\n` +
-        `Declarative tests MUST end with expect(ctx).toPassJudge({ criteria: "..." }).\n` +
-        `Use ctx.addTask() for supplemental verification tasks (optional), then define final judge criteria with toPassJudge().`,
+  const event = {
+    testId: testDef.title,
+    runner: runner.id,
+    suitePath: testDef.suitePath,
+    variantId: variant?.id,
+    variantName: variant?.name,
+  };
+  rep.onTestStart(event);
+
+  const setupStart = Date.now();
+  rep.onPipelineStep(event, "setup", "running");
+  await env.setup(cwd);
+  rep.onPipelineStep(event, "setup", "done");
+  const setupMs = Date.now() - setupStart;
+
+  const ctx = new EvalContext(cwd, env);
+  ctx.setRunnerInfo({ id: runner.id, model: getRunnerModelId(runner) });
+  const start = Date.now();
+  const thresholds = config.thresholds ?? DEFAULT_THRESHOLDS;
+
+  const agent: AgentHandle = {
+    id: runner.id,
+    model: getRunnerModelId(runner),
+    variant: variant
+      ? { id: variant.id, name: variant.name, metadata: variant.metadata }
+      : undefined,
+    run: async () => {
+      throw new Error("agent.run() is removed. Use ctx.prompt() instead.");
+    },
+    instruct: () => {
+      throw new Error("agent.instruct() is removed. Use ctx.prompt() instead.");
+    },
+  };
+
+  try {
+    // 1. Run Hooks
+    const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
+    if (config.beforeEach) await config.beforeEach({ ctx });
+    for (const hook of beforeEachHooks) await hook.fn({ ctx });
+
+    // 2. Call Test Fn (registers prompt, tasks and judge options)
+    await testDef.fn({ agent, ctx, judge: config.judge, variant });
+
+    // 3. Execute Mission
+    if (!ctx.instruction) {
+      throw new Error(
+        `Test "${testDef.title}" did not define a mission. Call ctx.prompt() in the test logic.`,
+      );
+    }
+
+    const finalPrompt = variant?.enrichPrompt
+      ? variant.enrichPrompt.replace("{{prompt}}", ctx.instruction)
+      : ctx.instruction;
+
+    // If variant has prompt enrichment, update the captured instruction
+    if (variant?.enrichPrompt) {
+      ctx.setInstruction(finalPrompt);
+    }
+
+    const agentStart = Date.now();
+    rep.onPipelineStep(event, "agent", "running");
+    await executeAgent(runner, finalPrompt, cwd, env, ctx, rep, testDef.title);
+    rep.onPipelineStep(event, "agent", "done");
+    const agentMs = Date.now() - agentStart;
+
+    // 4. Capture Diff
+    rep.onPipelineStep(event, "diff", "running");
+    await ctx.storeDiffAsync();
+    rep.onPipelineStep(event, "diff", "done");
+
+    // 5. Execute Tasks
+    const tasksStart = Date.now();
+    const taskResults: TaskResult[] = [];
+    for (const task of ctx.tasks) {
+      rep.onPipelineStep(event, "task", "running", task.name);
+      const actionResult = await task.action({
+        exec: (cmd) => ctx.runCommand(cmd.split(/\s+/)[0], cmd),
+      });
+      const result: CommandResult = {
+        name: actionResult.name ?? task.name,
+        command: actionResult.command ?? "",
+        stdout: actionResult.stdout,
+        stderr: actionResult.stderr ?? "",
+        exitCode: actionResult.exitCode,
+        durationMs: actionResult.durationMs ?? 0,
+      };
+      taskResults.push({ task, result });
+      rep.onPipelineStep(event, "task", "done", task.name);
+    }
+    const tasksMs = taskResults.length > 0 ? Date.now() - tasksStart : undefined;
+
+    // 6. Judge
+    const judgeOptions = getLastJudgeOptions();
+    if (!judgeOptions) throw new Error("Test completed without expect(ctx).toPassJudge()");
+
+    const timing: TimingData = { totalMs: Date.now() - start, setupMs, agentMs, tasksMs };
+    const executionData = ctx.buildExecutionData(taskResults, timing);
+
+    rep.onPipelineStep(event, "judge", "running");
+    const prompt = buildJudgePrompt({
+      criteria: judgeOptions.criteria,
+      execution: executionData,
+      expectedFiles: judgeOptions.expectedFiles,
+    });
+    const { result: judgeResult, tokenUsage: judgeTokenUsage } = await runJudge(
+      ctx,
+      prompt,
+      config.judge,
     );
-  }
+    rep.onPipelineStep(event, "judge", "done");
 
-  // 1. Execute the agent instruction
-  const agentStart = Date.now();
-  reporter.onPipelineStep(event, "agent", "running");
-  await executeRawAgent(runner, cwd, instruction, reporter, testDef.title, env, ctx);
-  reporter.onPipelineStep(event, "agent", "done");
-  const agentMs = Date.now() - agentStart;
+    const status = computeStatus(judgeResult.score, judgeOptions.thresholds ?? thresholds);
 
-  // 2. Auto storeDiff
-  reporter.onPipelineStep(event, "diff", "running");
-  await ctx.storeDiffAsync();
-  reporter.onPipelineStep(event, "diff", "done");
-  // 3. Execute registered tasks and collect results
-  const tasksStart = Date.now();
-  const taskResults: TaskResult[] = [];
-  for (const task of ctx.tasks) {
-    reporter.onPipelineStep(event, "task", "running", task.name);
-
-    // Pass utils to task action (shorthand for context methods)
-    const utils: import("./types.js").TaskUtils = {
-      exec: (command: string) => {
-        const shortName = command.split(/\s+/)[0];
-        return ctx.runCommand(shortName, command);
+    const entry: LedgerEntry = {
+      testId: testDef.title,
+      suitePath: testDef.suitePath ?? [],
+      timestamp: new Date().toISOString(),
+      agentRunner: runner.id,
+      variantId: variant?.id,
+      variantName: variant?.name,
+      basePrompt: ctx.instruction, // The original prompt before enrichment
+      instruction: finalPrompt,
+      diff: ctx.diff,
+      changedFiles: executionData.changedFiles,
+      commands: ctx.commands,
+      taskResults,
+      agentTokenUsage: ctx.agentTokenUsage,
+      timing: {
+        ...timing,
+        judgeMs: Date.now() - (start + (timing.agentMs ?? 0) + (timing.tasksMs ?? 0)),
       },
+      agentOutput: ctx.agentOutput,
+      logs: ctx.logs,
+      judgeModel: resolveModelId(config.judge.model),
+      score: judgeResult.score,
+      pass: status !== "FAIL",
+      status,
+      reason: judgeResult.reason,
+      improvement: judgeResult.improvement,
+      judgeTokenUsage,
+      criteria: judgeOptions.criteria,
+      expectedFiles: judgeOptions.expectedFiles,
+      thresholds: judgeOptions.thresholds ?? thresholds,
+      durationMs: Date.now() - start,
     };
 
-    const actionResult = await task.action(utils);
+    if (entry.status === "PASS") rep.onTestPass({ ...event, entry, durationMs: entry.durationMs });
+    else if (entry.status === "WARN")
+      rep.onTestWarn({ ...event, entry, durationMs: entry.durationMs });
+    else rep.onTestFail({ ...event, entry, durationMs: entry.durationMs });
 
-    // Enrich partial action result into a full CommandResult
-    const result: CommandResult = {
-      name: actionResult.name ?? task.name,
-      command: actionResult.command ?? "",
-      stdout: actionResult.stdout,
-      stderr: actionResult.stderr ?? "",
-      exitCode: actionResult.exitCode,
-      durationMs: actionResult.durationMs ?? 0,
-    };
-    taskResults.push({ task, result });
-    reporter.onPipelineStep(event, "task", "done", task.name);
+    return entry;
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    rep.onTestError(event, errorMsg);
+    return { testId: testDef.title, status: "FAIL", reason: errorMsg } as any;
+  } finally {
+    if (env.teardown) await env.teardown(cwd);
   }
-  const tasksMs = taskResults.length > 0 ? Date.now() - tasksStart : undefined;
-
-  // 4. Build execution data
-  const timing: TimingData = {
-    totalMs: Date.now() - start,
-    setupMs,
-    agentMs,
-    tasksMs,
-  };
-  const executionData = ctx.buildExecutionData(taskResults, timing);
-
-  // 5. Judge evaluation
-  const judgeStart = Date.now();
-  reporter.onPipelineStep(event, "judge", "running");
-  const prompt = buildJudgePrompt({
-    criteria: judgeOptions.criteria,
-    execution: executionData,
-    expectedFiles: judgeOptions.expectedFiles,
-  });
-  const { result: judgeResult, tokenUsage: judgeTokenUsage } = await runJudge(
-    ctx,
-    prompt,
-    config.judge,
-  );
-  reporter.onPipelineStep(event, "judge", "done");
-  const judgeMs = Date.now() - judgeStart;
-
-  // Update timing with judge phase
-  timing.judgeMs = judgeMs;
-  timing.totalMs = Date.now() - start;
-
-  const effectiveThresholds = judgeOptions.thresholds ?? thresholds;
-  const status = computeStatus(judgeResult.score, effectiveThresholds);
-  clearLastJudgeOptions();
-  clearLastJudgeResult();
-
-  return {
-    testId: testDef.title,
-    suitePath: testDef.suitePath ?? [],
-    timestamp: new Date().toISOString(),
-    tags: testDef.tags ?? [],
-    // Execution data
-    agentRunner: runner.name,
-    instruction,
-    diff: ctx.diff,
-    changedFiles: executionData.changedFiles,
-    commands: ctx.commands,
-    taskResults,
-    agentTokenUsage: ctx.agentTokenUsage,
-    timing,
-    agentOutput: ctx.agentOutput,
-    logs: ctx.logs,
-    // Judgment data
-    judgeModel: resolveModelId(config.judge.model),
-    score: judgeResult.score,
-    pass: status !== "FAIL",
-    status,
-    reason: judgeResult.reason,
-    improvement: judgeResult.improvement,
-    judgeTokenUsage,
-    criteria: judgeOptions.criteria,
-    expectedFiles: judgeOptions.expectedFiles,
-    thresholds: effectiveThresholds,
-    durationMs: timing.totalMs,
-  };
 }
 
-/**
- * Build a ledger entry for the imperative pipeline (agent.run + expect().toPassJudge).
- * The caller guarantees a judge result exists (validated before calling this function).
- */
-function buildImperativeEntry(
-  testDef: TestDefinition,
-  runner: RunnerConfig,
-  ctx: EvalContext,
-  config: AgentEvalConfig,
-  start: number,
-  setupMs: number,
-  thresholds: import("./types.js").Thresholds,
-): LedgerEntry {
-  const durationMs = Date.now() - start;
-  const judgeResult = getLastJudgeResult()!;
-  const judgeOptions = getLastJudgeOptions();
-  const effectiveThresholds = judgeOptions?.thresholds ?? thresholds;
-  clearLastJudgeResult();
-  clearLastJudgeOptions();
-
-  const timing: TimingData = {
-    totalMs: durationMs,
-    setupMs,
-  };
-  const executionData = ctx.buildExecutionData([], timing);
-
-  return {
-    testId: testDef.title,
-    suitePath: testDef.suitePath ?? [],
-    timestamp: new Date().toISOString(),
-    tags: testDef.tags ?? [],
-    // Execution data
-    agentRunner: runner.name,
-    instruction: ctx.instruction,
-    diff: ctx.diff,
-    changedFiles: executionData.changedFiles,
-    commands: ctx.commands,
-    taskResults: [],
-    agentTokenUsage: ctx.agentTokenUsage,
-    timing,
-    agentOutput: ctx.agentOutput,
-    logs: ctx.logs,
-    // Judgment data
-    judgeModel: resolveModelId(config.judge.model),
-    score: judgeResult.score,
-    pass: judgeResult.pass,
-    status: judgeResult.status ?? computeStatus(judgeResult.score, effectiveThresholds),
-    reason: judgeResult.reason,
-    improvement: judgeResult.improvement,
-    criteria: judgeOptions?.criteria ?? "",
-    expectedFiles: judgeOptions?.expectedFiles,
-    thresholds: effectiveThresholds,
-    durationMs,
-  };
+// Global store helpers
+const STORE_KEY = Symbol.for("__agenteval_judge_store__");
+function getStore() {
+  const g = globalThis as any;
+  if (!g[STORE_KEY]) g[STORE_KEY] = { lastOptions: null, reporter: null, currentEvent: null };
+  return g[STORE_KEY];
 }
-
-// ─── Global judge store (via globalThis for cross-instance singleton) ───
-
-const JUDGE_STORE_KEY = Symbol.for("__agenteval_judge_store__");
-
-interface JudgeStore {
-  lastResult: JudgeResult | null;
-  lastOptions: JudgeOptions | null;
-  /** Reporter ref so expect.ts can emit judge pipeline steps */
-  reporter: Reporter | null;
-  /** Current test event for reporter calls */
-  currentEvent: { testId: string; runner: string } | null;
+export function setLastJudgeOptions(o: JudgeOptions) {
+  getStore().lastOptions = o;
 }
-
-function getJudgeStore(): JudgeStore {
-  const g = globalThis as Record<symbol, JudgeStore | undefined>;
-  if (!g[JUDGE_STORE_KEY]) {
-    g[JUDGE_STORE_KEY] = {
-      lastResult: null,
-      lastOptions: null,
-      reporter: null,
-      currentEvent: null,
-    };
-  }
-  return g[JUDGE_STORE_KEY]!;
-}
-
-export function setLastJudgeResult(result: JudgeResult): void {
-  getJudgeStore().lastResult = result;
-}
-
-export function getLastJudgeResult(): JudgeResult | null {
-  return getJudgeStore().lastResult;
-}
-
-export function clearLastJudgeResult(): void {
-  getJudgeStore().lastResult = null;
-}
-
-export function setLastJudgeOptions(options: JudgeOptions): void {
-  getJudgeStore().lastOptions = options;
-}
-
 export function getLastJudgeOptions(): JudgeOptions | null {
-  return getJudgeStore().lastOptions;
+  return getStore().lastOptions;
+}
+export function clearLastJudgeOptions() {
+  getStore().lastOptions = null;
+}
+export function setJudgeReporterContext(r: any, e: any) {
+  const s = getStore();
+  s.reporter = r;
+  s.currentEvent = e;
+}
+export function getJudgeReporterContext() {
+  const s = getStore();
+  return s.reporter ? { reporter: s.reporter, event: s.currentEvent } : null;
+}
+export function clearJudgeReporterContext() {
+  const s = getStore();
+  s.reporter = null;
+  s.currentEvent = null;
 }
 
-export function clearLastJudgeOptions(): void {
-  getJudgeStore().lastOptions = null;
-}
-
-/** Set the active reporter + event so expect.ts can emit pipeline steps */
-export function setJudgeReporterContext(
-  reporter: Reporter,
-  event: { testId: string; runner: string },
-): void {
-  const store = getJudgeStore();
-  store.reporter = reporter;
-  store.currentEvent = event;
-}
-
-/** Get reporter context for emitting judge pipeline steps from expect.ts */
-export function getJudgeReporterContext(): {
-  reporter: Reporter;
-  event: { testId: string; runner: string };
-} | null {
-  const store = getJudgeStore();
-  if (store.reporter && store.currentEvent) {
-    return { reporter: store.reporter, event: store.currentEvent };
-  }
-  return null;
-}
-
-/** Clear the reporter context */
-export function clearJudgeReporterContext(): void {
-  const store = getJudgeStore();
-  store.reporter = null;
-  store.currentEvent = null;
+export async function dryRunTest(testDef: TestDefinition, config: AgentEvalConfig): Promise<any> {
+  return { testId: testDef.title, variants: testDef.variants };
 }

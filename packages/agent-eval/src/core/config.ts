@@ -13,26 +13,22 @@ const DEFAULT_CONFIG: Partial<AgentEvalConfig> = {
 };
 
 /**
- * Validate that all runner names are unique.
+ * Validate that all runner IDs are unique.
  *
- * @throws Error if duplicate runner names are found
+ * @throws Error if duplicate runner IDs are found
  */
 export function validateRunnerNames(runners: RunnerConfig[]): void {
-  const names = new Set<string>();
+  const ids = new Set<string>();
   for (const runner of runners) {
-    if (names.has(runner.name)) {
-      throw new Error(
-        `Duplicate runner name "${runner.name}". Each runner must have a unique name.`,
-      );
+    if (ids.has(runner.id)) {
+      throw new Error(`Duplicate runner ID "${runner.id}". Each runner must have a unique ID.`);
     }
-    names.add(runner.name);
+    ids.add(runner.id);
   }
 }
 
 /**
  * Resolve and load the agenteval config file from the given directory.
- * If an explicit configPath is provided, it is used directly.
- * If no config file is found, returns sensible defaults.
  */
 export async function loadConfig(
   cwd: string = process.cwd(),
@@ -72,10 +68,7 @@ export async function loadConfig(
 }
 
 /**
- * Validate all plugins in a loaded config and throw with a descriptive
- * message if any plugin fails validation.
- *
- * Call this after `loadConfig()` to fail fast with actionable errors.
+ * Validate all plugins in a loaded config.
  */
 export function assertValidPlugins(config: AgentEvalConfig): void {
   const errors = validatePlugins(config);

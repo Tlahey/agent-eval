@@ -56,15 +56,29 @@ function openDb(outputDir: string): InstanceType<typeof DatabaseSync> {
       warn_threshold      REAL    NOT NULL DEFAULT 0.8,
       fail_threshold      REAL    NOT NULL DEFAULT 0.5,
       duration_ms         INTEGER NOT NULL,
-      override            TEXT
+      override            TEXT,
+      variant_id          TEXT,
+      variant_name        TEXT,
+      base_prompt         TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_runs_test_id   ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_timestamp  ON runs(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_runs_variant_id ON runs(variant_id);
   `);
 
   // ─── Simple Migrations ───
   // Ensure new columns exist for existing databases
-  const columns = ["improvement", "task_results", "override", "suite_path", "instruction", "tags"];
+  const columns = [
+    "improvement",
+    "task_results",
+    "override",
+    "suite_path",
+    "instruction",
+    "tags",
+    "variant_id",
+    "variant_name",
+    "base_prompt",
+  ];
   for (const col of columns) {
     try {
       db.exec(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
@@ -107,6 +121,9 @@ interface RunRow {
   fail_threshold: number;
   duration_ms: number;
   override: string | null;
+  variant_id: string | null;
+  variant_name: string | null;
+  base_prompt: string | null;
 }
 
 /** SQL fragment that selects runs */
@@ -143,6 +160,10 @@ function rowToEntry(row: RunRow): LedgerEntry {
     testId: row.test_id,
     suitePath,
     timestamp: row.timestamp,
+    // Experiment context
+    variantId: row.variant_id ?? undefined,
+    variantName: row.variant_name ?? undefined,
+    basePrompt: row.base_prompt ?? undefined,
     // Execution data
     agentRunner: row.agent_runner,
     instruction: row.instruction ?? "",
@@ -194,9 +215,10 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
         agent_token_usage, timing, agent_output, logs,
         judge_model, score, pass, status, reason, improvement, tags,
         judge_token_usage, criteria, expected_files,
-        warn_threshold, fail_threshold, duration_ms, override
+        warn_threshold, fail_threshold, duration_ms, override,
+        variant_id, variant_name, base_prompt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       entry.testId,
@@ -226,6 +248,9 @@ export function appendLedgerEntry(outputDir: string, entry: LedgerEntry): void {
       entry.thresholds.fail,
       entry.durationMs,
       entry.override ? JSON.stringify(entry.override) : null,
+      entry.variantId ?? null,
+      entry.variantName ?? null,
+      entry.basePrompt ?? null,
     );
   } finally {
     db.close();

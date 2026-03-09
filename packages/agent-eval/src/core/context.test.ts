@@ -293,9 +293,9 @@ describe("EvalContext - setter methods", () => {
 
   it("setRunnerInfo stores and retrieves runner info", () => {
     const ctx = new EvalContext(tmpDir, new LocalEnvironment());
-    expect(ctx.runnerInfo).toEqual({ name: "unknown", model: "unknown" });
-    ctx.setRunnerInfo({ name: "copilot", model: "gpt-4o" });
-    expect(ctx.runnerInfo).toEqual({ name: "copilot", model: "gpt-4o" });
+    expect(ctx.runnerInfo).toEqual({ id: "unknown", model: "unknown" });
+    ctx.setRunnerInfo({ id: "copilot", model: "gpt-4o" });
+    expect(ctx.runnerInfo).toEqual({ id: "copilot", model: "gpt-4o" });
   });
 
   it("storeDiff throws when environment returns a promise", () => {
@@ -314,7 +314,7 @@ describe("EvalContext - setter methods", () => {
     writeFileSync(join(tmpDir, "file.txt"), "modified");
     ctx.storeDiff();
     ctx.setInstruction("Add feature X");
-    ctx.setRunnerInfo({ name: "copilot", model: "gpt-4o" });
+    ctx.setRunnerInfo({ id: "copilot", model: "gpt-4o" });
     ctx.setAgentOutput("Done!");
     ctx.setAgentTokenUsage({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
 
@@ -340,7 +340,7 @@ describe("EvalContext - setter methods", () => {
     const data = ctx.buildExecutionData(taskResults, timing);
 
     expect(data.instruction).toBe("Add feature X");
-    expect(data.runner).toEqual({ name: "copilot", model: "gpt-4o" });
+    expect(data.runner).toEqual({ id: "copilot", model: "gpt-4o" });
     expect(data.diff).toBeTruthy();
     expect(data.changedFiles).toContain("file.txt");
     expect(data.taskResults).toHaveLength(1);

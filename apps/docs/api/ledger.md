@@ -22,9 +22,12 @@ Each ledger entry captures the complete lifecycle of a test run — **execution 
   "testId": "Add a Close button to the Banner",
   "suitePath": ["UI Components", "Banner"],
   "timestamp": "2025-03-15T10:30:00.000Z",
-  "agentRunner": "copilot",
+  "variantId": "with-skills",
+  "variantName": "GPT-4o with UI Skills",
+  "basePrompt": "Add a close button to the Banner component",
+  "agentRunner": "gpt4o",
 
-  "instruction": "Add a close button to the Banner component",
+  "instruction": "Acting as a senior dev... Add a close button...",
   "diff": "diff --git a/...",
   "changedFiles": ["src/components/Banner.tsx"],
   "commands": [
@@ -35,14 +38,6 @@ Each ledger entry captures the complete lifecycle of a test run — **execution 
       "stderr": "",
       "exitCode": 0,
       "durationMs": 3200
-    },
-    {
-      "name": "typecheck",
-      "command": "pnpm build",
-      "stdout": "...",
-      "stderr": "",
-      "exitCode": 0,
-      "durationMs": 1500
     }
   ],
   "taskResults": [
@@ -103,7 +98,7 @@ agenteval ledger -o ./my-results
 Launch the dashboard server to explore results via HTTP:
 
 ```bash
-agenteval view           # default port 4747
+agenteval ui             # default port 4747
 agenteval ui -p 8080     # custom port
 ```
 
@@ -121,19 +116,10 @@ See the [Dashboard guide](/guide/dashboard) for details on the web UI.
 ### Programmatic
 
 ```ts
-import {
-  readLedger,
-  readLedgerByTestId,
-  getLatestEntries,
-  getRunnerStats,
-  getAllRunnerStats,
-} from "agent-eval/ledger";
+import { readLedger, readLedgerByTestId, getLatestEntries } from "@tlahey/agent-eval/ledger";
 
 const allEntries = readLedger(".agenteval");
-const bannerEntries = readLedgerByTestId(".agenteval", "Add Close button");
 const latest = getLatestEntries(".agenteval");
-const stats = getRunnerStats(".agenteval", "Add Close button");
-const allStats = getAllRunnerStats(".agenteval");
 ```
 
 ## SQLite Schema
@@ -143,10 +129,13 @@ erDiagram
     RUNS {
         int id PK "auto-increment"
         text test_id "indexed"
-        text suite_path "JSON array of suite names"
+        text suite_path "JSON array"
         text timestamp "indexed, ISO 8601"
-        text agent_runner "runner name"
-        text instruction "agent instruction"
+        text variant_id "experiment variant ID"
+        text variant_name "display name"
+        text base_prompt "common mission prompt"
+        text agent_runner "runner ID"
+        text instruction "final prompt sent to LLM"
         text diff "raw git diff"
         text changed_files "JSON: string[]"
         text commands "JSON: CommandResult[]"
@@ -179,24 +168,31 @@ erDiagram
     RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
 ```
 
+### `runs` Table — Identity & Experiment
+
+| Column         | Type   | Description                                   |
+| -------------- | ------ | --------------------------------------------- |
+| `id`           | `INT`  | Auto-increment primary key                    |
+| `test_id`      | `TEXT` | Test title (indexed)                          |
+| `suite_path`   | `TEXT` | JSON array of suite names                     |
+| `timestamp`    | `TEXT` | ISO 8601 timestamp (indexed)                  |
+| `variant_id`   | `TEXT` | Variant ID from test.variants()               |
+| `variant_name` | `TEXT` | Human-readable variant name                   |
+| `base_prompt`  | `TEXT` | The original mission prompt (before template) |
+| `agent_runner` | `TEXT` | Global Runner ID used                         |
+
 ### `runs` Table — Execution Data
 
 | Column              | Type      | Description                                     |
 | ------------------- | --------- | ----------------------------------------------- |
-| `id`                | `INTEGER` | Auto-increment primary key                      |
-| `test_id`           | `TEXT`    | Test title (indexed)                            |
-| `suite_path`        | `TEXT`    | JSON array of suite names (from `describe()`)   |
-| `timestamp`         | `TEXT`    | ISO 8601 timestamp (indexed)                    |
-| `agent_runner`      | `TEXT`    | Runner name                                     |
-| `instruction`       | `TEXT`    | Instruction given to the agent                  |
+| `instruction`       | `TEXT`    | Final prompt sent to the LLM (with template)    |
 | `diff`              | `TEXT`    | Raw git diff                                    |
 | `changed_files`     | `TEXT`    | JSON-encoded string array of changed file paths |
 | `commands`          | `TEXT`    | JSON-encoded `CommandResult[]`                  |
 | `task_results`      | `TEXT`    | JSON-encoded `TaskResult[]`                     |
-| `agent_token_usage` | `TEXT`    | JSON-encoded `TokenUsage` (agent LLM usage)     |
-| `timing`            | `TEXT`    | JSON-encoded `TimingData` (per-phase breakdown) |
+| `agent_token_usage` | `TEXT`    | JSON-encoded `TokenUsage`                       |
+| `timing`            | `TEXT`    | JSON-encoded `TimingData`                       |
 | `agent_output`      | `TEXT`    | Raw agent output text                           |
-| `logs`              | `TEXT`    | Formatted log string (diff + commands)          |
 | `duration_ms`       | `INTEGER` | Total duration in ms                            |
 
 ### `runs` Table — Judgment Data
@@ -213,80 +209,3 @@ erDiagram
 | `criteria`          | `TEXT`    | Evaluation criteria used                          |
 | `expected_files`    | `TEXT`    | JSON-encoded expected file list                   |
 | `thresholds`        | `TEXT`    | JSON-encoded thresholds `{ warn, fail }` snapshot |
-
-Indexes on `test_id` and `timestamp` for fast queries.
-
-### `score_overrides` Table
-
-| Column      | Type      | Description                        |
-| ----------- | --------- | ---------------------------------- |
-| `id`        | `INTEGER` | Auto-increment primary key         |
-| `run_id`    | `INTEGER` | Foreign key → `runs.id` (indexed)  |
-| `score`     | `REAL`    | Manually assigned score (0.0–1.0)  |
-| `pass`      | `INTEGER` | 1 = pass, 0 = fail                 |
-| `status`    | `TEXT`    | `PASS`, `WARN`, or `FAIL`          |
-| `reason`    | `TEXT`    | Human-provided justification       |
-| `timestamp` | `TEXT`    | ISO 8601 timestamp of the override |
-
-Multiple overrides per run are supported (audit trail). Aggregation queries automatically use the **latest** override via `COALESCE`.
-
-## Score Overrides (HITL)
-
-Human-in-the-loop score overrides allow reviewers to manually adjust scores when the LLM judge's assessment needs correction.
-
-```mermaid
-sequenceDiagram
-    participant R as Reviewer
-    participant UI as Dashboard
-    participant API as CLI Server
-    participant DB as SQLite
-
-    R->>UI: Click "Edit Score" on a run
-    UI->>R: Show override modal (slider + reason)
-    R->>UI: Submit score=0.9, reason="..."
-    UI->>API: PATCH /api/runs/42/override
-    API->>DB: INSERT INTO score_overrides
-    DB-->>API: OK
-    API-->>UI: ScoreOverride object
-    UI->>R: Update display with new score + "Adjusted" badge
-```
-
-### Override API
-
-**Create an override:**
-
-```bash
-curl -X PATCH http://localhost:4747/api/runs/42/override \
-  -H "Content-Type: application/json" \
-  -d '{"score": 0.9, "reason": "Re-evaluated after manual review"}'
-```
-
-**Get override history:**
-
-```bash
-curl http://localhost:4747/api/runs/42/overrides
-```
-
-### Programmatic
-
-```ts
-import { overrideRunScore, getRunOverrides } from "agent-eval/ledger";
-
-// Override a run's score
-const override = overrideRunScore(".agenteval", 42, 0.9, "Better than expected");
-
-// Get audit trail
-const history = getRunOverrides(".agenteval", 42);
-```
-
-## Query Functions
-
-| Function             | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `readLedger(dir)`    | Read all entries (with latest override if any) |
-| `readLedgerByTestId` | Filter entries by test ID (with overrides)     |
-| `getLatestEntries`   | Get latest N entries (default: 20)             |
-| `getRunnerStats`     | Get aggregate stats per runner for a test      |
-| `getAllRunnerStats`  | Get aggregate stats for all tests and runners  |
-| `overrideRunScore`   | Add a human score override to a run            |
-| `getRunOverrides`    | Get all overrides for a run (audit trail)      |

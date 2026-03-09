@@ -19,11 +19,19 @@ export class EvalContext implements TestContext {
   private _agentOutput: string | undefined;
   private _agentTokenUsage: TokenUsage | undefined;
   private _instruction: string = "";
-  private _runnerInfo: { name: string; model: string } = { name: "unknown", model: "unknown" };
+  private _runnerInfo: { id: string; model: string } = { id: "unknown", model: "unknown" };
 
   constructor(cwd: string, env: IEnvironmentPlugin) {
     this._cwd = cwd;
     this._env = env;
+  }
+
+  /** Define the agent mission (prompt) */
+  prompt(text: string): void {
+    if (!text || typeof text !== "string") {
+      throw new Error("Prompt must be a non-empty string");
+    }
+    this._instruction = text.trim();
   }
 
   /** Store the raw agent output (stdout for CLI, response for API) */
@@ -36,13 +44,13 @@ export class EvalContext implements TestContext {
     this._agentTokenUsage = usage;
   }
 
-  /** Store the instruction given to the agent */
+  /** Internal: set instruction (used by runner engine) */
   setInstruction(instruction: string): void {
     this._instruction = instruction;
   }
 
   /** Store runner metadata */
-  setRunnerInfo(info: { name: string; model: string }): void {
+  setRunnerInfo(info: { id: string; model: string }): void {
     this._runnerInfo = info;
   }
 
@@ -62,13 +70,12 @@ export class EvalContext implements TestContext {
     return this._instruction;
   }
 
-  get runnerInfo(): { name: string; model: string } {
+  get runnerInfo(): { id: string; model: string } {
     return this._runnerInfo;
   }
 
   storeDiff(): void {
     const result = this._env.getDiff(this._cwd);
-    // Handle both sync and async getDiff
     if (result instanceof Promise) {
       throw new Error(
         "storeDiff() is synchronous — use an environment plugin with a sync getDiff()",
@@ -77,7 +84,6 @@ export class EvalContext implements TestContext {
     this._diff = result as string;
   }
 
-  /** Async version of storeDiff for environments returning promises */
   async storeDiffAsync(): Promise<void> {
     this._diff = await this._env.getDiff(this._cwd);
   }

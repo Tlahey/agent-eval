@@ -33,8 +33,8 @@ packages/agent-eval/src/
 ├── core/           SRP: Each file = one concern
 │   ├── types.ts        All TypeScript interfaces
 │   ├── config.ts       Config file loading & defaults
-│   ├── context.ts      TestContext (storeDiff, runCommand)
-│   ├── runner.ts       Sequential test execution engine
+│   ├── context.ts      TestContext (prompt, storeDiff, runCommand)
+│   ├── runner.ts       Automatic test execution engine
 │   └── expect.ts       Fluent assertion API
 ├── git/
 │   └── git.ts          Git isolation (reset, clean, diff)
@@ -67,78 +67,31 @@ apps/eval-ui/src/
 
 ### Single Responsibility (SRP)
 
-Each module has **one reason to change**. The runner orchestrates tests but doesn't know how Git works. The judge evaluates diffs but doesn't know how they were produced.
-
-**Rule of thumb:** If a file exceeds ~200 lines or handles two concerns, split it.
+Each module has **one reason to change**. The runner orchestrates the mission but doesn't know how Git works. The judge evaluates diffs but doesn't know how they were produced.
 
 ### Open/Closed (OCP)
 
-Adding a new LLM provider means implementing `IModelPlugin` — the runner engine and judge never change. Same for storage (`ILedgerPlugin`) and environments (`IEnvironmentPlugin`). Runners are plain config objects (`RunnerConfig`) — no interface to implement.
-
-```typescript
-// To add a new provider, implement the interface — nothing else changes
-class MistralModel implements IModelPlugin {
-  readonly name = "mistral";
-  readonly modelId = "mistral-large";
-  async createModel() {
-    const { createMistral } = await import("@ai-sdk/mistral");
-    return createMistral({ apiKey: process.env.MISTRAL_API_KEY })(this.modelId);
-  }
-}
-```
+Adding a new LLM provider means implementing `IModelPlugin` — the runner engine and judge never change. Runners are defined in a central registry.
 
 ### Liskov Substitution (LSP)
 
-All runners implement the `AgentHandle` interface. The engine calls `agent.run(prompt)` regardless of whether it's a CLI spawn or an API call:
-
-```typescript
-interface AgentHandle {
-  run(prompt: string): Promise<void>;
-  readonly name: string;
-  readonly model: string;
-}
-```
+All runners are interchangeable technical resources. The engine executes the mission regardless of whether it's a CLI tool or an API model.
 
 ### Interface Segregation (ISP)
 
-Interfaces are small and focused. Test functions receive only what they need:
-
-| Interface            | Methods/Props                                        | Consumer            |
-| -------------------- | ---------------------------------------------------- | ------------------- |
-| `AgentHandle`        | `run()`, `instruct()`, `name`, `model`               | Test functions      |
-| `TestContext`        | `storeDiff()`, `runCommand()`, `addTask()`, `exec()` | Test functions      |
-| `IModelPlugin`       | `createModel()`, `name`, `modelId`                   | Judge, API runners  |
-| `RunnerConfig`       | `name`, `model`                                      | Runner engine       |
-| `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.       | Ledger persistence  |
-| `IEnvironmentPlugin` | `setup()`, `execute()`, `getDiff()`, `teardown?()`   | Workspace isolation |
+Interfaces are small and focused. Test functions receive only what they need to define missions and quality checks.
 
 ### Dependency Inversion (DIP)
 
-High-level modules (runner, judge) depend on **abstractions** (`IModelPlugin`, `ILedgerPlugin`, `IEnvironmentPlugin`), not concrete SDK implementations. Runners use plain `RunnerConfig` objects. Provider SDKs are **dynamically imported** at runtime inside plugin implementations:
-
-```typescript
-// Inside AnthropicModel — no static import at framework level
-async createModel() {
-  const { createAnthropic } = await import("@ai-sdk/anthropic");
-  return createAnthropic({ apiKey: this.apiKey })(this.modelId);
-}
-```
-
-This keeps the bundle small and avoids forcing users to install SDKs they don't use.
+High-level modules (runner, judge) depend on **abstractions** (`IModelPlugin`, `ILedgerPlugin`, `IEnvironmentPlugin`), not concrete implementations.
 
 ## Sequential Execution
 
-All tests run **sequentially** (no concurrency). This is intentional — agents mutate the filesystem and Git state. See ADR-003 (`docs/adrs/003-sequential-execution.md`) for details.
+All tests run **sequentially** (no concurrency). This is intentional — agents mutate the filesystem and Git state. See [ADR-003](#architecture-decisions).
 
 ## Workspace Isolation
 
-Before each test iteration, the **environment plugin** prepares a clean workspace. This logic is encapsulated in `IEnvironmentPlugin.setup()`:
-
-- **`LocalEnvironment`** (default): runs `git reset --hard HEAD && git clean -fd` on the host
-- **`DockerEnvironment`**: creates a fresh container with the project files
-- **Custom environments**: implement `IEnvironmentPlugin` for your own setup logic (cloud VMs, remote agents, etc.)
-
-After the test completes, `env.teardown()` is called to clean up resources (no-op for local, container removal for Docker). See the [Environments guide](/guide/plugins-environments).
+Before each test iteration, the **environment plugin** prepares a clean workspace. This logic is encapsulated in `IEnvironmentPlugin.setup()`.
 
 ## Data Flow
 
@@ -147,40 +100,36 @@ After the test completes, `env.teardown()` is called to clean up resources (no-o
 ```mermaid
 flowchart TB
     A["agenteval run"] --> B["Load config<br/>(agenteval.config.ts)"]
-    B --> C["Discover test files<br/>(*.eval.ts, *.agent-eval.ts)"]
+    B --> C["Discover test files<br/>(*.eval.ts)"]
     C --> D["Import files<br/>(registers tests via test())"]
-    D --> E{"For each<br/>test × runner"}
+    D --> E{"For each<br/>test × runner/variant"}
 
     E --> F["🔧 Environment Setup<br/>env.setup(cwd)"]
-    F --> F2["📋 Lifecycle Hooks<br/>config.beforeEach + DSL beforeEach"]
-    F2 --> G["🤖 Agent Execution<br/>agent.run/instruct(prompt)"]
-    G --> H["📸 Auto storeDiff()<br/>captures changes via env plugin"]
-    H --> I["⚙️ Execute Tasks<br/>from beforeEach + test"]
-    I --> J["⚖️ Judge Evaluation<br/>auto-judge or manual expect"]
-    J --> K["💾 Append to Ledger<br/>score, reason, diff, commands"]
-    K --> K2["📋 afterEach Hooks<br/>DSL afterEach"]
-    K2 --> K3["🔧 env.teardown(cwd)"]
-    K3 --> L{"More<br/>runners?"}
-    L -- Yes --> E
-    L -- No --> M["📊 Print Summary"]
+    F --> G["📋 Logic function<br/>defines prompt & tasks"]
+    G --> H["🤖 Agent Execution<br/>Automatic Mission"]
+    H --> I["📸 Auto storeDiff()<br/>captures changes"]
+    I --> J["⚙️ Execute Tasks<br/>from logic"]
+    J --> K["⚖️ Judge Evaluation<br/>expect(ctx).toPassJudge()"]
+    K --> L["💾 Append to Ledger<br/>score, reason, variant context"]
+    L --> M{"More<br/>variants?"}
+    M -- Yes --> E
+    M -- No --> N["📊 Print Summary"]
 
     style A fill:#4f46e5,color:#fff
-    style G fill:#f59e0b,color:#000
-    style J fill:#10b981,color:#fff
-    style K fill:#6366f1,color:#fff
-    style M fill:#4f46e5,color:#fff
+    style H fill:#f59e0b,color:#000
+    style K fill:#10b981,color:#fff
+    style L fill:#6366f1,color:#fff
+    style N fill:#4f46e5,color:#fff
 ```
 
 ### Test Execution Detail
-
-This is the detailed flow of a **single test iteration** for one runner:
 
 ```mermaid
 sequenceDiagram
     participant CLI as CLI (agenteval run)
     participant Runner as Runner Engine
     participant Git as Environment Plugin
-    participant Agent as Agent (CLI/API)
+    participant Agent as AI Agent (Runner)
     participant Ctx as TestContext
     participant Judge as Judge (LLM)
     participant Ledger as SQLite Ledger
@@ -190,22 +139,20 @@ sequenceDiagram
     rect rgb(240, 240, 255)
         Note over Runner,Git: 1. Environment Setup
         Runner->>Git: env.setup(cwd)
-        Git-->>Runner: clean workspace (git reset, docker create, etc.)
-    end
-
-    rect rgb(235, 235, 255)
-        Note over Runner,Ctx: 2. Lifecycle Hooks
-        Runner->>Runner: config.beforeEach(ctx)
-        Runner->>Runner: DSL beforeEach hooks (scoped)
+        Git-->>Runner: clean workspace
     end
 
     rect rgb(255, 248, 230)
-        Note over Runner,Ctx: 3. Agent Execution + Context Capture
-        Runner->>Agent: agent.run(prompt) / instruct(prompt)
-        Agent-->>Runner: files modified on disk
+        Note over Runner,Ctx: 2. Collection Phase
+        Runner->>Ctx: Call test function
+        Ctx-->>Runner: prompt text + tasks collected
+    end
+
+    rect rgb(255, 248, 230)
+        Note over Runner,Ctx: 3. Execution Phase
+        Runner->>Agent: Execute Mission (final prompt)
+        Agent-->>Runner: files modified
         Runner->>Ctx: storeDiffAsync() [automatic]
-        Ctx->>Git: env.getDiff(cwd)
-        Git-->>Ctx: diff string stored
 
         loop Tasks
             Runner->>Ctx: task.action()
@@ -215,112 +162,28 @@ sequenceDiagram
 
     rect rgb(230, 255, 240)
         Note over Runner,Judge: 4. Judge Evaluation
-        Runner->>Judge: auto-judge or expect(ctx).toPassJudge()
-        Judge->>Judge: buildJudgePrompt(criteria, ctx, tasks)
-        Note right of Judge: Prompt includes:<br/>- Evaluation criteria<br/>- ExecutionData (diff, commands,<br/>tasks, timing, tokens)
-        Judge-->>Runner: { pass, score, reason, improvement }
+        Runner->>Judge: expect(ctx).toPassJudge()
+        Note right of Judge: Includes:<br/>- Mission prompt<br/>- Variant metadata<br/>- Task evidence
+        Judge-->>Runner: { pass, score, reason }
     end
 
     rect rgb(240, 235, 255)
         Note over Runner,Ledger: 5. Persist Results
         Runner->>Ledger: appendLedgerEntry(entry)
-        Note right of Ledger: Stores: full LedgerEntry<br/>(execution + judgment data,<br/>timing, tokens, tasks)
     end
 
-    rect rgb(245, 240, 250)
-        Note over Runner,Git: 6. Cleanup
-        Runner->>Runner: DSL afterEach hooks
-        Runner->>Git: env.teardown(cwd)
-        Note over Git: LocalEnvironment: no-op<br/>DockerEnvironment: remove container
-    end
-
-    Runner-->>CLI: RunResult { passed, score }
+    Runner-->>CLI: RunResult
 ```
 
-### Judge Decision Flow
+## Architecture Decisions
 
-```mermaid
-flowchart LR
-    A["Build Prompt"] --> C["generateObject()<br/>Vercel AI SDK<br/>+ Zod schema"]
-    C --> H["Zod Validation"]
-    H --> I{"score ≥ 0.7?"}
-    I -- Yes --> J["✅ PASS"]
-    I -- No --> K["❌ FAIL"]
-    J --> L["Return<br/>{ pass, score,<br/>reason, improvement }"]
-    K --> L
-
-    style J fill:#10b981,color:#fff
-    style K fill:#ef4444,color:#fff
-```
-
-### Ledger Data Model
-
-Each `LedgerEntry` captures the full lifecycle of a test run, organized into **execution data** (what the agent did) and **judgment data** (how the judge evaluated it):
-
-```mermaid
-erDiagram
-    LEDGER_ENTRY {
-        int id PK "auto-increment"
-        text testId "test title"
-        text suitePath "JSON array of suite names"
-        text timestamp "ISO 8601"
-        text agentRunner "runner name"
-    }
-
-    EXECUTION_DATA {
-        text instruction "agent instruction"
-        text diff "git diff"
-        text changedFiles "JSON: string[]"
-        text commands "JSON: CommandResult[]"
-        text taskResults "JSON: TaskResult[]"
-        text agentTokenUsage "JSON: TokenUsage"
-        text timing "JSON: TimingData"
-        text agentOutput "raw agent output"
-        text logs "formatted log string"
-        int durationMs "total agent time"
-    }
-
-    JUDGMENT_DATA {
-        text judgeModel "judge LLM used"
-        real score "0.0 – 1.0"
-        int pass "0 or 1"
-        text status "PASS, WARN, FAIL"
-        text reason "judge explanation"
-        text improvement "judge suggestions"
-        text judgeTokenUsage "JSON: TokenUsage"
-        text criteria "evaluation criteria"
-        text expectedFiles "JSON: string[]"
-        text thresholds "JSON: Thresholds"
-    }
-
-    SCORE_OVERRIDES {
-        int id PK "auto-increment"
-        int run_id FK "references runs.id"
-        real score "0.0 – 1.0 (manually set)"
-        int pass "0 or 1"
-        text reason "human justification"
-        text timestamp "ISO 8601"
-    }
-
-    LEDGER_ENTRY ||--|| EXECUTION_DATA : "contains"
-    LEDGER_ENTRY ||--|| JUDGMENT_DATA : "contains"
-    LEDGER_ENTRY ||--o{ SCORE_OVERRIDES : "has overrides"
-```
-
-## Extending the Framework
-
-With the plugin architecture, extending AgentEval no longer requires modifying core code:
-
-| What                 | How                                                           |
-| -------------------- | ------------------------------------------------------------- |
-| New LLM provider     | Implement `IModelPlugin` interface                            |
-| New runner           | Add a `RunnerConfig` object with `IModelPlugin` or `CliModel` |
-| New storage backend  | Implement `ILedgerPlugin` interface                           |
-| New exec environment | Implement `IEnvironmentPlugin` interface                      |
-| New judge type       | Implement `IJudgePlugin` interface                            |
-| New CLI command      | Add `program.command()` in `cli/cli.ts`                       |
-| New context method   | Add to `TestContext` interface + `EvalContext` class          |
-
-See the [Plugins guide](/guide/plugins) for full details.
-
-See ADR-007 (`docs/adrs/007-solid-architecture.md`) for the full decision record.
+| ADR                                                         | Decision                                                   |
+| :---------------------------------------------------------- | :--------------------------------------------------------- |
+| [ADR-001](./001-why-custom-framework.md)                    | Why a custom framework (not Vitest / Promptfoo / Langfuse) |
+| [ADR-002](./002-sqlite-over-jsonl.md)                       | SQLite over JSONL for the ledger                           |
+| [ADR-003](./003-sequential-execution.md)                    | Sequential execution (no parallelism)                      |
+| [ADR-004](./004-llm-as-judge.md)                            | LLM-as-a-Judge with Vercel AI SDK                          |
+| [ADR-005](./005-monorepo-layout.md)                         | Monorepo layout (apps/ + packages/)                        |
+| [ADR-006](./006-code-quality-gates.md)                      | Code quality gates (ESLint + Prettier + Husky)             |
+| [ADR-007](./007-solid-architecture.md)                      | SOLID architecture principles                              |
+| [ADR-008](./008-experimentation-and-unified-test-format.md) | Unified mission-based testing and A/B Experiments          |

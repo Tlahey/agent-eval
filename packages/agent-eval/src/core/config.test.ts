@@ -16,8 +16,8 @@ function makeTmpDir(): string {
   return dir;
 }
 
-function makeCliRunner(name: string, command = `echo "{{prompt}}"`): RunnerConfig {
-  return { name, model: { type: "cli" as const, name: "cli", command } };
+function makeCliRunner(id: string, command = `echo "{{prompt}}"`): RunnerConfig {
+  return { id, model: { type: "cli" as const, name: "cli", command } };
 }
 
 describe("config", () => {
@@ -34,7 +34,7 @@ describe("config", () => {
   describe("defineConfig", () => {
     it("returns the config object as-is (identity helper)", () => {
       const mockRunner = {
-        name: "test",
+        id: "test",
         model: { type: "cli" as const, name: "test", command: "echo test" },
       };
       const config = defineConfig({
@@ -43,7 +43,7 @@ describe("config", () => {
       });
 
       expect(config.runners).toHaveLength(1);
-      expect(config.runners[0].name).toBe("test");
+      expect(config.runners[0].id).toBe("test");
     });
   });
 
@@ -86,16 +86,16 @@ describe("config", () => {
   });
 
   describe("validateRunnerNames", () => {
-    it("accepts runners with unique names", () => {
+    it("accepts runners with unique IDs", () => {
       const r1 = makeCliRunner("copilot", "copilot --prompt={{prompt}}");
       const r2 = makeCliRunner("custom", "custom-cmd {{prompt}}");
       expect(() => validateRunnerNames([r1, r2])).not.toThrow();
     });
 
-    it("throws on duplicate runner names", () => {
+    it("throws on duplicate runner IDs", () => {
       const r1 = makeCliRunner("copilot", "cmd1 {{prompt}}");
       const r2 = makeCliRunner("copilot", "cmd2 {{prompt}}");
-      expect(() => validateRunnerNames([r1, r2])).toThrow('Duplicate runner name "copilot"');
+      expect(() => validateRunnerNames([r1, r2])).toThrow('Duplicate runner ID "copilot"');
     });
 
     it("accepts empty array", () => {

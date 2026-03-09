@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { GitHubModelsModel, CliModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { GitHubModelsModel, CliModel } from "@tlahey/agent-eval/llm";
 
 /**
  * Runner — GitHub Models API (via models.github.ai)
@@ -18,7 +18,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "copilot",
+      id: "copilot",
       model: new CliModel({
         command: 'gh copilot suggest "{{prompt}}"',
       }),
@@ -26,7 +26,7 @@ export default defineConfig({
   ],
 
   judge: {
-    name: "gpt-5-mini",
+    id: "gpt-5-mini",
     model: new GitHubModelsModel({
       model: "openai/gpt-5-mini",
       settings: {

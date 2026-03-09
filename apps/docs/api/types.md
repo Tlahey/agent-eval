@@ -1,217 +1,63 @@
 # Types Reference
 
-All core types exported from `agent-eval`. Import them as needed:
+All core types exported from `@tlahey/agent-eval`.
 
 ```ts
 import type {
-  ModelSettings,
-  TokenUsage,
-  TaskActionResult,
-  TaskResult,
-  TimingData,
+  LedgerEntry,
+  RunnerConfig,
+  TestVariant,
   ExecutionData,
   JudgmentData,
-  RunReport,
-  CommandResult,
-  LedgerEntry,
-  TaskDefinition,
-  TestStatus,
-  Thresholds,
-} from "agent-eval";
+  AgentHandle,
+  TestContext,
+} from "@tlahey/agent-eval";
 ```
 
-## RunReport
+## RunnerConfig
 
-The unified report for a single test × runner evaluation. Combines execution and judgment data.
+A runner resource defined in the global config registry.
 
 ```ts
-interface RunReport {
-  execution: ExecutionData;
-  judgment: JudgmentData;
+interface RunnerConfig {
+  id: string; // Unique technical ID
+  model: LlmConfig; // API Model or CLI Model
 }
 ```
 
-```mermaid
-flowchart LR
-    RR["RunReport"] --> ED["ExecutionData<br/>(what the agent did)"]
-    RR --> JD["JudgmentData<br/>(how the judge scored it)"]
+## TestVariant
 
-    style RR fill:#4f46e5,color:#fff
-    style ED fill:#f59e0b,color:#000
-    style JD fill:#10b981,color:#fff
-```
-
-## ExecutionData
-
-Everything captured during agent execution — instruction, code changes, command outputs, task results, timing, and token usage.
+A specific configuration for an A/B test iteration.
 
 ```ts
-interface ExecutionData {
-  instruction: string; // Instruction given to the agent
-  runner: { name: string; model: string }; // Runner metadata
-  diff: string | null; // Git diff after execution
-  changedFiles: string[]; // Files changed (extracted from diff)
-  commands: CommandResult[]; // All command results (manual + task)
-  taskResults: TaskResult[]; // Task definitions + their results
-  tokenUsage?: TokenUsage; // Agent's LLM token usage (API runners only)
-  timing: TimingData; // Per-phase timing breakdown
-  agentOutput?: string; // Raw agent output text
-  logs: string; // Formatted log string (diff + commands)
-}
-```
-
-## JudgmentData
-
-The judge's evaluation of the agent's output — score, status, reasoning, and its own token usage.
-
-```ts
-interface JudgmentData {
-  model: string; // Judge model identifier
-  score: number; // Score 0.0–1.0
-  pass: boolean; // true if status is PASS or WARN
-  status: TestStatus; // "PASS" | "WARN" | "FAIL"
-  reason: string; // Markdown evaluation explanation
-  improvement: string; // Markdown improvement suggestions
-  tokenUsage?: TokenUsage; // Judge's LLM token usage
-  criteria: string; // Evaluation criteria used
-  expectedFiles?: string[]; // Expected changed files (if specified)
-  thresholds: Thresholds; // Scoring thresholds used
-}
-```
-
-## TokenUsage
-
-LLM token consumption for a single API call (agent or judge).
-
-```ts
-interface TokenUsage {
-  inputTokens: number; // Input/prompt tokens consumed
-  outputTokens: number; // Output/completion tokens generated
-  totalTokens: number; // Total (input + output)
-}
-```
-
-## TimingData
-
-Per-phase timing breakdown of a test execution.
-
-```ts
-interface TimingData {
-  totalMs: number; // Total wall-clock time (ms)
-  setupMs?: number; // Environment setup (git reset, docker create)
-  agentMs?: number; // Agent execution time
-  tasksMs?: number; // Task execution time
-  judgeMs?: number; // Judge evaluation time
-}
-```
-
-```mermaid
-flowchart LR
-    S["setupMs"] --> A["agentMs"] --> T["tasksMs"] --> J["judgeMs"]
-    S -.-> TOTAL["totalMs"]
-    J -.-> TOTAL
-
-    style S fill:#6366f1,color:#fff
-    style A fill:#f59e0b,color:#000
-    style J fill:#10b981,color:#fff
-    style TOTAL fill:#4f46e5,color:#fff
-```
-
-## TaskResult
-
-A task definition paired with its execution result.
-
-```ts
-interface TaskResult {
-  task: TaskDefinition; // The task that was executed
-  result: CommandResult; // The execution result
-}
-```
-
-## TaskDefinition
-
-A verification task registered via `ctx.addTask()` in the [declarative pipeline](/guide/declarative-pipeline).
-
-```ts
-interface TaskDefinition {
-  name: string; // Human-readable task name
-  action: () => TaskActionResult | Promise<TaskActionResult>; // Task execution function
-  criteria: string; // Judge evaluation criteria
-  weight?: number; // Scoring weight (default: 1)
-}
-```
-
-## TaskActionResult
-
-The return type of `TaskDefinition.action`. Only `stdout` and `exitCode` are required — the runner fills in the rest.
-
-```ts
-interface TaskActionResult {
-  stdout: string; // Command output (required)
-  exitCode: number; // Exit code (required)
-  stderr?: string; // Error output (optional, default: "")
-  name?: string; // Auto-filled from task.name
-  command?: string; // Auto-filled (default: "")
-  durationMs?: number; // Auto-filled (default: 0)
-}
-```
-
-::: tip Lenient by design
-You can return just `{ stdout, exitCode }` from task actions:
-
-```ts
-ctx.addTask({
-  name: "Build",
-  action: async () => {
-    const result = await ctx.exec("pnpm build");
-    return { stdout: result.stdout, exitCode: result.exitCode };
-  },
-  criteria: "Build succeeds",
-});
-```
-
-Or simply use `ctx.exec()` which returns a full `CommandResult` (which satisfies `TaskActionResult`):
-
-```ts
-ctx.addTask({
-  name: "Build",
-  action: () => ctx.exec("pnpm build"),
-  criteria: "Build succeeds",
-});
-```
-
-:::
-
-## CommandResult
-
-The full result of a shell command execution.
-
-```ts
-interface CommandResult {
-  name: string; // Command label
-  command: string; // Shell command string
-  stdout: string; // Standard output
-  stderr: string; // Standard error
-  exitCode: number; // Exit code (0 = success)
-  durationMs: number; // Execution duration (ms)
+interface TestVariant {
+  id: string; // Unique technical ID for this variant
+  name: string; // Display name (e.g. "Gpt-4o with Persona")
+  runnerId: string; // ID of the runner to use (must exist in registry)
+  enrichPrompt?: string; // Prompt template with {{prompt}} placeholder
+  metadata?: Record<string, any>; // Custom data for the test function
 }
 ```
 
 ## LedgerEntry
 
-A complete record stored in the ledger for one test × runner evaluation. Contains all execution and judgment data.
+A complete record of a single test iteration.
 
 ```ts
 interface LedgerEntry {
-  // Identity
   id?: number;
   testId: string;
   suitePath: string[];
   timestamp: string;
-  agentRunner: string;
 
-  // Execution data
-  instruction?: string;
+  // --- Experiment Context ---
+  variantId?: string; // Present if run via test.variants()
+  variantName?: string;
+  basePrompt?: string; // Common mission prompt
+
+  // --- Execution data ---
+  agentRunner: string; // Global Runner ID
+  instruction?: string; // Final prompt sent to LLM
   diff: string | null;
   changedFiles: string[];
   commands: CommandResult[];
@@ -220,13 +66,12 @@ interface LedgerEntry {
   timing: TimingData;
   agentOutput?: string;
   logs: string;
-  durationMs: number;
 
-  // Judgment data
+  // --- Judgment data ---
   judgeModel: string;
   score: number;
   pass: boolean;
-  status: TestStatus;
+  status: "PASS" | "WARN" | "FAIL";
   reason: string;
   improvement: string;
   judgeTokenUsage?: TokenUsage;
@@ -234,155 +79,43 @@ interface LedgerEntry {
   expectedFiles?: string[];
   thresholds: Thresholds;
 
-  // HITL override
+  durationMs: number;
   override?: ScoreOverride;
 }
 ```
 
-## TestStatus
+## AgentHandle
+
+Injected into the test function.
 
 ```ts
-type TestStatus = "PASS" | "WARN" | "FAIL";
-```
-
-## Thresholds
-
-```ts
-interface Thresholds {
-  warn: number; // Score ≥ warn → PASS (default: 0.8)
-  fail: number; // Score ≥ fail → WARN (default: 0.5)
+interface AgentHandle {
+  run(prompt: string): Promise<void>;
+  instruct(prompt: string): void;
+  readonly id: string; // Runner ID
+  readonly model: string; // Model identifier
+  readonly variant?: {
+    // Present in A/B tests
+    id: string;
+    name: string;
+    metadata?: Record<string, any>;
+  };
 }
 ```
 
-## JudgeResult
-
-Returned by the judge after evaluation.
+## ExecutionData
 
 ```ts
-interface JudgeResult {
-  pass: boolean;
-  status?: TestStatus;
-  score: number;
-  reason: string;
-  improvement: string;
-}
-```
-
-## LlmConfig
-
-A union type shared by both `RunnerConfig.model` and `JudgeConfig.model`. Accepts either an API model plugin or a CLI model.
-
-```ts
-type LlmConfig = IModelPlugin | ICliModel;
-```
-
-Use the `isCliModel()` type guard to discriminate at runtime:
-
-```ts
-import { isCliModel } from "agent-eval";
-
-if (isCliModel(config.model)) {
-  // CLI model — has command, type: "cli"
-} else {
-  // API model — has createModel(), modelId
-}
-```
-
-## ModelSettings
-
-Generation settings forwarded to `generateObject()` / `generateText()` calls. Set these on any `IModelPlugin` to control LLM behavior.
-
-```ts
-interface ModelSettings {
-  /** Sampling temperature (0 = deterministic, 1 = creative) */
-  temperature?: number;
-  /** Maximum tokens in the response */
-  maxTokens?: number;
-  /** Nucleus sampling threshold (0-1) */
-  topP?: number;
-}
-```
-
-Used by both the **judge** and **API runner** when calling the model:
-
-```ts
-import { GitHubModelsModel } from "agent-eval/llm";
-
-new GitHubModelsModel({
-  model: "openai/gpt-5-mini",
-  settings: { temperature: 0.3, maxTokens: 4096, topP: 1 },
-});
-```
-
-## JudgeConfig
-
-```ts
-interface JudgeConfig {
-  name?: string; // Human-readable name for the judge
-  model?: LlmConfig; // LLM for evaluation (API or CLI model)
-  maxRetries?: number; // Retry attempts on failure (default: 2)
-}
-```
-
-## Plugin Interfaces
-
-See [Plugins](/guide/plugins) for full documentation. Quick reference:
-
-| Interface            | Key Methods                                        | Import              |
-| -------------------- | -------------------------------------------------- | ------------------- |
-| `IModelPlugin`       | `createModel()`, `name`, `modelId`, `settings?`    | `from "agent-eval"` |
-| `ICliModel`          | `command`, `name`, `type`, `parseOutput?()`        | `from "agent-eval"` |
-| `RunnerConfig`       | `name`, `model` (plain config object)              | `from "agent-eval"` |
-| `ILedgerPlugin`      | `recordRun()`, `getRuns()`, `getStats()`, etc.     | `from "agent-eval"` |
-| `IJudgePlugin`       | `judge(ctx, criteria, config)`, `name`             | `from "agent-eval"` |
-| `IEnvironmentPlugin` | `setup()`, `execute()`, `getDiff()`, `teardown?()` | `from "agent-eval"` |
-
-## ICliModel
-
-The interface for CLI-based agent models. CLI models execute a shell command with a `{{prompt}}` placeholder.
-
-```ts
-interface ICliModel {
-  /** Always "cli" — used to discriminate from IModelPlugin */
-  readonly type: "cli";
-  /** Human-readable name (e.g., "aider", "copilot") */
-  readonly name: string;
-  /** Shell command template with {{prompt}} placeholder */
-  readonly command: string;
-  /**
-   * Optional output parser — extracts token usage and cleaned output
-   * from raw CLI output. When undefined, raw stdout is used as-is.
-   */
-  parseOutput?: CliOutputParser;
-}
-```
-
-## CliOutputMetrics
-
-Structured metrics extracted from CLI command output by `parseOutput`.
-
-```ts
-interface CliOutputMetrics {
-  /** Token usage extracted from the CLI output (undefined if not available) */
+interface ExecutionData {
+  instruction: string;
+  runner: { id: string; model: string };
+  diff: string | null;
+  changedFiles: string[];
+  commands: CommandResult[];
+  taskResults: TaskResult[];
   tokenUsage?: TokenUsage;
-  /** Cleaned agent output (e.g., extracted from JSON wrapper) */
+  timing: TimingData;
   agentOutput?: string;
+  logs: string;
 }
 ```
-
-## CliOutputParser
-
-Parser function type for extracting `CliOutputMetrics` from raw CLI stdout/stderr.
-
-```ts
-type CliOutputParser = (output: { stdout: string; stderr: string }) => CliOutputMetrics;
-```
-
-::: tip
-Import these types from `agent-eval`:
-
-```ts
-import type { ICliModel, CliOutputMetrics, CliOutputParser } from "agent-eval";
-```
-
-:::

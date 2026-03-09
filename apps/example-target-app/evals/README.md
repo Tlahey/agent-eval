@@ -4,7 +4,7 @@ A simple React app used as a target for AgentEval evaluations. Each subdirectory
 
 ## Structure
 
-```
+````
 evals/
 ├── anthropic/          ← Claude Sonnet via AnthropicModel
 ├── openai/             ← GPT-4o via OpenAIModel
@@ -13,39 +13,50 @@ evals/
 ├── cli-copilot/        ← GitHub Copilot CLI via CliModel
 ├── cli-aider/          ← Aider via CliModel
 ├── cli-mock/           ← Local mock agent script (no API keys needed)
-└── multi-runner/       ← Compare multiple agents on the same evals
-```
+├── multi-runner/       ← Compare multiple agents on the same evals
+└── experiments/        ← A/B testing (variants) for prompt engineering
 
 ## Usage
 
 Run a specific example with `--config`:
 
 ```bash
+# A/B Testing (Experiments)
+pnpm eval:experiment
+
 # Mock agent (no API keys, great for testing the pipeline)
 pnpm eval:mock
+````
 
 # API runners (direct LLM calls via plugin)
+
 agenteval run --config evals/anthropic/agenteval.config.ts
 agenteval run --config evals/openai/agenteval.config.ts
 agenteval run --config evals/ollama/agenteval.config.ts
 
 # CLI runners (spawn a shell command)
+
 agenteval run --config evals/cli-copilot/agenteval.config.ts
 agenteval run --config evals/cli-aider/agenteval.config.ts
 agenteval run --config evals/cli-mock/agenteval.config.ts
 
 # GitHub Models API (uses GH_COPILOT_TOKEN or GITHUB_TOKEN)
+
 agenteval run --config evals/github-models/agenteval.config.ts
 
 # Multi-runner — compare Claude, GPT-4o, and Aider side-by-side
+
 agenteval run --config evals/multi-runner/agenteval.config.ts
 
 # Run all evals with the default config
+
 pnpm eval
 
 # View results in the dashboard
+
 pnpm eval:view
-```
+
+````
 
 ## Environment Variables
 
@@ -75,7 +86,7 @@ export default defineConfig({
   ],
   // Each runner executes every test → results compared in the dashboard
 });
-```
+````
 
 ## Judge Recommendations
 

@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, OpenAIModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, OpenAIModel } from "@tlahey/agent-eval/llm";
 
 /**
  * Runner — Anthropic Claude Sonnet
@@ -19,7 +19,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "claude-sonnet",
+      id: "claude-sonnet",
       model: new AnthropicModel({ model: "claude-sonnet-4-20250514" }),
     },
   ],

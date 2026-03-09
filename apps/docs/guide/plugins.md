@@ -64,7 +64,7 @@ Runners are plain config objects (`RunnerConfig`), not plugin instances. See the
 
 ## Import Map
 
-Plugins are **not** re-exported from the main `"agent-eval"` entry point. Each plugin category has its own barrel export:
+Plugins are **not** re-exported from the main `"@tlahey/agent-eval"` entry point. Each plugin category has its own barrel export:
 
 | Import                   | What you get                                                                    |
 | ------------------------ | ------------------------------------------------------------------------------- |
@@ -80,7 +80,7 @@ Each plugin category dynamically imports its dependencies (`@ai-sdk/openai`, `@a
 ## Quick Configuration
 
 ```ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { CliModel, OpenAIModel } from "agent-eval/llm";
 import { SqliteLedger } from "agent-eval/ledger";
 import { LocalEnvironment } from "agent-eval/environment";
@@ -90,10 +90,10 @@ const gpt4o = new OpenAIModel({ model: "gpt-4o" });
 export default defineConfig({
   // Runners are plain config objects: { name, model }
   runners: [
-    { name: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) },
-    { name: "gpt-4o", model: gpt4o },
+    { id: "copilot", model: new CliModel({ command: "gh copilot -p '{{prompt}}'" }) },
+    { id: "gpt-4o", model: gpt4o },
   ],
-  judge: { name: "gpt-4o", model: gpt4o },
+  judge: { id: "gpt-4o", model: gpt4o },
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
   environment: new LocalEnvironment(),
 });
@@ -141,7 +141,7 @@ Create a plugin directly in your codebase:
 
 ```ts
 // my-plugins/mistral-model.ts
-import type { IModelPlugin } from "agent-eval";
+import type { IModelPlugin } from "@tlahey/agent-eval";
 
 export class MistralModel implements IModelPlugin {
   readonly name = "mistral";
@@ -162,7 +162,7 @@ Then import it in your config:
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { MistralModel } from "./my-plugins/mistral-model";
 
 export default defineConfig({
@@ -197,7 +197,7 @@ pnpm add agent-eval @ai-sdk/mistral
 
 ```ts
 // src/index.ts
-import type { IModelPlugin } from "agent-eval";
+import type { IModelPlugin } from "@tlahey/agent-eval";
 
 export class MistralModel implements IModelPlugin {
   readonly name = "mistral";
@@ -228,7 +228,7 @@ pnpm add -D agent-eval agenteval-plugin-mistral
 
 ```ts
 // agenteval.config.ts
-import { defineConfig } from "agent-eval";
+import { defineConfig } from "@tlahey/agent-eval";
 import { MistralModel } from "agenteval-plugin-mistral";
 
 export default defineConfig({
@@ -255,13 +255,13 @@ Any of the three plugin types can be external packages:
 | **Ledger**      | `ILedgerPlugin`      | `agenteval-plugin-postgres`, `agenteval-plugin-mongodb`, `agenteval-plugin-s3`   |
 | **Environment** | `IEnvironmentPlugin` | `agenteval-plugin-kubernetes`, `agenteval-plugin-ssh`, `agenteval-plugin-wasm`   |
 
-All interfaces are exported from the main `"agent-eval"` entry point — your package only needs `agent-eval` as a **peer dependency**:
+All interfaces are exported from the main `"@tlahey/agent-eval"` entry point — your package only needs `agent-eval` as a **peer dependency**:
 
 ```json
 {
   "name": "agenteval-plugin-mistral",
   "peerDependencies": {
-    "agent-eval": ">=0.1.0"
+    "@tlahey/agent-eval": ">=0.1.0"
   }
 }
 ```

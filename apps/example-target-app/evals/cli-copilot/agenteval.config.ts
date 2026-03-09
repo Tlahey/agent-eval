@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, CliModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, CliModel } from "@tlahey/agent-eval/llm";
 
 /**
  * CLI Runner — GitHub Copilot
@@ -21,7 +21,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "copilot",
+      id: "copilot",
       model: new CliModel({ command: 'gh copilot suggest -t shell "{{prompt}}"' }),
     },
   ],

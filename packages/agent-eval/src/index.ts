@@ -5,6 +5,7 @@ import type {
   HookFn,
   TestDefinition,
   TestFn,
+  TestVariant,
 } from "./core/types.js";
 import { DEFAULT_THRESHOLDS } from "./core/types.js";
 
@@ -33,65 +34,46 @@ function getRegistry(): AgentEvalRegistry {
 }
 
 /**
- * Register a test. This is the primary DX API.
+ * Unified Test Registration API.
+ *
+ * Supports both standard runs and A/B experiments.
  *
  * @example
- * ```ts
- * import { test, expect } from "agent-eval";
- *
- * test("Add a Close button to the Banner", async ({ agent, ctx }) => {
- *   await agent.run("Add a Close button inside the banner");
- *   // storeDiff() runs automatically after agent.run()
+ * // Standard
+ * test("Refactor Header", async ({ ctx }) => {
+ *   ctx.prompt("Refactor this component...");
  *   await expect(ctx).toPassJudge({ criteria: "..." });
  * });
- * ```
+ *
+ * @example
+ * // Experiment
+ * test("Refactor Header", [ { id: 'v1', runnerId: 'sonnet' }, ... ], async ({ ctx }) => {
+ *   ctx.prompt("Refactor this component...");
+ *   await expect(ctx).toPassJudge({ criteria: "..." });
+ * });
  */
-export function test(title: string, fn: TestFn): void {
+export function test(title: string, variantsOrFn: TestVariant[] | TestFn, maybeFn?: TestFn): void {
   const reg = getRegistry();
+  const variants = Array.isArray(variantsOrFn) ? variantsOrFn : undefined;
+  const fn = Array.isArray(variantsOrFn) ? maybeFn! : variantsOrFn;
+
   reg.tests.push({
     title,
     fn,
+    variants,
     suitePath: reg.suiteStack.length > 0 ? [...reg.suiteStack] : undefined,
   });
 }
 
 /**
- * Register a tagged test.
+ * Skip a test.
  */
-test.tagged = function (tags: string[], title: string, fn: TestFn): void {
-  const reg = getRegistry();
-  reg.tests.push({
-    title,
-    fn,
-    tags,
-    suitePath: reg.suiteStack.length > 0 ? [...reg.suiteStack] : undefined,
-  });
+test.skip = function (_title: string, _variantsOrFn: any, _maybeFn?: any): void {
+  // no-op
 };
 
 /**
- * Skip a test (register but don't execute).
- */
-test.skip = function (_title: string, _fn: TestFn): void {
-  // no-op: intentionally not registered
-};
-
-/**
- * Group tests into a named suite. Supports nesting.
- *
- * @example
- * ```ts
- * import { test, describe, expect } from "agent-eval";
- *
- * describe("UI Components", () => {
- *   describe("Banner", () => {
- *     test("Add close button", async ({ agent, ctx }) => {
- *       // suitePath = ["UI Components", "Banner"]
- *       await agent.run("...");
- *       await expect(ctx).toPassJudge({ criteria: "..." });
- *     });
- *   });
- * });
- * ```
+ * Group tests into a named suite.
  */
 export function describe(name: string, fn: () => void): void {
   const reg = getRegistry();
@@ -124,27 +106,7 @@ export function clearRegisteredTests(): void {
 // ─── Lifecycle Hooks ───
 
 /**
- * Register a beforeEach hook. Runs before each test in the current scope.
- * Hooks registered inside a describe() block only apply to tests in that block.
- *
- * @example
- * ```ts
- * import { test, describe, beforeEach } from "agent-eval";
- *
- * describe("UI Components", () => {
- *   beforeEach(({ ctx }) => {
- *     ctx.addTask({
- *       name: "typecheck",
- *       action: ({ exec }) => exec("pnpm tsc --noEmit"),
- *       criteria: "must pass type checking",
- *     });
- *   });
- *
- *   test("Add close button", ({ agent }) => {
- *     agent.instruct("Add a close button to the Banner");
- *   });
- * });
- * ```
+ * Register a beforeEach hook.
  */
 export function beforeEach(fn: HookFn): void {
   const reg = getRegistry();
@@ -152,14 +114,7 @@ export function beforeEach(fn: HookFn): void {
 }
 
 /**
- * Register an afterEach hook. Runs after each test in the current scope.
- *
- * @example
- * ```ts
- * afterEach(async ({ ctx }) => {
- *   // Custom cleanup logic
- * });
- * ```
+ * Register an afterEach hook.
  */
 export function afterEach(fn: HookFn): void {
   const reg = getRegistry();
@@ -168,7 +123,6 @@ export function afterEach(fn: HookFn): void {
 
 /**
  * Get hooks matching a test's suite path.
- * A hook matches if its suitePath is a prefix of the test's suitePath.
  */
 export function getMatchingHooks(
   hooks: HookDefinition[],
@@ -248,6 +202,7 @@ export type {
   RunReport,
   RunnerConfig,
   LlmConfig,
+  TestVariant,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
 export { validateRunnerNames } from "./core/config.js";
@@ -286,9 +241,3 @@ export type { PluginValidationError } from "./core/plugin-validator.js";
 
 export { setDebug, isDebug, debug } from "./core/debug.js";
 export { env } from "./core/env.js";
-
-// ─── Built-in plugins are NOT re-exported from the main entry. ───
-// Import them from their sub-paths:
-//   import { AnthropicModel, OpenAIModel, OllamaModel, CliModel } from "agent-eval/llm";
-//   import { LocalEnvironment, DockerEnvironment } from "agent-eval/environment";
-//   import { SqliteLedger, JsonLedger } from "agent-eval/ledger";

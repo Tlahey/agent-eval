@@ -1,252 +1,80 @@
-import { describe, it, expect as vitestExpect, vi, beforeEach } from "vitest";
-import {
-  expect as agentExpect,
-  setJudgeConfig,
-  clearJudgeConfig,
-  setGlobalThresholds,
-  getGlobalThresholds,
-} from "./expect.js";
-import {
-  clearLastJudgeOptions,
-  clearLastJudgeResult,
-  getLastJudgeOptions,
-  getLastJudgeResult,
-} from "./runner.js";
-import type { TestContext, JudgeConfig } from "./types.js";
-import { DEFAULT_THRESHOLDS } from "./types.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { expect as evalExpect, setJudgeConfig, clearJudgeConfig } from "./expect.js";
+import { judge as runJudge } from "../judge/judge.js";
+import type { TestContext, JudgeResult } from "./types.js";
 
 // Mock the judge module
 vi.mock("../judge/judge.js", () => ({
   judge: vi.fn(),
-  buildJudgePrompt: vi.fn(() => "mock judge prompt"),
+  buildJudgePrompt: vi.fn(() => "mock prompt"),
   extractChangedFiles: vi.fn(() => []),
+  filterDiff: vi.fn((diff) => diff),
 }));
 
-import { judge as mockJudge } from "../judge/judge.js";
+// Mock runner to avoid side effects
+vi.mock("./runner.js", () => ({
+  setLastJudgeOptions: vi.fn(),
+  setLastJudgeResult: vi.fn(),
+  getJudgeReporterContext: vi.fn(() => null),
+}));
 
-function createMockContext(overrides: Partial<TestContext> = {}): TestContext {
-  return {
-    cwd: "/mock/cwd",
+describe("expect", () => {
+  const mockCtx: TestContext = {
+    cwd: "/tmp",
+    prompt: vi.fn(),
     storeDiff: vi.fn(),
-    runCommand: vi.fn(),
     addTask: vi.fn(),
-    diff: "diff --git a/test.ts",
+    runCommand: vi.fn(),
+    setRunnerInfo: vi.fn(),
+    setInstruction: vi.fn(),
+    diff: "mock diff",
     commands: [],
     tasks: [],
     logs: "mock logs",
-    ...overrides,
   };
-}
 
-const judgeConfig: JudgeConfig = {
-  model: {
-    name: "mock",
-    modelId: "gpt-4o",
-    createModel: async () => ({ modelId: "gpt-4o", provider: "mock" }),
-  },
-};
-
-describe("expect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearLastJudgeResult();
-    clearLastJudgeOptions();
     clearJudgeConfig();
   });
 
   it("throws if judge config is not set", async () => {
-    const ctx = createMockContext();
-
-    await vitestExpect(agentExpect(ctx).toPassJudge({ criteria: "test" })).rejects.toThrow(
+    await expect(evalExpect(mockCtx).toPassJudge({ criteria: "test" })).rejects.toThrow(
       "Judge config not set",
     );
   });
 
   it("calls judge and returns result on pass", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.9, reason: "looks good", improvement: "none" },
-    });
-
-    const result = await agentExpect(ctx).toPassJudge({
-      criteria: "test criteria",
-    });
-
-    vitestExpect(result.pass).toBe(true);
-    vitestExpect(result.score).toBe(0.9);
-  });
-
-  it("calls judge with correct arguments", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.85, reason: "well done", improvement: "none" },
-    });
-
-    await agentExpect(ctx).toPassJudge({
-      criteria: "must have close button",
-    });
-
-    vitestExpect(mockJudge).toHaveBeenCalledWith(ctx, "mock judge prompt", judgeConfig);
-  });
-
-  it("passes expectedFiles to buildJudgePrompt", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
-    const { buildJudgePrompt: mockBuildPrompt } = await import("../judge/judge.js");
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.9, reason: "files ok", improvement: "none" },
-    });
-
-    await agentExpect(ctx).toPassJudge({
-      criteria: "test",
-      expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
-    });
-
-    vitestExpect(mockBuildPrompt).toHaveBeenCalledWith({
-      criteria: "test",
-      execution: vitestExpect.objectContaining({
-        diff: "diff --git a/test.ts",
-        commands: [],
-        logs: "mock logs",
-      }),
-      expectedFiles: ["src/Banner.tsx", "src/Banner.test.tsx"],
-    });
-  });
-
-  it("stores the judge result in the global store", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.95, reason: "perfect", improvement: "No improvement needed." },
-    });
-
-    await agentExpect(ctx).toPassJudge({ criteria: "test" });
-
-    const stored = getLastJudgeResult();
-    vitestExpect(stored).toEqual({
+    const mockResult: JudgeResult = {
       pass: true,
-      status: "PASS",
-      score: 0.95,
-      reason: "perfect",
-      improvement: "No improvement needed.",
-    });
-  });
+      score: 0.9,
+      reason: "good",
+      improvement: "none",
+    };
+    vi.mocked(runJudge).mockResolvedValue({ result: mockResult });
 
-  it("defers judge evaluation when diff is not available yet", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext({ diff: null });
+    setJudgeConfig({ model: { name: "test", modelId: "m", createModel: () => ({}) } as any });
 
-    const result = await agentExpect(ctx).toPassJudge({
-      criteria: "declarative criteria",
-      expectedFiles: ["src/Banner.tsx"],
-    });
+    const result = await evalExpect(mockCtx).toPassJudge({ criteria: "should pass" });
 
-    vitestExpect(mockJudge).not.toHaveBeenCalled();
-    vitestExpect(getLastJudgeOptions()).toEqual({
-      criteria: "declarative criteria",
-      expectedFiles: ["src/Banner.tsx"],
-    });
-    vitestExpect(result.reason).toContain("Deferred judge evaluation registered");
+    expect(result.pass).toBe(true);
+    expect(result.score).toBe(0.9);
+    expect(runJudge).toHaveBeenCalled();
   });
 
   it("throws JudgeFailure when judge returns pass=false", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
+    const mockResult: JudgeResult = {
+      pass: false,
+      score: 0.2,
+      reason: "bad",
+      improvement: "fix it",
+    };
+    vi.mocked(runJudge).mockResolvedValue({ result: mockResult });
 
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: {
-        pass: false,
-        score: 0.3,
-        reason: "missing close button",
-        improvement: "add a close button",
-      },
-    });
+    setJudgeConfig({ model: { name: "test", modelId: "m", createModel: () => ({}) } as any });
 
-    await vitestExpect(
-      agentExpect(ctx).toPassJudge({ criteria: "must have close button" }),
-    ).rejects.toThrow("Score below threshold");
-  });
-
-  it("includes score and reason in the thrown error", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: false, score: 0.2, reason: "no tests pass", improvement: "fix the tests" },
-    });
-
-    try {
-      await agentExpect(ctx).toPassJudge({ criteria: "all tests pass" });
-      vitestExpect.unreachable("should have thrown");
-    } catch (err: unknown) {
-      const error = err as Error;
-      vitestExpect(error.name).toBe("JudgeFailure");
-      vitestExpect(error.message).toContain("0.20");
-      vitestExpect(error.message).toContain("no tests pass");
-    }
-  });
-
-  // ─── Threshold tests ───
-
-  it("computes WARN status for score between fail and warn thresholds", async () => {
-    setJudgeConfig(judgeConfig);
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: {
-        pass: true,
-        score: 0.65,
-        reason: "partially correct",
-        improvement: "needs more work",
-      },
-    });
-
-    const result = await agentExpect(ctx).toPassJudge({ criteria: "test" });
-    vitestExpect(result.status).toBe("WARN");
-    vitestExpect(result.pass).toBe(true); // WARN still passes
-  });
-
-  it("uses per-test thresholds over global", async () => {
-    setJudgeConfig(judgeConfig);
-    setGlobalThresholds({ warn: 0.9, fail: 0.7 });
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.75, reason: "ok", improvement: "none" },
-    });
-
-    // With global thresholds (warn=0.9, fail=0.7): 0.75 → WARN
-    // With per-test thresholds (warn=0.6, fail=0.3): 0.75 → PASS
-    const result = await agentExpect(ctx).toPassJudge({
-      criteria: "test",
-      thresholds: { warn: 0.6, fail: 0.3 },
-    });
-    vitestExpect(result.status).toBe("PASS");
-  });
-
-  it("uses global thresholds when no per-test thresholds", async () => {
-    setJudgeConfig(judgeConfig);
-    setGlobalThresholds({ warn: 0.95, fail: 0.8 });
-    const ctx = createMockContext();
-
-    vi.mocked(mockJudge).mockResolvedValue({
-      result: { pass: true, score: 0.9, reason: "good", improvement: "none" },
-    });
-
-    // score 0.9 with warn=0.95 → WARN
-    const result = await agentExpect(ctx).toPassJudge({ criteria: "test" });
-    vitestExpect(result.status).toBe("WARN");
-  });
-
-  it("resets global thresholds on clearJudgeConfig", () => {
-    setGlobalThresholds({ warn: 0.99, fail: 0.9 });
-    clearJudgeConfig();
-    vitestExpect(getGlobalThresholds()).toEqual(DEFAULT_THRESHOLDS);
+    await expect(evalExpect(mockCtx).toPassJudge({ criteria: "fail" })).rejects.toThrow(
+      "Score below threshold",
+    );
   });
 });

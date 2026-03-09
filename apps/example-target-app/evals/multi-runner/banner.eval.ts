@@ -1,18 +1,12 @@
-import { test, expect } from "agent-eval";
+import { test, expect } from "@tlahey/agent-eval";
 
-/**
- * Multi-runner eval — the same test runs against every runner in the config.
- *
- * Each runner (claude-sonnet, gpt-4o, aider) receives the same prompt.
- * The judge scores each independently. Compare results in the dashboard.
- */
-test("Add a Close button to the Banner", async ({ agent, ctx }) => {
-  agent.instruct(
-    "Add a Close button to the Banner component in src/components/Banner.tsx. " +
-      "The Banner should accept an onClose prop. " +
-      "When onClose is provided, render a button with aria-label='Close'. " +
-      "Also update the test file src/components/Banner.test.tsx with tests for the close button.",
-  );
+test("Add a Close button to the Banner", async ({ ctx }) => {
+  ctx.prompt(`
+      Add a Close button to the Banner component in src/components/Banner.tsx.
+      The Banner should accept an onClose prop.
+      When onClose is provided, render a button with aria-label='Close'.
+      Also update the test file src/components/Banner.test.tsx with tests for the close button.
+    `);
 
   ctx.addTask({
     name: "Close button renders",
@@ -34,13 +28,13 @@ test("Add a Close button to the Banner", async ({ agent, ctx }) => {
   });
 });
 
-test("Create a debounce utility", async ({ agent, ctx }) => {
-  agent.instruct(
-    "Create a debounce utility function in src/utils/debounce.ts. " +
-      "It should accept a function and a delay in milliseconds. " +
-      "Export the debounce function as a named export. " +
-      "Create a test file src/utils/debounce.test.ts with tests for the debounce function.",
-  );
+test("Create a debounce utility", async ({ ctx }) => {
+  ctx.prompt(`
+      Create a debounce utility function in src/utils/debounce.ts.
+      It should accept a function and a delay in milliseconds.
+      Export the debounce function as a named export.
+      Create a test file src/utils/debounce.test.ts with tests for the debounce function.
+    `);
 
   ctx.addTask({
     name: "File created",

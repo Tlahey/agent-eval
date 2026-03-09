@@ -2,9 +2,9 @@
 
 Create a fluent assertion chain for LLM-as-a-Judge evaluation.
 
-::: danger Mandatory in all test modes
-Every test (imperative or declarative) **must** call `expect(ctx).toPassJudge()`.  
-`agent.run()` / `agent.instruct()` define the implementation request; `toPassJudge()` defines scoring criteria and file scope for the judge.  
+::: danger Mandatory
+Every test **must** call `expect(ctx).toPassJudge()`.  
+`ctx.prompt()` defines the mission request; `toPassJudge()` defines scoring criteria and file scope for the judge.  
 If a test completes without `toPassJudge()`, AgentEval throws an error.
 :::
 
@@ -53,24 +53,22 @@ interface JudgeResult {
 ## Usage
 
 ```ts
-import { test, expect } from "agent-eval";
+import { test, expect } from "@tlahey/agent-eval";
 
-test("Example", async ({ agent, ctx }) => {
-  await agent.run("Add feature X");
-  // storeDiff() is automatic — no need to call it
+test("Example", async ({ ctx }) => {
+  ctx.prompt("Add feature X");
 
   const result = await expect(ctx).toPassJudge({
     criteria: "Feature X is properly implemented",
     expectedFiles: ["src/feature-x.ts", "src/feature-x.test.ts"],
-    thresholds: { warn: 0.85, fail: 0.6 }, // optional per-test thresholds
+    thresholds: { warn: 0.85, fail: 0.6 },
   });
 
   // result.score, result.status, result.reason, result.improvement
 });
 ```
 
-In **declarative** tests, call `expect(ctx).toPassJudge(...)` after `agent.instruct(...)`.  
-The runner uses these options later (after agent execution) to run the final judge step, optionally enriched by `ctx.addTask()` results.
+The runner executes the mission defined in `ctx.prompt()` before evaluating the `expect()` call.
 
 ## Behavior
 

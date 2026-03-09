@@ -1,5 +1,5 @@
-import { defineConfig } from "agent-eval";
-import { AnthropicModel, CliModel } from "agent-eval/llm";
+import { defineConfig } from "@tlahey/agent-eval";
+import { AnthropicModel, CliModel } from "@tlahey/agent-eval/llm";
 
 /**
  * Default config — runs the mock agent against ALL eval scenarios.
@@ -24,7 +24,7 @@ export default defineConfig({
 
   runners: [
     {
-      name: "mock-agent",
+      id: "mock-agent",
       model: new CliModel({ command: 'node scripts/mock-agent.mjs "{{prompt}}"' }),
     },
   ],

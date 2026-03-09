@@ -350,7 +350,13 @@ export default defineConfig({
 You can create your own reporter by implementing the `Reporter` interface:
 
 ```typescript
-import type { Reporter, TestEvent, TestResultEvent, PipelineStep, StepStatus } from "agent-eval";
+import type {
+  Reporter,
+  TestEvent,
+  TestResultEvent,
+  PipelineStep,
+  StepStatus,
+} from "@tlahey/agent-eval";
 
 class MyReporter implements Reporter {
   onRunStart(totalTests: number, totalRunners: number): void {
@@ -404,7 +410,7 @@ class MyReporter implements Reporter {
 The `isCI()` function detects CI environments:
 
 ```typescript
-import { isCI } from "agent-eval";
+import { isCI } from "@tlahey/agent-eval";
 
 if (isCI()) {
   // Running in CI — disable interactive features
