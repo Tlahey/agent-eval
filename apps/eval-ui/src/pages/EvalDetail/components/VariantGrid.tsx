@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import type { VariantStats } from "../useEvalDetail";
 import { ScoreRing } from "../../../components/ScoreRing";
-import { Clock, Bot, Zap, Plus, Minus } from "lucide-react";
+import { Clock, Bot, Plus, Minus, ShieldCheck } from "lucide-react";
 
 interface Props {
   stats: VariantStats[];
@@ -33,7 +33,6 @@ export function VariantGrid({ stats, compareA, compareB, onCompare }: Props) {
     if (!scrollRef.current) return;
     const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
 
-    // Total scrollable distance
     const maxScrollLeft = scrollWidth - clientWidth;
     if (maxScrollLeft <= 0) {
       setActiveIndex(0);
@@ -41,9 +40,6 @@ export function VariantGrid({ stats, compareA, compareB, onCompare }: Props) {
     }
 
     const pageCount = Math.ceil(stats.length / itemsPerPage);
-
-    // Calculate index based on scroll percentage
-    // This is more robust for carousels with multiple items
     const scrollPercentage = scrollLeft / maxScrollLeft;
     const index = Math.round(scrollPercentage * (pageCount - 1));
 
@@ -120,9 +116,9 @@ export function VariantGrid({ stats, compareA, compareB, onCompare }: Props) {
                   icon={<Bot size={10} />}
                 />
                 <MetricItem
-                  label="Success"
-                  val={`${(v.passRate * 100).toFixed(0)}%`}
-                  icon={<Zap size={10} />}
+                  label="Stability"
+                  val={`${(v.stability * 100).toFixed(0)}%`}
+                  icon={<ShieldCheck size={10} />}
                   color="text-ok"
                 />
               </div>

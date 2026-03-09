@@ -16,6 +16,7 @@ export interface VariantStats {
   avgTokens: number;
   runs: number;
   passRate: number;
+  stability: number; // New metric: 1 - standard deviation
   latestRun: LedgerRun;
 }
 
@@ -176,6 +177,14 @@ function buildVariantStats(runs: LedgerRun[]): VariantStats[] {
         (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       )[0];
       const totalScore = vRuns.reduce((s, r) => s + r.score, 0);
+      const avgScore = totalScore / vRuns.length;
+
+      // Stability calculation: 1 - stdDev
+      const variance =
+        vRuns.reduce((s, r) => s + Math.pow(r.score - avgScore, 2), 0) / vRuns.length;
+      const stdDev = Math.sqrt(variance);
+      const stability = Math.max(0, 1 - stdDev);
+
       const totalDuration = vRuns.reduce((s, r) => s + r.durationMs, 0);
       const totalTokens = vRuns.reduce((s, r) => s + (r.agentTokenUsage?.totalTokens || 0), 0);
       const passCount = vRuns.filter((r) => r.pass).length;
@@ -183,11 +192,12 @@ function buildVariantStats(runs: LedgerRun[]): VariantStats[] {
       return {
         variantName: name,
         runner: latest.agentRunner,
-        avgScore: totalScore / vRuns.length,
+        avgScore,
         avgDurationMs: totalDuration / vRuns.length,
         avgTokens: totalTokens / vRuns.length,
         runs: vRuns.length,
         passRate: passCount / vRuns.length,
+        stability,
         latestRun: latest,
       };
     })
