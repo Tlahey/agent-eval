@@ -8,6 +8,17 @@ const ITEMS_PER_PAGE = 10;
 type SortField = "timestamp" | "score" | "durationMs";
 type SortDir = "asc" | "desc";
 
+export interface VariantStats {
+  variantName: string;
+  runner: string;
+  avgScore: number;
+  avgDurationMs: number;
+  avgTokens: number;
+  runs: number;
+  passRate: number;
+  latestRun: LedgerRun;
+}
+
 export function useEvalDetail() {
   const { testId: rawTestId } = useParams<{ testId: string }>();
   const testId = decodeURIComponent(rawTestId ?? "");
@@ -17,12 +28,16 @@ export function useEvalDetail() {
   const [allRuns, setAllRuns] = useState<LedgerRun[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const variantFilter = searchParams.get("variant") || "";
   const runnerFilter = searchParams.get("runner") || "";
   const statusFilter = (searchParams.get("status") as "all" | "pass" | "fail") || "all";
   const sortRaw = searchParams.get("sort") || "-timestamp";
   const sortField = (sortRaw.startsWith("-") ? sortRaw.slice(1) : sortRaw) as SortField;
   const sortDir = (sortRaw.startsWith("-") ? "desc" : "asc") as SortDir;
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
+
+  const compareA = searchParams.get("compareA") || "";
+  const compareB = searchParams.get("compareB") || "";
 
   useEffect(() => {
     let cancelled = false;
@@ -44,13 +59,18 @@ export function useEvalDetail() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [testId]);
+  }, [testId, searchParams, setSelectedRun]);
 
+  const variants = useMemo(
+    () => [...new Set(allRuns.map((r) => r.variantName || "default"))],
+    [allRuns],
+  );
   const runners = useMemo(() => [...new Set(allRuns.map((r) => r.agentRunner))], [allRuns]);
 
   const filteredAndSortedRuns = useMemo(() => {
     let result = [...allRuns];
+    if (variantFilter)
+      result = result.filter((r) => (r.variantName || "default") === variantFilter);
     if (runnerFilter) result = result.filter((r) => r.agentRunner === runnerFilter);
     if (statusFilter !== "all")
       result = result.filter((r) => (statusFilter === "pass" ? r.pass : !r.pass));
@@ -64,7 +84,7 @@ export function useEvalDetail() {
       return sortDir === "asc" ? (va as number) - (vb as number) : (vb as number) - (va as number);
     });
     return result;
-  }, [allRuns, runnerFilter, statusFilter, sortField, sortDir]);
+  }, [allRuns, variantFilter, runnerFilter, statusFilter, sortField, sortDir]);
 
   const totalRunsCount = filteredAndSortedRuns.length;
   const totalPages = Math.ceil(totalRunsCount / ITEMS_PER_PAGE);
@@ -73,17 +93,24 @@ export function useEvalDetail() {
     currentPage * ITEMS_PER_PAGE,
   );
 
-  const avgScoreTotal =
-    totalRunsCount > 0
-      ? filteredAndSortedRuns.reduce((s, r) => s + r.score, 0) / totalRunsCount
-      : 0;
-  const passCountTotal = filteredAndSortedRuns.filter((r) => r.pass).length;
+  const variantStats = useMemo(() => buildVariantStats(allRuns), [allRuns]);
 
-  const trendData = useMemo(() => buildTrendData(allRuns), [allRuns]);
-  const radarData = useMemo(() => buildRadarData(allRuns), [allRuns]);
-  const distributionData = useMemo(() => buildDistributionData(allRuns), [allRuns]);
-  const runnerStats = useMemo(() => buildRunnerStats(allRuns), [allRuns]);
-  const bestWorst = useMemo(() => buildBestWorst(allRuns), [allRuns]);
+  const comparison = useMemo(() => {
+    if (!compareA || !compareB) return null;
+    const a = variantStats.find((v) => v.variantName === compareA);
+    const b = variantStats.find((v) => v.variantName === compareB);
+    if (!a || !b) return null;
+
+    return {
+      a,
+      b,
+      deltas: {
+        score: b.avgScore - a.avgScore,
+        duration: b.avgDurationMs - a.avgDurationMs,
+        tokens: b.avgTokens - a.avgTokens,
+      },
+    };
+  }, [variantStats, compareA, compareB]);
 
   const updateParams = (updates: Record<string, string | null>) => {
     const newParams = new URLSearchParams(searchParams);
@@ -94,10 +121,6 @@ export function useEvalDetail() {
         newParams.set(key, value);
       }
     });
-    const filterKeys = ["runner", "status"];
-    if (Object.keys(updates).some((k) => filterKeys.includes(k)) && !updates.page) {
-      newParams.delete("page");
-    }
     setSearchParams(newParams, { replace: true });
   };
 
@@ -110,18 +133,17 @@ export function useEvalDetail() {
     testId,
     loading,
     allRuns,
+    variants,
     runners,
     currentRuns,
     totalRunsCount,
     totalPages,
     currentPage,
-    avgScoreTotal,
-    passCountTotal,
-    trendData,
-    radarData,
-    distributionData,
-    runnerStats,
-    bestWorst,
+    variantStats,
+    comparison,
+    compareA,
+    compareB,
+    variantFilter,
     runnerFilter,
     statusFilter,
     sortField,
@@ -132,96 +154,34 @@ export function useEvalDetail() {
   };
 }
 
-function buildTrendData(runs: LedgerRun[]) {
-  const sorted = [...runs].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
-  const grouped = new Map<string, Map<string, number[]>>();
-  for (const run of sorted) {
-    const date = new Date(run.timestamp).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-    if (!grouped.has(date)) grouped.set(date, new Map());
-    const runners = grouped.get(date)!;
-    if (!runners.has(run.agentRunner)) runners.set(run.agentRunner, []);
-    runners.get(run.agentRunner)!.push(run.score);
-  }
-  return Array.from(grouped.entries()).map(([date, runners]) => {
-    const point: Record<string, string | number> = { date };
-    for (const [runner, scores] of runners) {
-      point[runner] = +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3);
-    }
-    return point;
-  });
-}
-
-function buildRadarData(runs: LedgerRun[]) {
-  const runners = [...new Set(runs.map((r) => r.agentRunner))];
-  const metrics = [
-    { key: "score", label: "Success" },
-    { key: "durationMs", label: "Speed", inverse: true, max: 60000 },
-    { key: "totalTokens", label: "Efficiency", inverse: true, max: 10000 },
-  ];
-
-  return metrics.map((m) => {
-    const row: Record<string, string | number> = { subject: m.label };
-    runners.forEach((r) => {
-      const rRuns = runs.filter((x) => x.agentRunner === r);
-      let val = 0;
-      if (m.key === "score") {
-        val = (rRuns.reduce((s, x) => s + x.score, 0) / rRuns.length) * 100;
-      } else if (m.key === "durationMs") {
-        const avg = rRuns.reduce((s, x) => s + x.durationMs, 0) / rRuns.length;
-        val = Math.max(0, 100 - (avg / (m.max || 1)) * 100);
-      } else if (m.key === "totalTokens") {
-        const avg =
-          rRuns.reduce((s, x) => s + (x.agentTokenUsage?.totalTokens || 0), 0) / rRuns.length;
-        val = Math.max(0, 100 - (avg / (m.max || 1)) * 100);
-      }
-      row[r] = Math.round(val);
-    });
-    return row;
-  });
-}
-
-function buildDistributionData(runs: LedgerRun[]) {
-  const buckets = [
-    { range: "0-20%", midpoint: 0.1, count: 0 },
-    { range: "20-40%", midpoint: 0.3, count: 0 },
-    { range: "40-60%", midpoint: 0.5, count: 0 },
-    { range: "60-80%", midpoint: 0.7, count: 0 },
-    { range: "80-100%", midpoint: 0.9, count: 0 },
-  ];
+function buildVariantStats(runs: LedgerRun[]): VariantStats[] {
+  const groups = new Map<string, LedgerRun[]>();
   runs.forEach((r) => {
-    const idx = Math.min(Math.floor(r.score * 5), 4);
-    buckets[idx].count++;
+    const key = r.variantName || "default";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
   });
-  return buckets;
-}
 
-function buildRunnerStats(runs: LedgerRun[]) {
-  const stats = new Map<string, { totalScore: number; count: number; passCount: number }>();
-  runs.forEach((r) => {
-    if (!stats.has(r.agentRunner))
-      stats.set(r.agentRunner, { totalScore: 0, count: 0, passCount: 0 });
-    const s = stats.get(r.agentRunner)!;
-    s.totalScore += r.score;
-    s.count++;
-    if (r.pass) s.passCount++;
-  });
-  return Array.from(stats.entries())
-    .map(([runner, s]) => ({
-      runner,
-      avgScore: s.totalScore / s.count,
-      runs: s.count,
-      passRate: s.passCount / s.count,
-    }))
+  return Array.from(groups.entries())
+    .map(([name, vRuns]) => {
+      const latest = [...vRuns].sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      )[0];
+      const totalScore = vRuns.reduce((s, r) => s + r.score, 0);
+      const totalDuration = vRuns.reduce((s, r) => s + r.durationMs, 0);
+      const totalTokens = vRuns.reduce((s, r) => s + (r.agentTokenUsage?.totalTokens || 0), 0);
+      const passCount = vRuns.filter((r) => r.pass).length;
+
+      return {
+        variantName: name,
+        runner: latest.agentRunner,
+        avgScore: totalScore / vRuns.length,
+        avgDurationMs: totalDuration / vRuns.length,
+        avgTokens: totalTokens / vRuns.length,
+        runs: vRuns.length,
+        passRate: passCount / vRuns.length,
+        latestRun: latest,
+      };
+    })
     .sort((a, b) => b.avgScore - a.avgScore);
-}
-
-function buildBestWorst(runs: LedgerRun[]) {
-  if (runs.length === 0) return [null, null] as const;
-  const sorted = [...runs].sort((a, b) => b.score - a.score);
-  return [sorted[0], sorted[sorted.length - 1]] as const;
 }

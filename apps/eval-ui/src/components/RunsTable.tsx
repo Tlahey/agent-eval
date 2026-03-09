@@ -102,9 +102,16 @@ export function RunsTable({ runs, onSelect, compact }: Props) {
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                   <RunnerDot runner={run.agentRunner} />
-                  <span className="text-[11px] font-bold text-txt-secondary uppercase tracking-wider">
-                    {run.agentRunner}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-bold text-txt-secondary uppercase tracking-wider">
+                      {run.agentRunner}
+                    </span>
+                    {run.variantName && (
+                      <span className="text-[9px] font-bold text-primary italic lowercase opacity-70">
+                        {run.variantName}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </td>
               <td className="px-6 py-4">

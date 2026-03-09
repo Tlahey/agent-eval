@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen } from "@testing-library/react";
-import { renderWithRouter } from "../../../test/render";
 import { EvalHeader } from "./EvalHeader";
+import { renderWithRouter } from "../../../test/render";
 
 describe("EvalHeader", () => {
   it("renders the testId and stats correctly", () => {
@@ -9,7 +9,7 @@ describe("EvalHeader", () => {
       <EvalHeader
         testId="test-banner-app"
         totalRunsCount={50}
-        runnersCount={3}
+        variantsCount={3}
         avgScoreTotal={0.85}
         passCountTotal={42}
       />,
@@ -17,7 +17,7 @@ describe("EvalHeader", () => {
 
     expect(screen.getByText("test-banner-app")).toBeInTheDocument();
     expect(screen.getByText(/50 Total executions/)).toBeInTheDocument();
-    expect(screen.getByText(/3 Runners/)).toBeInTheDocument();
+    expect(screen.getByText(/3 Variants/)).toBeInTheDocument();
     expect(screen.getByText("85%")).toBeInTheDocument(); // Avg Score
     expect(screen.getByText("84%")).toBeInTheDocument(); // Pass Rate (42/50)
   });
@@ -26,14 +26,14 @@ describe("EvalHeader", () => {
     renderWithRouter(
       <EvalHeader
         testId="test"
-        totalRunsCount={0}
-        runnersCount={0}
-        avgScoreTotal={0}
-        passCountTotal={0}
+        totalRunsCount={1}
+        variantsCount={1}
+        avgScoreTotal={1}
+        passCountTotal={1}
       />,
     );
 
-    const backLink = screen.getByRole("link");
-    expect(backLink).toHaveAttribute("href", "/");
+    const backButton = screen.getByRole("link");
+    expect(backButton).toHaveAttribute("href", "/");
   });
 });

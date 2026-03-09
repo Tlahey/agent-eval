@@ -16,6 +16,8 @@ export function createMockRun(overrides: Partial<LedgerRun> = {}): LedgerRun {
     testId: "add close button to Banner",
     suitePath: ["UI Components", "Banner"],
     timestamp: "2026-02-20T10:00:00.000Z",
+    variantName: "Baseline",
+    basePrompt: "Add a close button to the Banner component",
     agentRunner: "copilot",
     instruction: "Add a close button to the Banner component",
     diff: `diff --git a/src/Banner.tsx b/src/Banner.tsx
@@ -88,12 +90,15 @@ index 1234567..abcdefg 100644
 export function createMockRuns(count = 5): LedgerRun[] {
   const runners = ["copilot", "cursor", "claude-code", "aider"];
   const testIds = ["add close button to Banner", "implement search with debounce"];
+  const variants = ["Baseline", "Expert Persona", "Detailed Specs"];
+
   return Array.from({ length: count }, (_, i) => {
     const score = 0.5 + Math.random() * 0.5;
     return createMockRun({
       id: i + 1,
       testId: testIds[i % testIds.length],
       agentRunner: runners[i % runners.length],
+      variantName: variants[i % variants.length],
       score,
       timestamp: new Date(Date.now() - i * 86400000).toISOString(),
       durationMs: 20000 + i * 10000,

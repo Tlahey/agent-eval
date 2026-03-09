@@ -35,6 +35,8 @@ export interface LedgerRun {
   testId: string;
   suitePath: string[];
   timestamp: string;
+  variantName?: string;
+  basePrompt?: string;
   // Execution data
   agentRunner: string;
   instruction: string;
