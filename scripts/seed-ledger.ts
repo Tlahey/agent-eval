@@ -220,7 +220,7 @@ index 1234567..abcdefg 100644
             `The agent used the ${profile.name} strategy. Evaluation shows good adherence to criteria with minor optimizations needed.`,
             `To reach a perfect score, consider ${pick(["better error handling", "more unit tests", "cleaner code structure"])}.`,
             JSON.stringify([...baseTags, profile.name]),
-            JSON.stringify({ totalTokens: 1500 }),
+            JSON.stringify({ inputTokens: 1200, outputTokens: 300, totalTokens: 1500 }),
             scenario.criteria,
             JSON.stringify(scenario.files),
             0.8,

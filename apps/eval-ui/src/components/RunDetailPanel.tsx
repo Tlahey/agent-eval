@@ -366,11 +366,11 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
             </p>
             <MetricRow
               label="Input Context"
-              value={agentTokens?.inputTokens.toLocaleString() ?? "0"}
+              value={agentTokens?.inputTokens?.toLocaleString() ?? "0"}
             />
             <MetricRow
               label="Output Generation"
-              value={agentTokens?.outputTokens.toLocaleString() ?? "0"}
+              value={agentTokens?.outputTokens?.toLocaleString() ?? "0"}
             />
           </div>
           <div>
@@ -379,11 +379,11 @@ function MetricsViewer({ run }: { run: LedgerRun }) {
             </p>
             <MetricRow
               label="Input Context"
-              value={judgeTokens?.inputTokens.toLocaleString() ?? "0"}
+              value={judgeTokens?.inputTokens?.toLocaleString() ?? "0"}
             />
             <MetricRow
               label="Output Generation"
-              value={judgeTokens?.outputTokens.toLocaleString() ?? "0"}
+              value={judgeTokens?.outputTokens?.toLocaleString() ?? "0"}
             />
           </div>
         </div>

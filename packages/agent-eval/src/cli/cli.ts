@@ -22,7 +22,7 @@ import {
   isCI,
 } from "../core/reporter.js";
 import type { LedgerEntry } from "../core/types.js";
-import { readLedger } from "../ledger/ledger.js";
+import * as ledgerModule from "../ledger/ledger.js";
 import { createServer } from "node:http";
 import { parse as parseUrl } from "node:url";
 
@@ -202,7 +202,7 @@ program
   .action(async (opts) => {
     const config = await loadConfig(process.cwd(), opts.config);
     const outputDir = opts.output || config.outputDir || ".agenteval";
-    const entries = readLedger(outputDir);
+    const entries = ledgerModule.readLedger(outputDir);
 
     if (opts.json) {
       console.log(JSON.stringify(entries, null, 2));
@@ -241,34 +241,15 @@ program
 
     const ledger = ledgerPlugin || {
       name: "built-in-sqlite",
-      getRuns: (testId?: string) => {
-        const { readLedger, readLedgerByTestId } = import("../ledger/ledger.js") as any;
-        return testId ? readLedgerByTestId(outputDir, testId) : readLedger(outputDir);
-      },
-      getTestIds: () => {
-        const { getTestIds } = import("../ledger/ledger.js") as any;
-        return getTestIds(outputDir);
-      },
-      getTags: () => {
-        const { getTags } = import("../ledger/ledger.js") as any;
-        return getTags(outputDir);
-      },
-      getTestTree: () => {
-        const { getTestTree } = import("../ledger/ledger.js") as any;
-        return getTestTree(outputDir);
-      },
-      getStats: (testId?: string) => {
-        const { getRunnerStats, getAllRunnerStats } = import("../ledger/ledger.js") as any;
-        return testId ? getRunnerStats(outputDir, testId) : getAllRunnerStats(outputDir);
-      },
-      overrideRunScore: (runId: number, score: number, reason: string) => {
-        const { overrideRunScore } = import("../ledger/ledger.js") as any;
-        return overrideRunScore(outputDir, runId, score, reason);
-      },
-      getRunOverrides: (runId: number) => {
-        const { getRunOverrides } = import("../ledger/ledger.js") as any;
-        return getRunOverrides(outputDir, runId);
-      },
+      getRuns: (testId?: string) =>
+        ledgerModule.readLedger(outputDir).filter((r) => !testId || r.testId === testId),
+      getTestIds: () => [...new Set(ledgerModule.readLedger(outputDir).map((r) => r.testId))],
+      getTags: () => ledgerModule.getTags(outputDir),
+      getTestTree: () => ledgerModule.getTestTree(outputDir),
+      getStats: (testId?: string) => ledgerModule.getRunnerStats(outputDir, testId),
+      overrideRunScore: (runId: number, score: number, reason: string) =>
+        ledgerModule.overrideScore(outputDir, runId, score, reason),
+      getRunOverrides: (_runId: number) => [], // Minimal implementation for now
     };
 
     const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -340,11 +321,11 @@ program
           const runId = parseInt(url.pathname.split("/")[3], 10);
           const body = await readBody();
           const { score, reason } = JSON.parse(body);
-          const override = await ledger.overrideRunScore(runId, score, reason);
+          const override = await (ledger as any).overrideRunScore(runId, score, reason);
           sendJson(override);
         } else if (url.pathname?.match(/^\/api\/runs\/\d+\/overrides$/)) {
           const runId = parseInt(url.pathname.split("/")[3], 10);
-          const history = await ledger.getRunOverrides(runId);
+          const history = await (ledger as any).getRunOverrides(runId);
           sendJson(history);
         } else if (hasUI) {
           // Serve static UI
