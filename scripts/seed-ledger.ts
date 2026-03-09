@@ -1,6 +1,6 @@
 /**
- * Seed script – populates .agenteval/ledger.sqlite with realistic test data.
- * Rich A/B Testing scenarios: Baseline, Skills, MCP, Versioning.
+ * Enhanced Seed script – populates .agenteval/ledger.sqlite with rich, diverse test data.
+ * Includes: Nested suites, Tags, Varied metrics, and realistic AB test scenarios.
  */
 
 import { mkdirSync, rmSync } from "node:fs";
@@ -21,7 +21,7 @@ function initDb(): InstanceType<typeof DatabaseSync> {
   try {
     rmSync(DB_PATH);
   } catch {
-    // Ignore if file doesn't exist
+    /* ignore */
   }
   const db = new DatabaseSync(DB_PATH);
   db.exec(`
@@ -69,30 +69,77 @@ function rand(min: number, max: number): number {
 function randInt(min: number, max: number): number {
   return Math.floor(rand(min, max + 1));
 }
-
-// ── A/B Variations Configuration ─────────────────────────────────────────────
-interface VariantProfile {
-  name: string;
-  scoreBoost: number;
-  speedBoost: number; // multiplier (0.8 = 20% faster)
-  tokenEfficiency: number; // multiplier (0.9 = 10% less tokens)
+function pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function pickMany<T>(arr: readonly T[], count: number): T[] {
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
 }
 
-const VARIANT_PROFILES: VariantProfile[] = [
-  { name: "baseline", scoreBoost: 0, speedBoost: 1, tokenEfficiency: 1 },
-  { name: "with skills", scoreBoost: 0.15, speedBoost: 0.85, tokenEfficiency: 0.95 },
-  { name: "with MCP", scoreBoost: 0.22, speedBoost: 0.75, tokenEfficiency: 0.8 },
-  { name: "skill-v2-optimized", scoreBoost: 0.28, speedBoost: 0.6, tokenEfficiency: 0.7 },
+// ── data definitions ─────────────────────────────────────────────────────────
+const SUITE_TEMPLATES = [
+  ["Core", "Engine"],
+  ["UI", "Components", "Buttons"],
+  ["UI", "Layouts"],
+  ["Features", "Auth", "OAuth"],
+  ["Features", "Search", "Indexing"],
+  ["Refactors", "Cleanup"],
+  ["Regression"],
 ];
 
-const TEST_IDS = [
-  "complex-refactoring-task",
-  "bug-fix-edge-case",
-  "new-feature-implementation",
-] as const;
+const TAG_OPTIONS = [
+  "high-priority",
+  "regression",
+  "perf-critical",
+  "experimental",
+  "v2-release",
+  "bug-fix",
+  "mcp-enabled",
+];
 
-const RUNNERS = ["gpt-4o", "claude-3-5-sonnet"];
+const VARIANT_PROFILES = [
+  { name: "baseline", score: [0.4, 0.6], speed: 1.0, tokens: 1.0 },
+  { name: "with-skills-v1", score: [0.6, 0.8], speed: 0.8, tokens: 0.9 },
+  { name: "with-mcp-server", score: [0.75, 0.95], speed: 0.7, tokens: 0.75 },
+  { name: "skill-v2-optimized", score: [0.85, 1.0], speed: 0.5, tokens: 0.6 },
+];
 
+const TEST_SCENARIOS = [
+  {
+    id: "login-validation-fix",
+    instruction: "Fix the regex for email validation in the login form to allow .dev domains.",
+    files: ["src/auth/validation.ts", "src/auth/validation.test.ts"],
+    criteria: "Emails ending in .dev should be accepted. Unit tests must pass.",
+  },
+  {
+    id: "button-glassmorphism",
+    instruction: "Update the primary button component to use a translucent glassmorphism style.",
+    files: ["src/components/Button.tsx", "src/components/Button.module.css"],
+    criteria:
+      "Background should have backdrop-blur and border-opacity. Contrast ratios must be kept.",
+  },
+  {
+    id: "search-indexing-speed",
+    instruction:
+      "Refactor the search indexing loop to use a more efficient data structure (Map instead of Array search).",
+    files: ["src/engine/indexer.ts"],
+    criteria: "Search complexity should drop from O(n) to O(1) for lookups.",
+  },
+  {
+    id: "mcp-database-connector",
+    instruction:
+      "Implement a new MCP tool to query the local SQLite database for schema inspection.",
+    files: ["mcp/db-server.ts", "mcp/db-server.test.ts"],
+    criteria:
+      "The tool should return a list of tables and their column definitions in JSON format.",
+  },
+];
+
+const RUNNERS = ["gpt-4o", "claude-3-5-sonnet", "deepseek-v3"];
+const JUDGE_MODELS = ["gpt-4o", "claude-3-5-sonnet-judge"];
+
+// ── main seed logic ──────────────────────────────────────────────────────────
 function seed(): void {
   const db = initDb();
   const stmt = db.prepare(`
@@ -101,77 +148,103 @@ function seed(): void {
       diff, changed_files, commands, task_results,
       agent_token_usage, timing, agent_output, logs,
       judge_model, score, pass, status, reason, improvement,
-      judge_token_usage, criteria, expected_files,
+      tags, judge_token_usage, criteria, expected_files,
       warn_threshold, fail_threshold, duration_ms,
       variant_name, base_prompt
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
+  let totalEntries = 0;
 
-  for (const testId of TEST_IDS) {
+  for (const scenario of TEST_SCENARIOS) {
+    const suite = pick(SUITE_TEMPLATES);
+    const baseTags = pickMany(TAG_OPTIONS, randInt(1, 3));
+
     for (const runner of RUNNERS) {
       for (const profile of VARIANT_PROFILES) {
-        // Generate 3 runs per variant to have a good average
-        for (let i = 0; i < 3; i++) {
-          const ts = new Date(now - randInt(0, 7 * 24 * 60 * 60 * 1000));
+        // 5 runs per variant to show consistent averages and some variance
+        for (let i = 0; i < 5; i++) {
+          const ts = new Date(now - randInt(0, 30 * 24 * 60 * 60 * 1000));
 
-          // Base stats for the runner
-          let score = rand(0.5, 0.7) + profile.scoreBoost;
-          score = Math.min(1, Math.max(0, score));
+          // Calculate varied performance based on profile
+          const baseScore = rand(profile.score[0], profile.score[1]);
+          const noise = rand(-0.05, 0.05);
+          const score = Math.min(1, Math.max(0, baseScore + noise));
 
-          const durationMs = randInt(20000, 45000) * profile.speedBoost;
-          const tokens = randInt(2000, 5000) * profile.tokenEfficiency;
+          const durationBase = randInt(15000, 60000);
+          const durationMs = durationBase * profile.speed;
+
+          const tokensBase = randInt(1000, 8000);
+          const tokens = tokensBase * profile.tokens;
 
           const status = score >= 0.8 ? "PASS" : score >= 0.5 ? "WARN" : "FAIL";
-          const pass = status !== "FAIL" ? 1 : 0;
+
+          // Realistic diff mockup
+          const diff = `diff --git a/${scenario.files[0]} b/${scenario.files[0]}
+index 1234567..abcdefg 100644
+--- a/${scenario.files[0]}
++++ b/${scenario.files[0]}
+@@ -10,5 +10,5 @@
+- const oldLogic = true;
++ const newLogic = ${profile.name.includes("v2") ? "true /* optimized */" : "true"};
+`;
 
           stmt.run(
-            testId,
-            JSON.stringify(["AB Tests"]),
+            scenario.id,
+            JSON.stringify(suite),
             ts.toISOString(),
             runner,
-            `Instruction for ${testId}`,
-            "diff content",
-            JSON.stringify(["src/main.ts"]),
-            "[]",
-            "[]",
+            scenario.instruction,
+            diff,
+            JSON.stringify(scenario.files),
+            "[]", // commands
+            "[]", // task_results
             JSON.stringify({
-              inputTokens: tokens * 0.6,
-              outputTokens: tokens * 0.4,
-              totalTokens: tokens,
+              inputTokens: Math.floor(tokens * 0.7),
+              outputTokens: Math.floor(tokens * 0.3),
+              totalTokens: Math.floor(tokens),
             }),
             JSON.stringify({
               totalMs: durationMs,
-              agentMs: durationMs * 0.8,
-              judgeMs: durationMs * 0.15,
+              agentMs: durationMs * 0.85,
+              judgeMs: durationMs * 0.1,
             }),
-            null,
-            "",
-            "gpt-4o",
+            "Agent executed successfully.",
+            "Full execution logs...",
+            pick(JUDGE_MODELS),
             Math.round(score * 100) / 100,
-            pass,
+            status === "FAIL" ? 0 : 1,
             status,
-            `Reasoning for ${profile.name}`,
-            `Improvement for ${profile.name}`,
-            JSON.stringify({ totalTokens: 1200 }),
-            "Criteria text",
-            "[]",
+            `The agent used the ${profile.name} strategy. Evaluation shows good adherence to criteria with minor optimizations needed.`,
+            `To reach a perfect score, consider ${pick(["better error handling", "more unit tests", "cleaner code structure"])}.`,
+            JSON.stringify([...baseTags, profile.name]),
+            JSON.stringify({ totalTokens: 1500 }),
+            scenario.criteria,
+            JSON.stringify(scenario.files),
             0.8,
             0.5,
             Math.round(durationMs),
             profile.name,
-            "Base prompt text",
+            scenario.instruction,
           );
+          totalEntries++;
         }
       }
     }
   }
 
   db.close();
-  console.log("\n🌱 Rich A/B scenarios seeded!");
-  console.log("   Variants: baseline, with skills, with MCP, skill-v2-optimized\n");
+  console.log(`\n🌱  Rich Database Seeded!`);
+  console.log(`    Total Runs:  ${totalEntries}`);
+  console.log(`    Suites:      ${SUITE_PATHS_COUNT(TEST_SCENARIOS.length)} nested structures`);
+  console.log(`    Variants:    Baseline, Skills, MCP, Optimized v2`);
+  console.log(`    Tags:        Diverse technical metadata\n`);
+}
+
+function SUITE_PATHS_COUNT(n: number) {
+  return n;
 }
 
 seed();

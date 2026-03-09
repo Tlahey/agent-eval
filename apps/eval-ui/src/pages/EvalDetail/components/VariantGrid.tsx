@@ -72,7 +72,7 @@ export function VariantGrid({ stats, compareA, compareB, onCompare }: Props) {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory no-scrollbar"
+        className="flex overflow-x-auto gap-4 pt-4 pb-4 snap-x snap-mandatory no-scrollbar"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {stats.map((v) => {
