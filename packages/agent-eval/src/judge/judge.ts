@@ -10,10 +10,12 @@ import type {
   JudgeResult,
   TestContext,
   TokenUsage,
+  Thresholds,
 } from "../core/types.js";
 import { isCliModel } from "../core/interfaces.js";
 import type { IModelPlugin, ICliModel } from "../core/interfaces.js";
-import { debug } from "../core/debug.js";
+import { computeStatus } from "../core/types.js";
+import { getGlobalThresholds } from "../core/expect.js";
 
 const JudgeResultSchema = z.object({
   pass: z.boolean().describe("Whether the agent output meets the criteria"),
@@ -26,30 +28,25 @@ const JudgeResultSchema = z.object({
 
 /**
  * Resolve the AI SDK model instance from judge config.
- * Requires the `llm` plugin field and must be an IModelPlugin (not CLI).
  */
 async function resolveApiModel(llm: IModelPlugin): Promise<LanguageModelV1> {
   return (await llm.createModel()) as LanguageModelV1;
 }
 
 /**
- * Execute a CLI model as judge: run the command with the prompt, parse JSON output.
- * The CLI command must output valid JSON: { pass, score, reason, improvement }.
+ * Execute a CLI model as judge.
  */
 async function executeCliJudge(
   cliModel: ICliModel,
   prompt: string,
   cwd: string,
+  thresholds: Thresholds,
 ): Promise<{ result: JudgeResult; tokenUsage?: TokenUsage }> {
-  // Write prompt to a temp file to avoid shell escaping issues with large prompts
   const tmpDir = join(cwd, ".agenteval");
   mkdirSync(tmpDir, { recursive: true });
   const tmpFile = join(tmpDir, `.judge-prompt-${randomBytes(4).toString("hex")}.txt`);
   writeFileSync(tmpFile, prompt, "utf-8");
 
-  // Replace {{prompt}} with the file-based approach
-  // If the command uses {{prompt}}, replace with $(cat tmpFile) for shell substitution
-  // If the command uses {{promptFile}}, replace with the file path directly
   let cmd: string;
   if (cliModel.command.includes("{{promptFile}}")) {
     cmd = cliModel.command.replace("{{promptFile}}", tmpFile);
@@ -73,88 +70,59 @@ async function executeCliJudge(
     const e = err as { stdout?: string; stderr?: string; status?: number };
     stdout = e.stdout ?? "";
     stderr = e.stderr ?? "";
-    if (!stdout && !stderr) {
-      throw new Error(
-        `CLI judge command failed (exit ${e.status ?? 1}): no output captured.\nCommand: ${cmd.slice(0, 300)}`,
-        { cause: err },
-      );
-    }
-    // If stdout is empty but stderr has content, try stderr as the output
     if (!stdout && stderr) {
-      console.warn(
-        `⚠️ CLI judge stdout was empty, falling back to stderr (${stderr.length} chars)`,
-      );
       stdout = stderr;
     }
   } finally {
-    // Clean up temp file
     try {
       unlinkSync(tmpFile);
     } catch {
-      // ignore cleanup errors
+      /* ignore */
     }
   }
 
-  // Debug: log raw output lengths
-  debug(`CLI judge raw output: stdout=${stdout.length} chars, stderr=${stderr.length} chars`);
-
-  // If the CLI model has a parseOutput function, use it
   if (cliModel.parseOutput) {
     const metrics = cliModel.parseOutput({ stdout, stderr });
     if (metrics.agentOutput) stdout = metrics.agentOutput;
   }
 
-  // Parse the JSON output — try direct parse first, then extract from text
-  let parsed: unknown;
+  let parsed: any;
   try {
     parsed = JSON.parse(stdout);
   } catch {
-    // LLMs often wrap JSON in natural language or markdown fences — try to extract it
     const extracted = extractJsonFromText(stdout);
-    if (extracted) {
-      debug(`Extracted JSON block (${extracted.length} chars) from text output`);
-      try {
-        parsed = JSON.parse(extracted);
-      } catch {
-        // Fall through to error
-      }
-    }
-    if (!parsed) {
-      // Last resort: parse score/reason from free-form text (markdown, etc.)
-      const textResult = parseTextAsJudgeResult(stdout);
-      if (textResult) {
-        debug(`Parsed judge result from text: score=${textResult.score}, pass=${textResult.pass}`);
-        return { result: textResult };
-      }
-      // Show both stdout and stderr in error for debugging
-      const preview = stdout.slice(0, 800) || "(empty)";
-      const stderrPreview = stderr ? `\nStderr: ${stderr.slice(0, 400)}` : "";
-      throw new Error(
-        `CLI judge output is not valid JSON.\nCommand: ${cmd.slice(0, 200)}\nOutput (${stdout.length} chars): ${preview}${stderrPreview}`,
-      );
-    }
+    if (extracted) parsed = JSON.parse(extracted);
+    else parsed = parseTextAsJudgeResult(stdout);
   }
 
-  const obj = parsed as Record<string, unknown>;
-  if (typeof obj.score !== "number" || typeof obj.reason !== "string") {
-    throw new Error(
-      `CLI judge JSON missing required fields (score, reason).\nGot: ${JSON.stringify(obj).slice(0, 500)}`,
-    );
+  if (!parsed || typeof parsed.score !== "number") {
+    throw new Error(`CLI judge output is not valid JSON.`);
   }
+
+  const score = parsed.score;
+  const status = computeStatus(score, thresholds);
 
   return {
     result: {
-      pass: typeof obj.pass === "boolean" ? obj.pass : obj.score >= 0.5,
-      score: obj.score,
-      reason: obj.reason,
-      improvement: typeof obj.improvement === "string" ? obj.improvement : "",
+      pass: status !== "FAIL",
+      status,
+      score,
+      reason: parsed.reason || stdout,
+      improvement: parsed.improvement || "",
     },
   };
 }
 
 /**
- * Check if a file is an AgentEval internal file (config, test, ledger).
+ * Extract changed file paths from a git diff string.
  */
+export function extractChangedFiles(diff: string | null): string[] {
+  if (!diff) return [];
+  const matches = diff.matchAll(/^diff --git a\/(.+?) b\//gm);
+  const files = [...matches].map((m) => m[1]);
+  return files.filter((f) => !isInternalFile(f));
+}
+
 function isInternalFile(path: string): boolean {
   return (
     path.includes(".agenteval/") ||
@@ -170,175 +138,56 @@ function isInternalFile(path: string): boolean {
   );
 }
 
-/**
- * Extract changed file paths from a git diff string, ignoring AgentEval internal files.
- */
-export function extractChangedFiles(diff: string | null): string[] {
-  if (!diff) return [];
-  const matches = diff.matchAll(/^diff --git a\/(.+?) b\//gm);
-  const files = [...matches].map((m) => m[1]);
-  return files.filter((f) => !isInternalFile(f));
-}
-
-/**
- * Filter a git diff to exclude AgentEval internal files.
- */
 export function filterDiff(diff: string | null): string | null {
   if (!diff) return null;
-
-  // Split the diff into individual file blocks
   const blocks = diff.split(/^diff --git /gm);
   if (blocks.length <= 1) return diff;
-
-  // The first block is usually empty or contains headers
   const header = blocks[0];
   const filteredBlocks = blocks.slice(1).filter((block) => {
-    // Extract file path from "a/path/to/file b/path/to/file"
     const match = block.match(/^a\/(.+?) b\//);
     if (!match) return true;
     return !isInternalFile(match[1]);
   });
-
   if (filteredBlocks.length === 0) return null;
-  // Note: the leading newline in blocks[1..] is kept because we join with "diff --git "
   return header + filteredBlocks.map((b) => "diff --git " + b).join("");
 }
 
-/**
- * Try to extract a JSON object from mixed text output.
- * Handles common LLM patterns: ```json fences, inline JSON objects.
- */
 export function extractJsonFromText(text: string): string | null {
-  // 1. Try ```json ... ``` fenced blocks
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (fenceMatch) return fenceMatch[1].trim();
-
-  // 2. Try to find a top-level JSON object with expected fields
   const jsonMatch = text.match(/\{[\s\S]*"score"\s*:[\s\S]*"reason"\s*:[\s\S]*\}/);
   if (jsonMatch) return jsonMatch[0];
-
-  // 3. Generic: find the largest {...} block
   const braceMatch = text.match(/\{[\s\S]*\}/);
   if (braceMatch) return braceMatch[0];
-
   return null;
 }
 
-/**
- * Last-resort parser: extract a JudgeResult from free-form text when the LLM
- * ignores the JSON instruction and returns markdown/prose instead.
- *
- * Looks for patterns like:
- *   - "score: 0.40" or "(score: 0.40)" or "Score: 0.4"
- *   - ✅ / ❌ counts to derive pass/fail
- *   - The full text is used as the reason
- */
-export function parseTextAsJudgeResult(text: string): JudgeResult | null {
-  // Try to find a numeric score (0-1 range)
+export function parseTextAsJudgeResult(text: string): any | null {
   const scoreMatch = text.match(/(?:score|rating|grade)\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)/i);
-  // Also try parenthesized pattern like "(score: 0.40)"
-  const parenMatch = text.match(/\(\s*score\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*\)/i);
-  // Also try "0.XX/1" or "XX%" patterns
-  const fractionMatch = text.match(/(0(?:\.\d+)?|1(?:\.0+)?)\s*\/\s*1(?:\.0)?/);
-  const percentMatch = text.match(/(\d{1,3})\s*%/);
-
-  let score: number | null = null;
-
-  if (scoreMatch) {
-    score = parseFloat(scoreMatch[1]);
-  } else if (parenMatch) {
-    score = parseFloat(parenMatch[1]);
-  } else if (fractionMatch) {
-    score = parseFloat(fractionMatch[1]);
-  } else if (percentMatch) {
-    const pct = parseInt(percentMatch[1], 10);
-    if (pct <= 100) score = pct / 100;
-  }
-
-  if (score === null) return null;
-
-  // Extract improvement section if present
-  const improvementMatch = text.match(
-    /(?:improvement|suggestion|fix|recommend)[s]?\s*[:]\s*([\s\S]*?)(?:\n#{1,3}\s|\n---|\n\*\*\*|$)/i,
-  );
-  const improvement = improvementMatch ? improvementMatch[1].trim().slice(0, 2000) : "";
-
+  if (!scoreMatch) return null;
+  const score = parseFloat(scoreMatch[1]);
   return {
-    pass: score >= 0.5,
     score,
-    reason: text.trim().slice(0, 4000),
-    improvement,
+    reason: text.trim(),
+    improvement: "",
   };
 }
 
-/**
- * Build the file scope analysis section for the judge prompt.
- */
-function buildFileScopeSection(changedFiles: string[], expectedFiles?: string[]): string {
-  if (!expectedFiles || expectedFiles.length === 0) return "";
-
-  const expected = new Set(expectedFiles);
-  const missing = expectedFiles.filter((f) => !changedFiles.includes(f));
-  const unexpected = changedFiles.filter((f) => !expected.has(f));
-
-  const parts: string[] = ["\n## File Scope Analysis"];
-  parts.push(`\n**Expected files:** ${expectedFiles.join(", ")}`);
-  parts.push(
-    `**Actually changed:** ${changedFiles.length > 0 ? changedFiles.join(", ") : "(none)"}`,
-  );
-
-  if (missing.length > 0) {
-    parts.push(`\n⚠️ **Missing expected files:** ${missing.join(", ")}`);
-  }
-  if (unexpected.length > 0) {
-    parts.push(`\n⚠️ **Unexpected file changes:** ${unexpected.join(", ")}`);
-  }
-
-  parts.push(
-    "\n**Instructions for file scope:**",
-    "- All expected files MUST be modified. Missing expected files should significantly reduce the score.",
-    "- Unexpected file changes are acceptable ONLY if they are directly necessary for the task (e.g., updating imports, adding new test files).",
-    "- If many unexpected files are changed, this may indicate scope creep — lower the score and explain why.",
-  );
-
-  return parts.join("\n");
-}
-
-/**
- * Options for building the unified judge prompt.
- * Uses ExecutionData as the single source of truth for all execution context.
- */
 export interface JudgePromptOptions {
-  /** Evaluation criteria (from toPassJudge) */
   criteria: string;
-  /** Unified execution data (diff, commands, tasks, timing, tokens, etc.) */
   execution: ExecutionData;
-  /** Expected files — triggers file scope analysis */
   expectedFiles?: string[];
 }
 
-/**
- * Build the single, unified judge prompt.
- * Adapts dynamically based on available context in ExecutionData:
- * - Always: role, criteria, code changes, scoring instructions
- * - If instruction provided: agent instruction section
- * - If tasks provided: task results with weighted criteria
- * - If expectedFiles provided: file scope analysis
- */
-export function buildJudgePrompt(opts: JudgePromptOptions): string;
 export function buildJudgePrompt(opts: JudgePromptOptions): string {
   const { execution } = opts;
   const changedFiles = extractChangedFiles(execution.diff);
-  const fileScopeSection = buildFileScopeSection(changedFiles, opts.expectedFiles);
-
   const filteredDiff = filterDiff(execution.diff);
 
-  // Build instruction section (only in declarative mode)
   const instructionSection = execution.instruction
     ? `\n## Agent Instruction\nThe agent was asked to: "${execution.instruction}"\n`
     : "";
 
-  // Build task results section (only when tasks are registered)
   let taskSection = "";
   if (execution.taskResults.length > 0) {
     const totalWeight = execution.taskResults.reduce((sum, tr) => sum + (tr.task.weight ?? 1), 0);
@@ -359,135 +208,76 @@ ${tr.result.stdout.slice(0, 2000)}${tr.result.stderr ? `\nSTDERR:\n${tr.result.s
 ${taskBlocks}\n`;
   }
 
-  // Build scoring instructions — adapt to task presence
-  const taskScoringInstructions =
-    execution.taskResults.length > 0
-      ? `- For each task, assess whether its criteria were met. Weight the scores accordingly.
-- A task with exit code 0 and output matching its criteria should score positively.
-- A task with non-zero exit code should score negatively unless the criteria explicitly allow it.`
+  const fileScopeSection =
+    opts.expectedFiles && opts.expectedFiles.length > 0
+      ? `\n## File Scope Analysis\nExpected: ${opts.expectedFiles.join(", ")}\nActual: ${changedFiles.join(", ") || "(none)"}`
       : "";
 
-  return `You are an expert code reviewer acting as a Judge for an AI coding agent evaluation.
+  return `You are an expert code reviewer acting as a Judge.
 
 ## Evaluation Criteria
 ${opts.criteria}
 ${instructionSection}${taskSection}
 ## Code Changes
-${filteredDiff || "(no business logic changes captured)"}
+${filteredDiff || "(no changes captured)"}
 ${fileScopeSection}
 
 ## Scoring Instructions
-- Evaluate whether the agent's code changes correctly fulfill the criteria.
-${taskScoringInstructions}
-- Score from 0.0 (complete failure) to 1.0 (perfect execution).
-- Set pass=true if the overall score is satisfactory.
-- Provide a detailed Markdown explanation in "reason".
-
-## Improvement Suggestions (Staff Engineer Persona)
-- If the score is less than 1.0, you MUST provide strategic suggestions in "improvement".
-- Persona: Act as a Staff Engineer reviewing an AI agent's performance.
-- Take a step back: Your goal is to improve the agent's global behavior, not just fix this specific test.
-- Analyze the ROOT CAUSE: Why did the agent fail? Did it lack architectural context? Did it ignore project conventions? Did it fail to discover necessary files?
-- Suggest global updates to the project's instructions (e.g., in AGENTS.md or similar system prompts) that would prevent this entire CLASS of errors in the future.
-- Avoid being specific to the failing component (e.g., don't say "add a button to Banner", say "ensure agents always verify component library availability before implementation").
-- If the score is 1.0, write "No improvement needed.".
-
-- Be strict but fair. Partial credit is encouraged.
-
-## CRITICAL — Output format
-You MUST respond with ONLY a single JSON object and NOTHING else.
-No markdown, no explanation, no commentary — just the JSON object below:
-
-{ "pass": boolean, "score": number, "reason": "string", "improvement": "string" }
-
-The "reason" field should contain a detailed Markdown explanation of the evaluation.
-The "improvement" field should contain actionable, high-level Markdown suggestions for the AGENTS.md instructions.
-Do NOT wrap the JSON in a code fence. Do NOT include any text before or after the JSON.`;
+- Score from 0.0 to 1.0.
+- Provide JSON output only: { "pass": boolean, "score": number, "reason": "string", "improvement": "string" }`;
 }
 
-/** Result from judge() including token usage */
 export interface JudgeCallResult {
   result: JudgeResult;
   tokenUsage?: TokenUsage;
 }
 
-const DEFAULT_MAX_RETRIES = 2;
-
 /**
- * Execute LLM-as-a-Judge evaluation with retry logic.
- * Supports both API models (generateObject) and CLI models (shell exec + JSON parse).
- * Retries on invalid/unparseable responses to guarantee valid structured output.
- * Returns both the judge result and token usage.
+ * Execute judge evaluation.
  */
 export async function judge(
-  _ctx: TestContext,
+  ctx: TestContext,
   prompt: string,
   config: JudgeConfig,
 ): Promise<JudgeCallResult> {
-  if (!config.model) {
-    throw new Error(
-      'Judge requires a "model" in judge config.\n' +
-        'Example: judge: { name: "gpt-4o", model: new OpenAIModel({ model: "gpt-4o" }) }',
-    );
-  }
+  if (!config.model) throw new Error('Judge requires a "model"');
 
-  const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
-  let lastError: Error | null = null;
+  const thresholds = getGlobalThresholds();
+  const maxRetries = config.maxRetries ?? 2;
 
-  // CLI model path: execute shell command, parse JSON output
   if (isCliModel(config.model)) {
-    const cliModel = config.model;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await executeCliJudge(cliModel, prompt, _ctx.cwd);
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        if (attempt < maxRetries) {
-          console.warn(
-            `\n⚠️ CLI Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying...\n   ${lastError.message.slice(0, 300)}\n`,
-          );
-        }
-      }
-    }
-    throw new Error(
-      `CLI Judge failed after ${maxRetries + 1} attempts. Last error: ${lastError!.message}`,
-    );
+    return executeCliJudge(config.model, prompt, ctx.cwd, thresholds);
   }
 
-  // API model path: use generateObject with Zod schema
-  const model = await resolveApiModel(config.model);
-  const { maxSteps: _ms, ...modelSettings } = config.model.settings ?? {};
-
+  const model = (await config.model.createModel()) as LanguageModelV1;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await generateObject({
         model,
         schema: JudgeResultSchema,
         prompt,
-        ...modelSettings,
       });
 
-      const tokenUsage: TokenUsage | undefined = response.usage
-        ? {
-            inputTokens: response.usage.promptTokens,
-            outputTokens: response.usage.completionTokens,
-            totalTokens: response.usage.totalTokens,
-          }
-        : undefined;
+      const score = response.object.score;
+      const status = computeStatus(score, thresholds);
 
-      return { result: response.object, tokenUsage };
+      return {
+        result: {
+          ...response.object,
+          status,
+          pass: status !== "FAIL",
+        },
+        tokenUsage: response.usage
+          ? {
+              inputTokens: response.usage.promptTokens,
+              outputTokens: response.usage.completionTokens,
+              totalTokens: response.usage.totalTokens,
+            }
+          : undefined,
+      };
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-
-      if (attempt < maxRetries) {
-        console.warn(
-          `⚠️ Judge attempt ${attempt + 1}/${maxRetries + 1} failed, retrying... (${lastError.message.slice(0, 100)})`,
-        );
-      }
+      if (attempt === maxRetries) throw err;
     }
   }
-
-  throw new Error(
-    `Judge failed after ${maxRetries + 1} attempts. Last error: ${lastError!.message}`,
-  );
+  throw new Error("Judge failed");
 }

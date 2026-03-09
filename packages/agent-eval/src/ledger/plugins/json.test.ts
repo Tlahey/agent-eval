@@ -102,7 +102,6 @@ describe("JsonLedger", () => {
     const override = ledger.overrideRunScore(1, 0.9, "Manual correction");
     expect(override.score).toBe(0.9);
     expect(override.reason).toBe("Manual correction");
-    expect(override.pass).toBe(true);
 
     const overrides = ledger.getRunOverrides(1);
     expect(overrides).toHaveLength(1);

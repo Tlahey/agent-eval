@@ -17,7 +17,7 @@ import { AnthropicModel, CliModel } from "@tlahey/agent-eval/llm";
  *   agenteval run --config evals/cli-copilot/agenteval.config.ts
  */
 export default defineConfig({
-  rootDir: "../..",
+  rootDir: ".",
 
   runners: [
     {
@@ -49,7 +49,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/cli-copilot/**/*.eval.ts",
+  testFiles: "evals/cli-copilot/banner.eval.ts",
   outputDir: ".agenteval",
   timeout: 120_000,
 });

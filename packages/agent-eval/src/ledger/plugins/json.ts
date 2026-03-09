@@ -7,8 +7,7 @@
 
 import { mkdirSync, readFileSync, appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { LedgerEntry, ScoreOverride, Thresholds } from "../../core/types.js";
-import { computeStatus, DEFAULT_THRESHOLDS } from "../../core/types.js";
+import type { LedgerEntry, ScoreOverride } from "../../core/types.js";
 import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../../core/interfaces.js";
 
 export interface JsonLedgerOptions {
@@ -125,7 +124,7 @@ export class JsonLedger implements ILedgerPlugin {
       const bucket = byRunner.get(key)!;
 
       const effectiveScore = run.override ? run.override.score : run.score;
-      const effectivePass = run.override ? run.override.pass : run.pass;
+      const effectivePass = run.pass; // ScoreOverride doesn't store pass anymore, it's computed
       bucket.scores.push(effectiveScore);
       if (effectivePass) bucket.passes++;
     }
@@ -148,15 +147,10 @@ export class JsonLedger implements ILedgerPlugin {
     const index = runs.findIndex((r) => r.id === runId);
     if (index === -1) throw new Error(`Run #${runId} not found`);
 
-    const run = runs[index];
-    const thresholds: Thresholds = run.thresholds ?? DEFAULT_THRESHOLDS;
-    const status = computeStatus(score, thresholds);
     const timestamp = new Date().toISOString();
 
     const override: ScoreOverride = {
       score,
-      pass: status !== "FAIL",
-      status,
       reason: reason.trim(),
       timestamp,
     };

@@ -196,45 +196,24 @@ export async function runTest(
     appendLedgerEntry(outputDir, entry);
   };
 
-  const results: RunResult[] = [];
+  const runSingle = async (variant: TestVariant) => {
+    const runner = config.runners.find((r) => r.id === variant.runner);
+    if (!runner)
+      throw new Error(`Runner "${variant.runner}" not found for variant "${variant.name}"`);
+    const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd, variant);
+    await record(entry);
+    return { testId: testDef.title, runner: runner.id, entries: [entry], passed: entry.pass };
+  };
 
-  // --- Experiment Mode ---
-  if (testDef.variants && testDef.variants.length > 0) {
+  if (env.supportsConcurrency) {
+    return Promise.all(testDef.variants.map(runSingle));
+  } else {
+    const results: RunResult[] = [];
     for (const variant of testDef.variants) {
-      const runner = config.runners.find((r) => r.id === variant.runnerId);
-      if (!runner)
-        throw new Error(`Runner "${variant.runnerId}" not found for variant "${variant.id}"`);
-
-      const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd, variant);
-      await record(entry);
-      results.push({
-        testId: testDef.title,
-        runner: runner.id,
-        entries: [entry],
-        passed: entry.pass,
-      });
+      results.push(await runSingle(variant));
     }
     return results;
   }
-
-  // --- Standard Mode (Matrix or Default) ---
-  const runnerIds =
-    config.matrix?.runners ||
-    (config.defaultRunner ? [config.defaultRunner] : config.runners.map((r) => r.id));
-  const runners = config.runners.filter((r) => runnerIds.includes(r.id));
-
-  for (const runner of runners) {
-    const entry = await runSingleIteration(testDef, runner, config, rep, env, cwd);
-    await record(entry);
-    results.push({
-      testId: testDef.title,
-      runner: runner.id,
-      entries: [entry],
-      passed: entry.pass,
-    });
-  }
-
-  return results;
 }
 
 async function runSingleIteration(
@@ -244,7 +223,7 @@ async function runSingleIteration(
   rep: Reporter,
   env: IEnvironmentPlugin,
   cwd: string,
-  variant?: TestVariant,
+  variant: TestVariant,
 ): Promise<LedgerEntry> {
   clearLastJudgeOptions();
 
@@ -252,73 +231,74 @@ async function runSingleIteration(
     testId: testDef.title,
     runner: runner.id,
     suitePath: testDef.suitePath,
-    variantId: variant?.id,
-    variantName: variant?.name,
+    variantName: variant.name,
   };
   rep.onTestStart(event);
 
   const setupStart = Date.now();
   rep.onPipelineStep(event, "setup", "running");
-  await env.setup(cwd);
+
+  let workingDir = cwd;
+  let cleanupRun: (() => Promise<void>) | undefined;
+
+  if (env.prepareRun) {
+    const prepared = await env.prepareRun(cwd, `${testDef.title}-${variant.name}`);
+    workingDir = prepared.workingDir;
+    cleanupRun = prepared.cleanup;
+  } else {
+    await env.setup(cwd);
+  }
+
   rep.onPipelineStep(event, "setup", "done");
   const setupMs = Date.now() - setupStart;
 
-  const ctx = new EvalContext(cwd, env);
+  const ctx = new EvalContext(workingDir, env);
   ctx.setRunnerInfo({ id: runner.id, model: getRunnerModelId(runner) });
   const start = Date.now();
-  const thresholds = config.thresholds ?? DEFAULT_THRESHOLDS;
 
   const agent: AgentHandle = {
     id: runner.id,
     model: getRunnerModelId(runner),
-    variant: variant
-      ? { id: variant.id, name: variant.name, metadata: variant.metadata }
-      : undefined,
+    variant: { name: variant.name, metadata: variant.metadata },
     run: async () => {
-      throw new Error("agent.run() is removed. Use ctx.prompt() instead.");
+      throw new Error("agent.run() removed. Use ctx.prompt().");
     },
     instruct: () => {
-      throw new Error("agent.instruct() is removed. Use ctx.prompt() instead.");
+      throw new Error("agent.instruct() removed. Use ctx.prompt().");
     },
   };
 
   try {
-    // 1. Run Hooks
     const beforeEachHooks = getMatchingHooks(getRegisteredBeforeEachHooks(), testDef.suitePath);
     if (config.beforeEach) await config.beforeEach({ ctx });
     for (const hook of beforeEachHooks) await hook.fn({ ctx });
 
-    // 2. Call Test Fn (registers prompt, tasks and judge options)
     await testDef.fn({ agent, ctx, judge: config.judge, variant });
 
-    // 3. Execute Mission
     if (!ctx.instruction) {
       throw new Error(
         `Test "${testDef.title}" did not define a mission. Call ctx.prompt() in the test logic.`,
       );
     }
 
-    const finalPrompt = variant?.enrichPrompt
+    const finalPrompt = variant.enrichPrompt
       ? variant.enrichPrompt.replace("{{prompt}}", ctx.instruction)
       : ctx.instruction;
 
-    // If variant has prompt enrichment, update the captured instruction
-    if (variant?.enrichPrompt) {
+    if (variant.enrichPrompt) {
       ctx.setInstruction(finalPrompt);
     }
 
     const agentStart = Date.now();
     rep.onPipelineStep(event, "agent", "running");
-    await executeAgent(runner, finalPrompt, cwd, env, ctx, rep, testDef.title);
+    await executeAgent(runner, finalPrompt, workingDir, env, ctx, rep, testDef.title);
     rep.onPipelineStep(event, "agent", "done");
     const agentMs = Date.now() - agentStart;
 
-    // 4. Capture Diff
     rep.onPipelineStep(event, "diff", "running");
     await ctx.storeDiffAsync();
     rep.onPipelineStep(event, "diff", "done");
 
-    // 5. Execute Tasks
     const tasksStart = Date.now();
     const taskResults: TaskResult[] = [];
     for (const task of ctx.tasks) {
@@ -339,7 +319,6 @@ async function runSingleIteration(
     }
     const tasksMs = taskResults.length > 0 ? Date.now() - tasksStart : undefined;
 
-    // 6. Judge
     const judgeOptions = getLastJudgeOptions();
     if (!judgeOptions) throw new Error("Test completed without expect(ctx).toPassJudge()");
 
@@ -359,16 +338,16 @@ async function runSingleIteration(
     );
     rep.onPipelineStep(event, "judge", "done");
 
-    const status = computeStatus(judgeResult.score, judgeOptions.thresholds ?? thresholds);
+    const thresholds = judgeOptions.thresholds ?? config.thresholds ?? DEFAULT_THRESHOLDS;
+    const status = computeStatus(judgeResult.score, thresholds);
 
     const entry: LedgerEntry = {
       testId: testDef.title,
       suitePath: testDef.suitePath ?? [],
       timestamp: new Date().toISOString(),
       agentRunner: runner.id,
-      variantId: variant?.id,
-      variantName: variant?.name,
-      basePrompt: ctx.instruction, // The original prompt before enrichment
+      variantName: variant.name,
+      basePrompt: ctx.instruction,
       instruction: finalPrompt,
       diff: ctx.diff,
       changedFiles: executionData.changedFiles,
@@ -390,27 +369,43 @@ async function runSingleIteration(
       judgeTokenUsage,
       criteria: judgeOptions.criteria,
       expectedFiles: judgeOptions.expectedFiles,
-      thresholds: judgeOptions.thresholds ?? thresholds,
+      thresholds,
       durationMs: Date.now() - start,
     };
 
-    if (entry.status === "PASS") rep.onTestPass({ ...event, entry, durationMs: entry.durationMs });
-    else if (entry.status === "WARN")
-      rep.onTestWarn({ ...event, entry, durationMs: entry.durationMs });
-    else rep.onTestFail({ ...event, entry, durationMs: entry.durationMs });
+    const rEvent = { ...event, entry, durationMs: entry.durationMs };
+    if (entry.status === "PASS") rep.onTestPass(rEvent);
+    else if (entry.status === "WARN") rep.onTestWarn(rEvent);
+    else rep.onTestFail(rEvent);
 
     return entry;
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     rep.onTestError(event, errorMsg);
-    return { testId: testDef.title, status: "FAIL", reason: errorMsg } as any;
+    return {
+      testId: testDef.title,
+      status: "FAIL",
+      reason: errorMsg,
+      thresholds: config.thresholds ?? DEFAULT_THRESHOLDS,
+      durationMs: 0,
+      timestamp: new Date().toISOString(),
+      agentRunner: runner.id,
+      pass: false,
+      score: 0,
+      judgeModel: "error",
+      improvement: "",
+      logs: "",
+      criteria: "",
+      suitePath: testDef.suitePath ?? [],
+    } as any;
   } finally {
-    if (env.teardown) await env.teardown(cwd);
+    if (cleanupRun) await cleanupRun();
+    else if (env.teardownRun) await env.teardownRun(cwd, workingDir);
   }
 }
 
 // Global store helpers
-const STORE_KEY = Symbol.for("__agenteval_judge_store__");
+const STORE_KEY = "__agenteval_judge_store__";
 function getStore() {
   const g = globalThis as any;
   if (!g[STORE_KEY]) g[STORE_KEY] = { lastOptions: null, reporter: null, currentEvent: null };

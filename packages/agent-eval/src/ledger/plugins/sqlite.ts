@@ -1,25 +1,17 @@
 /**
- * SQLite Ledger Plugin — wraps the existing ledger.ts functions
- * behind the ILedgerPlugin interface.
- *
- * This is the default ledger plugin when the user doesn't provide one.
+ * SQLite Ledger Plugin wrapper.
  */
 
-import type { LedgerEntry, ScoreOverride } from "../../core/types.js";
-import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../../core/interfaces.js";
 import {
   appendLedgerEntry,
   readLedger,
-  readLedgerByTestId,
-  getTestIds as _getTestIds,
-  getTags as _getTags,
-  getTestTree as _getTestTree,
-  getLatestEntries as _getLatestEntries,
-  getRunnerStats as _getRunnerStats,
-  getAllRunnerStats,
-  overrideRunScore as _overrideRunScore,
-  getRunOverrides as _getRunOverrides,
+  getRunnerStats,
+  getTestTree,
+  getTags,
+  overrideScore,
 } from "../ledger.js";
+import type { LedgerEntry, ScoreOverride } from "../../core/types.js";
+import type { ILedgerPlugin, RunnerStats, TestTreeNode } from "../../core/interfaces.js";
 
 export interface SqliteLedgerOptions {
   /** Directory where ledger.sqlite is stored (defaults to ".agenteval") */
@@ -35,8 +27,7 @@ export class SqliteLedger implements ILedgerPlugin {
   }
 
   initialize(): void {
-    // The underlying openDb() in ledger.ts auto-creates the DB and schema on first call.
-    // No explicit init needed — schema is lazily created per operation.
+    // Schema is handled in openDb called by individual methods
   }
 
   recordRun(entry: LedgerEntry): void {
@@ -44,39 +35,49 @@ export class SqliteLedger implements ILedgerPlugin {
   }
 
   getRuns(testId?: string): LedgerEntry[] {
-    return testId ? readLedgerByTestId(this.outputDir, testId) : readLedger(this.outputDir);
+    const all = readLedger(this.outputDir);
+    return testId ? all.filter((r) => r.testId === testId) : all;
   }
 
   getRunById(id: number): LedgerEntry | undefined {
-    const all = readLedger(this.outputDir);
-    return all.find((e) => e.id === id);
+    return readLedger(this.outputDir).find((r) => r.id === id);
   }
 
   getTestIds(): string[] {
-    return _getTestIds(this.outputDir);
+    const runs = readLedger(this.outputDir);
+    return [...new Set(runs.map((r) => r.testId))].sort();
   }
 
   getTags(): string[] {
-    return _getTags(this.outputDir);
+    return getTags(this.outputDir);
   }
 
   getTestTree(): TestTreeNode[] {
-    return _getTestTree(this.outputDir);
+    return getTestTree(this.outputDir);
   }
 
   getLatestEntries(): Map<string, LedgerEntry> {
-    return _getLatestEntries(this.outputDir);
+    const runs = readLedger(this.outputDir);
+    const result = new Map<string, LedgerEntry>();
+    for (const run of runs) {
+      const existing = result.get(run.testId);
+      if (!existing || run.timestamp >= existing.timestamp) {
+        result.set(run.testId, run);
+      }
+    }
+    return result;
   }
 
   getStats(testId?: string): RunnerStats[] {
-    return testId ? _getRunnerStats(this.outputDir, testId) : getAllRunnerStats(this.outputDir);
+    return getRunnerStats(this.outputDir, testId);
   }
 
   overrideRunScore(runId: number, score: number, reason: string): ScoreOverride {
-    return _overrideRunScore(this.outputDir, runId, score, reason);
+    return overrideScore(this.outputDir, runId, score, reason);
   }
 
   getRunOverrides(runId: number): ScoreOverride[] {
-    return _getRunOverrides(this.outputDir, runId);
+    const run = this.getRunById(runId);
+    return run?.override ? [run.override] : [];
   }
 }

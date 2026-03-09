@@ -30,10 +30,9 @@ interface RunnerConfig {
 A specific configuration for an A/B test iteration.
 
 ```ts
-interface TestVariant {
-  id: string; // Unique technical ID for this variant
+interface TestVariant<TRunnerId extends string = string> {
   name: string; // Display name (e.g. "Gpt-4o with Persona")
-  runnerId: string; // ID of the runner to use (must exist in registry)
+  runner: TRunnerId; // ID of the runner to use (must exist in registry)
   enrichPrompt?: string; // Prompt template with {{prompt}} placeholder
   metadata?: Record<string, any>; // Custom data for the test function
 }
@@ -47,12 +46,12 @@ A complete record of a single test iteration.
 interface LedgerEntry {
   id?: number;
   testId: string;
+  tags?: string[];
   suitePath: string[];
   timestamp: string;
 
   // --- Experiment Context ---
-  variantId?: string; // Present if run via test.variants()
-  variantName?: string;
+  variantName?: string; // Display name of the variant
   basePrompt?: string; // Common mission prompt
 
   // --- Execution data ---
@@ -90,13 +89,9 @@ Injected into the test function.
 
 ```ts
 interface AgentHandle {
-  run(prompt: string): Promise<void>;
-  instruct(prompt: string): void;
   readonly id: string; // Runner ID
   readonly model: string; // Model identifier
-  readonly variant?: {
-    // Present in A/B tests
-    id: string;
+  readonly variant: {
     name: string;
     metadata?: Record<string, any>;
   };

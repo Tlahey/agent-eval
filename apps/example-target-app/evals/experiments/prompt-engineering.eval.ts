@@ -4,21 +4,18 @@ test(
   "Close Button Experiment",
   [
     {
-      id: "baseline",
       name: "Direct Instruction",
-      runnerId: "mock-agent",
+      runner: "mock-agent",
     },
     {
-      id: "expert-persona",
       name: "Expert Persona",
-      runnerId: "mock-agent",
+      runner: "mock-agent",
       enrichPrompt:
         "You are a world-class React developer. Your task: {{prompt}} Ensure accessibility.",
     },
     {
-      id: "detailed-specs",
       name: "Detailed Constraints",
-      runnerId: "mock-agent",
+      runner: "mock-agent",
       enrichPrompt: "{{prompt}} Use aria-label='Close', ensure onClose prop is used.",
     },
   ],

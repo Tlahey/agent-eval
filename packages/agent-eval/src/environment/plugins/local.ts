@@ -18,6 +18,7 @@ import type {
 
 export class LocalEnvironment implements IEnvironmentPlugin {
   readonly name = "local";
+  readonly supportsConcurrency = false;
   private initialDiff: string | null = null;
 
   /**

@@ -1,81 +1,64 @@
 # test()
 
-Register an evaluation test. Supports both standard runs and A/B experiments.
+Register an evaluation test. Every test strictly requires three arguments: title, variants, and the logic function.
 
-## Standard Test
-
-Registers a test that will run against the `defaultRunner` defined in your config.
-
-### Signature
+## Signature
 
 ```ts
-function test(title: string, fn: TestFn): void;
+function test<TRunnerId extends string = string>(
+  title: string,
+  variants: TestVariant<TRunnerId>[],
+  logic: TestFn<TRunnerId>,
+): void;
 ```
 
-### Usage
+---
+
+## Defining a Test (Baseline)
+
+Even for a simple test, you must explicitly define which runner to use via a variant array. This is your **Baseline**.
 
 ```ts
 import { test, expect } from "@tlahey/agent-eval";
 
-test("My evaluation", async ({ ctx }) => {
-  ctx.prompt("Refactor this component.");
-  await expect(ctx).toPassJudge({ criteria: "Code is cleaner" });
+test("Add a Close button", [{ name: "Claude 3.5 Sonnet", runner: "sonnet" }], async ({ ctx }) => {
+  ctx.prompt("Add a close button to the Banner component");
+
+  ctx.addTask({
+    name: "Check component",
+    action: ({ exec }) => exec('grep -q "aria-label" src/components/Banner.tsx'),
+    criteria: "Navbar should contain 'aria-label' for accessibility",
+  });
+
+  await expect(ctx).toPassJudge({
+    criteria: "Uses a proper close button, accessibility is respected.",
+    expectedFiles: ["src/components/Banner.tsx"],
+  });
 });
 ```
 
 ---
 
-## A/B Testing (Variants)
+## A/B Testing (Experiments)
 
-Registers a test with multiple variations to compare configurations (prompts, skills, models) on the same mission.
-
-### Signature
+To compare different runners or prompt templates on the same mission, simply add more variants to the array. If the environment supports it (e.g. Docker), variants will run in **parallel**.
 
 ```ts
 test(
-  title: string,
-  variants: TestVariant[],
-  fn: TestFn
-): void;
-```
-
-### Parameters
-
-| Param      | Type            | Description                                                             |
-| ---------- | --------------- | ----------------------------------------------------------------------- |
-| `title`    | `string`        | Test title                                                              |
-| `variants` | `TestVariant[]` | List of configurations to compare.                                      |
-| `fn`       | `TestFn`        | Test logic. Mission is defined via `ctx.prompt()` inside this function. |
-
-### TestVariant Interface
-
-```ts
-interface TestVariant {
-  id: string; // Technical ID for grouping
-  name: string; // Display name (e.g., "Gpt-4o Baseline")
-  runnerId: string; // ID from global config registry
-  enrichPrompt?: string; // Optional template: "Persona: expert. Mission: {{prompt}}"
-  metadata?: Record<string, any>; // Arbitrary data accessible in test
-}
-```
-
-### Usage
-
-```ts
-test(
-  "Accessibility Validation",
+  "Refactor FP",
   [
-    { id: "raw", name: "Direct Sonnet", runnerId: "sonnet" },
+    { name: "Standard Sonnet", runner: "sonnet" },
     {
-      id: "expert",
-      name: "Sonnet Expert",
-      runnerId: "sonnet",
-      enrichPrompt: "Agis en tant qu'expert WCAG. Mission : {{prompt}}",
+      name: "FP Expert Persona",
+      runner: "sonnet",
+      enrichPrompt: "Agis comme un expert FP. Mission : {{prompt}}",
     },
+    { name: "GPT-4o Baseline", runner: "gpt4" },
   ],
   async ({ ctx }) => {
-    ctx.prompt("Create a Dropdown component.");
-    await expect(ctx).toPassJudge({ criteria: "Respects WCAG" });
+    ctx.prompt("Refactor this logic to use functional programming patterns.");
+
+    await expect(ctx).toPassJudge({ criteria: "Code is clean and idiomatic." });
   },
 );
 ```
@@ -86,23 +69,40 @@ test(
 
 The `agent` parameter provides access to the AI agent and the current variant context.
 
-| Prop / Method | Type     | Description                                       |
-| ------------- | -------- | ------------------------------------------------- |
-| `id`          | `string` | Global runner ID                                  |
-| `model`       | `string` | Model identifier (e.g., "gpt-4o")                 |
-| `variant`     | `object` | Current variation data (`{ id, name, metadata }`) |
+| Prop / Method | Type     | Description                                   |
+| ------------- | -------- | --------------------------------------------- |
+| `id`          | `string` | Global runner ID                              |
+| `model`       | `string` | Model identifier (e.g., "gpt-4o")             |
+| `variant`     | `object` | Current variation data (`{ name, metadata }`) |
+
+---
+
+## createTest()
+
+Helper to create a type-safe test registration function tied to your runner IDs.
+
+```ts
+import { createTest } from "@tlahey/agent-eval";
+
+type MyRunners = "sonnet" | "gpt4" | "aider";
+const test = createTest<MyRunners>();
+
+test("Mission", [
+  { name: "V1", runner: "sonnet" } // Autocomplete for runner IDs!
+], ({ ctx }) => { ... });
+```
 
 ---
 
 ## describe()
 
-Group tests into named suites. Supports nesting. Captured as `suitePath` in the ledger.
+Group tests into named suites. Captured as `suitePath` in the ledger.
 
 ```ts
 import { test, describe, expect } from "@tlahey/agent-eval";
 
 describe("UI Components", () => {
-  test("Add close button", async ({ ctx }) => {
+  test("Add close button", [{ name: "Sonnet", runner: "sonnet" }], async ({ ctx }) => {
     ctx.prompt("...");
     await expect(ctx).toPassJudge({ criteria: "..." });
   });

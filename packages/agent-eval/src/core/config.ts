@@ -53,7 +53,7 @@ export async function loadConfig(
       rootDir: cwd,
       runners: [],
       judge: {},
-    } as AgentEvalConfig;
+    } as unknown as AgentEvalConfig;
   }
 
   const jiti = createJiti(cwd, { interopDefault: true });
@@ -64,7 +64,32 @@ export async function loadConfig(
     ...DEFAULT_CONFIG,
     rootDir: cwd,
     ...(raw as Partial<AgentEvalConfig>),
-  } as AgentEvalConfig;
+  } as unknown as AgentEvalConfig;
+}
+
+/**
+ * Validate that all runners used in tests exist in the config registry.
+ */
+export function validateTestsAgainstConfig(tests: any[], runners: RunnerConfig[]): void {
+  const validIds = new Set(runners.map((r) => r.id));
+  const errors: string[] = [];
+
+  for (const test of tests) {
+    for (const variant of test.variants || []) {
+      if (!validIds.has(variant.runner)) {
+        errors.push(
+          `Test "${test.title}" uses unknown runner "${variant.runner}" in variant "${variant.name}".`,
+        );
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    const available = Array.from(validIds).join(", ") || "none";
+    throw new Error(
+      `Invalid runner(s) detected in tests:\n- ${errors.join("\n- ")}\n\nAvailable runners in config: ${available}`,
+    );
+  }
 }
 
 /**

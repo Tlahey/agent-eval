@@ -90,7 +90,6 @@ export class EvalContext implements TestContext {
 
   /**
    * Internal helper to run a command and record it in the context.
-   * Not exposed via the public TestContext interface to encourage addTask().
    */
   async runCommand(name: string, command: string): Promise<CommandResult> {
     const start = Date.now();
@@ -158,7 +157,6 @@ export class EvalContext implements TestContext {
 
   /**
    * Build the unified ExecutionData from all collected context.
-   * Called by the runner to pass to the judge and store in the ledger.
    */
   buildExecutionData(taskResults: TaskResult[], timing: TimingData): ExecutionData {
     return {
@@ -168,7 +166,7 @@ export class EvalContext implements TestContext {
       changedFiles: extractChangedFiles(this._diff),
       commands: [...this._commands],
       taskResults,
-      tokenUsage: this._agentTokenUsage,
+      agentTokenUsage: this._agentTokenUsage,
       timing,
       agentOutput: this._agentOutput,
       logs: this.logs,

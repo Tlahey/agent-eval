@@ -28,7 +28,7 @@ import { AnthropicModel, CliModel, OpenAIModel } from "@tlahey/agent-eval/llm";
 const claude = new AnthropicModel({ model: "claude-sonnet-4-20250514" });
 
 export default defineConfig({
-  rootDir: "../..",
+  rootDir: ".",
 
   runners: [
     { id: "claude-sonnet", model: claude },
@@ -66,7 +66,7 @@ export default defineConfig({
   // Uncomment to run only specific runners:
   // matrix: { runners: ["claude-sonnet", "gpt-4o"] },
 
-  testFiles: "evals/multi-runner/**/*.eval.ts",
+  testFiles: "evals/multi-runner/banner.eval.ts",
   outputDir: ".agenteval",
   timeout: 180_000,
 });

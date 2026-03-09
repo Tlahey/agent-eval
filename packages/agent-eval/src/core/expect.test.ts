@@ -21,12 +21,17 @@ vi.mock("./runner.js", () => ({
 describe("expect", () => {
   const mockCtx: TestContext = {
     cwd: "/tmp",
+    instruction: "test",
     prompt: vi.fn(),
     storeDiff: vi.fn(),
+    storeDiffAsync: vi.fn(),
     addTask: vi.fn(),
     runCommand: vi.fn(),
     setRunnerInfo: vi.fn(),
     setInstruction: vi.fn(),
+    setAgentOutput: vi.fn(),
+    setAgentTokenUsage: vi.fn(),
+    buildExecutionData: vi.fn(),
     diff: "mock diff",
     commands: [],
     tasks: [],
@@ -48,6 +53,7 @@ describe("expect", () => {
     const mockResult: JudgeResult = {
       pass: true,
       score: 0.9,
+      status: "PASS",
       reason: "good",
       improvement: "none",
     };
@@ -66,6 +72,7 @@ describe("expect", () => {
     const mockResult: JudgeResult = {
       pass: false,
       score: 0.2,
+      status: "FAIL",
       reason: "bad",
       improvement: "fix it",
     };

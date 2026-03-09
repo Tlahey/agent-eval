@@ -58,11 +58,12 @@ flowchart TD
 
 ### 🧪 Test (Mission)
 
-A **test** is a scenario you want to evaluate. It contains a **mission** (the base prompt) and **logic** (how to judge the result).
+A **test** is a scenario you want to evaluate. It contains a **mission** (the base prompt) and **logic** (how to judge the result). Every test requires an explicit variant (your execution target).
 
 ```ts
-test("Add Close Button", "Add a close button to the Banner component", ({ ctx }) => {
-  expect(ctx).toPassJudge({
+test("Add Close Button", [{ name: "Baseline", runner: "sonnet" }], async ({ ctx }) => {
+  ctx.prompt("Add a close button to the Banner component");
+  await expect(ctx).toPassJudge({
     criteria: "Uses a proper button element with aria-label 'Close'",
   });
 });
@@ -70,13 +71,11 @@ test("Add Close Button", "Add a close button to the Banner component", ({ ctx })
 
 ### 🏃 Runner
 
-A **runner** is the AI agent being evaluated. You define a **registry** of runners in your config.
-
-Every test runs against a **default runner** or specific **variants** (A/B testing).
+A **runner** is the technical resource being evaluated (e.g. an API model or a CLI tool). You define a **registry** of runners in your config.
 
 ### 🔒 Environment
 
-The **environment** provides **isolation** between test runs. Before each evaluation, it resets the workspace to a clean state.
+The **environment** provides **isolation** between test runs. If your environment supports it (e.g. Docker), variants can run in **parallel**.
 
 ### ⚖️ Judge
 
@@ -100,9 +99,9 @@ sequenceDiagram
     CLI->>AE: agenteval run
     AE->>AE: Load config + discover *.eval.ts files
 
-    loop For each test × runner/variant
-        AE->>ENV: Reset workspace (git clean)
-        ENV-->>AE: ✅ Clean state
+    loop For each test × variants (Parallel if supported)
+        AE->>ENV: prepareRun()
+        ENV-->>AE: ✅ Isolated Workspace
         AE->>AE: Call logic function (addTask)
         AE->>AGENT: Execute Mission (final prompt)
         AGENT-->>AE: Code changes on disk
@@ -111,6 +110,7 @@ sequenceDiagram
         AE->>JUDGE: Evaluate (diff + outputs + criteria)
         JUDGE-->>AE: { score, status, reason, improvement }
         AE->>DB: Store result
+        AE->>ENV: teardownRun()
     end
 
     AE-->>CLI: Summary table with scores

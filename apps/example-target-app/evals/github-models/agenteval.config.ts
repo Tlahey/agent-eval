@@ -14,7 +14,7 @@ import { GitHubModelsModel, CliModel } from "@tlahey/agent-eval/llm";
  *   agenteval run --config evals/github-models/agenteval.config.ts
  */
 export default defineConfig({
-  rootDir: "../..",
+  rootDir: ".",
 
   runners: [
     {
@@ -26,7 +26,6 @@ export default defineConfig({
   ],
 
   judge: {
-    id: "gpt-5-mini",
     model: new GitHubModelsModel({
       model: "openai/gpt-5-mini",
       settings: {
@@ -53,7 +52,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/github-models/**/*.eval.ts",
+  testFiles: "evals/github-models/banner.eval.ts",
   outputDir: ".agenteval",
   timeout: 180_000,
 });

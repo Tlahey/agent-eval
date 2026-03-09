@@ -344,7 +344,7 @@ describe("EvalContext - setter methods", () => {
     expect(data.diff).toBeTruthy();
     expect(data.changedFiles).toContain("file.txt");
     expect(data.taskResults).toHaveLength(1);
-    expect(data.tokenUsage).toEqual({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+    expect(data.agentTokenUsage).toEqual({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
     expect(data.timing).toEqual(timing);
     expect(data.agentOutput).toBe("Done!");
     expect(data.logs).toContain("Git Diff");

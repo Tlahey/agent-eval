@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -20,6 +20,8 @@ function makeCliRunner(id: string, command = `echo "{{prompt}}"`): RunnerConfig 
   return { id, model: { type: "cli" as const, name: "cli", command } };
 }
 
+const mockJudge = { model: { name: "test", modelId: "m", createModel: vi.fn() } as any };
+
 describe("config", () => {
   let tmpDir: string;
 
@@ -39,7 +41,7 @@ describe("config", () => {
       };
       const config = defineConfig({
         runners: [mockRunner],
-        judge: {},
+        judge: mockJudge,
       });
 
       expect(config.runners).toHaveLength(1);
@@ -60,12 +62,12 @@ describe("config", () => {
         join(tmpDir, "agenteval.config.js"),
         `module.exports = {
           runners: [],
-          judge: { },
+          judge: { model: { name: 'test' } },
         };`,
       );
 
       const config = await loadConfig(tmpDir);
-      expect(config.judge).toEqual({});
+      expect(config.judge).toBeDefined();
     });
 
     it("applies defaults for missing optional fields", async () => {
@@ -73,7 +75,7 @@ describe("config", () => {
         join(tmpDir, "agenteval.config.js"),
         `module.exports = {
           runners: [],
-          judge: {},
+          judge: { model: { name: 'test' } },
         };`,
       );
 
@@ -109,7 +111,7 @@ describe("config", () => {
         rootDir: tmpDir,
         outputDir: ".agenteval",
         runners: [makeCliRunner("test")],
-        judge: {},
+        judge: mockJudge,
       };
       expect(() => assertValidPlugins(config)).not.toThrow();
     });
@@ -119,7 +121,7 @@ describe("config", () => {
         rootDir: tmpDir,
         outputDir: ".agenteval",
         runners: [],
-        judge: {},
+        judge: mockJudge,
         ledger: { name: "broken" },
       } as unknown as AgentEvalConfig;
       expect(() => assertValidPlugins(config)).toThrow("Plugin configuration errors");

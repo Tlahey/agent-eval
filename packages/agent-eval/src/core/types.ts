@@ -1,22 +1,6 @@
-// ─── Judge Configuration ───
-
-export interface JudgeConfig {
-  name?: string;
-  model?: LlmConfig;
-  maxRetries?: number;
-}
-
-// ─── Status & Thresholds ───
-
-export type TestStatus = "PASS" | "WARN" | "FAIL";
-
-export interface Thresholds {
-  warn: number;
-  fail: number;
-}
-
-export const DEFAULT_THRESHOLDS: Thresholds = { warn: 0.8, fail: 0.5 };
-
+/**
+ * Logic for computing test status from a judge score.
+ */
 export function computeStatus(
   score: number,
   thresholds: Thresholds = DEFAULT_THRESHOLDS,
@@ -28,39 +12,62 @@ export function computeStatus(
 
 // ─── LLM Configuration ───
 
-export type LlmConfig =
-  | import("./interfaces.js").IModelPlugin
-  | import("./interfaces.js").ICliModel;
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
 
-// ─── Runner Configuration ───
+export interface ModelSettings {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  maxSteps?: number;
+}
+
+export interface LlmConfig {
+  readonly name: string;
+  readonly modelId: string;
+  readonly settings?: ModelSettings;
+  readonly tools?: Record<string, unknown>;
+  createModel(): unknown | Promise<unknown>;
+}
 
 export interface RunnerConfig {
   id: string;
-  model: LlmConfig;
+  model: LlmConfig | import("./interfaces.js").ICliModel;
 }
 
 // ─── Variants & Experiments ───
 
-export interface TestVariant {
-  id: string;
+export interface TestVariant<TRunnerId extends string = string> {
+  /** Display name for the UI and identification */
   name: string;
-  runnerId: string;
+  /** The runner to use for this specific variant (must match config.runners) */
+  runner: TRunnerId;
+  /** Optional prompt enrichment template (e.g., "Answer as a {{role}}: {{prompt}}") */
   enrichPrompt?: string;
-  skills?: string[];
+  /** Custom metadata for reporting/filtering */
   metadata?: Record<string, any>;
 }
 
 // ─── Main Configuration ───
 
+export interface Thresholds {
+  warn: number;
+  fail: number;
+}
+
+export const DEFAULT_THRESHOLDS: Thresholds = {
+  warn: 0.8,
+  fail: 0.5,
+};
+
 export interface AgentEvalConfig {
   rootDir?: string;
   testFiles?: string | string[];
   runners: RunnerConfig[];
-  defaultRunner?: string;
   judge: JudgeConfig;
-  matrix?: {
-    runners?: string[];
-  };
   outputDir?: string;
   timeout?: number;
   beforeEach?: (args: { ctx: TestContext }) => void | Promise<void>;
@@ -69,57 +76,7 @@ export interface AgentEvalConfig {
   environment?: import("./interfaces.js").IEnvironmentPlugin;
 }
 
-// ─── Data Structures ───
-
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-}
-
-export interface TaskResult {
-  task: TaskDefinition;
-  result: CommandResult;
-}
-
-export interface TimingData {
-  totalMs: number;
-  setupMs?: number;
-  agentMs?: number;
-  tasksMs?: number;
-  judgeMs?: number;
-}
-
-export interface ExecutionData {
-  instruction: string;
-  runner: { id: string; model: string };
-  diff: string | null;
-  changedFiles: string[];
-  commands: CommandResult[];
-  taskResults: TaskResult[];
-  tokenUsage?: TokenUsage;
-  timing: TimingData;
-  agentOutput?: string;
-  logs: string;
-}
-
-export interface JudgmentData {
-  model: string;
-  score: number;
-  pass: boolean;
-  status: TestStatus;
-  reason: string;
-  improvement: string;
-  tokenUsage?: TokenUsage;
-  criteria: string;
-  expectedFiles?: string[];
-  thresholds: Thresholds;
-}
-
-export interface RunReport {
-  execution: ExecutionData;
-  judgment: JudgmentData;
-}
+// ─── Test Context & Execution ───
 
 export interface CommandResult {
   name: string;
@@ -150,25 +107,47 @@ export interface TaskDefinition {
   weight?: number;
 }
 
-export interface TestContext {
-  readonly cwd: string;
-  /** Define the agent mission (prompt) */
-  prompt(text: string): void;
-  storeDiff(): void;
-  addTask(task: TaskDefinition): void;
-  runCommand(name: string, command: string): Promise<CommandResult>;
-  setRunnerInfo(info: { id: string; model: string }): void;
-  setInstruction(instruction: string): void;
-  readonly diff: string | null;
-  readonly commands: CommandResult[];
-  readonly tasks: ReadonlyArray<TaskDefinition>;
-  readonly logs: string;
+export interface TaskResult {
+  task: TaskDefinition;
+  result: CommandResult;
+}
+
+export interface TimingData {
+  totalMs: number;
+  setupMs?: number;
+  agentMs?: number;
+  tasksMs?: number;
+  judgeMs?: number;
+}
+
+export interface ExecutionData {
+  instruction: string;
+  runner: { id: string; model: string };
+  diff: string | null;
+  changedFiles: string[];
+  commands: CommandResult[];
+  taskResults: TaskResult[];
+  agentTokenUsage?: TokenUsage;
+  timing: TimingData;
+  agentOutput?: string;
+  logs: string;
+}
+
+export interface JudgmentData {
+  score: number;
+  reason: string;
+  improvement: string;
+}
+
+export interface JudgeConfig {
+  model: LlmConfig | import("./interfaces.js").ICliModel;
+  maxRetries?: number;
 }
 
 export interface JudgeResult {
-  pass: boolean;
-  status?: TestStatus;
   score: number;
+  pass: boolean;
+  status: TestStatus;
   reason: string;
   improvement: string;
 }
@@ -185,7 +164,6 @@ export interface LedgerEntry {
   tags?: string[];
   suitePath: string[];
   timestamp: string;
-  variantId?: string;
   variantName?: string;
   basePrompt?: string;
   agentRunner: string;
@@ -213,20 +191,20 @@ export interface LedgerEntry {
 }
 
 export interface ScoreOverride {
-  score: number;
-  pass: boolean;
-  status: TestStatus;
-  reason: string;
   timestamp: string;
+  score: number;
+  reason: string;
+  author?: string;
 }
 
-// ─── Test Handle ───
+export type TestStatus = "PASS" | "WARN" | "FAIL";
+
+// ─── Test Definitions ───
 
 export interface AgentHandle {
   readonly id: string;
   readonly model: string;
   readonly variant?: {
-    id: string;
     name: string;
     metadata?: Record<string, any>;
   };
@@ -236,26 +214,53 @@ export interface AgentHandle {
   instruct(prompt: string): void;
 }
 
-export interface TestFnArgs {
+export interface TestFnArgs<TRunnerId extends string = string> {
   agent: AgentHandle;
   ctx: TestContext;
   judge: JudgeConfig;
-  variant?: TestVariant;
+  variant: TestVariant<TRunnerId>;
 }
 
-export type TestFn = (args: TestFnArgs) => void | Promise<void>;
+export type TestFn<TRunnerId extends string = string> = (
+  args: TestFnArgs<TRunnerId>,
+) => void | Promise<void>;
 
-export interface TestDefinition {
+export interface TestDefinition<TRunnerId extends string = string> {
   title: string;
-  fn: TestFn;
+  /** Variants are now mandatory (even for a single baseline run) */
+  variants: TestVariant<TRunnerId>[];
+  fn: TestFn<TRunnerId>;
   tags?: string[];
   suitePath?: string[];
-  variants?: TestVariant[];
 }
 
 export interface ExpectChain {
   toPassJudge(options: JudgeOptions): Promise<JudgeResult>;
 }
+
+export interface TestContext {
+  readonly cwd: string;
+  readonly instruction: string;
+  readonly diff: string | null;
+  readonly commands: CommandResult[];
+  readonly tasks: ReadonlyArray<TaskDefinition>;
+  readonly logs: string;
+  readonly agentOutput?: string;
+  readonly agentTokenUsage?: TokenUsage;
+
+  prompt(text: string): void;
+  setInstruction(text: string): void;
+  setRunnerInfo(info: { id: string; model: string }): void;
+  setAgentOutput(output: string): void;
+  setAgentTokenUsage(usage: TokenUsage): void;
+  addTask(task: TaskDefinition): void;
+  runCommand(name: string, command: string): Promise<CommandResult>;
+  storeDiff(): void;
+  storeDiffAsync(): Promise<void>;
+  buildExecutionData(taskResults: TaskResult[], timing: TimingData): ExecutionData;
+}
+
+// ─── Hooks ───
 
 export interface HookContext {
   ctx: TestContext;
@@ -266,4 +271,12 @@ export type HookFn = (args: HookContext) => void | Promise<void>;
 export interface HookDefinition {
   fn: HookFn;
   suitePath: string[];
+}
+
+export interface RunReport {
+  timestamp: string;
+  totalTests: number;
+  passed: number;
+  failed: number;
+  results: LedgerEntry[];
 }

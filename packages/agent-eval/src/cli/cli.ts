@@ -7,7 +7,12 @@ import { fileURLToPath } from "node:url";
 import { program } from "commander";
 import { glob } from "glob";
 import pc from "picocolors";
-import { loadConfig, validateRunnerNames, assertValidPlugins } from "../core/config.js";
+import {
+  loadConfig,
+  validateRunnerNames,
+  assertValidPlugins,
+  validateTestsAgainstConfig,
+} from "../core/config.js";
 import { runTest, dryRunTest } from "../core/runner.js";
 import {
   DefaultReporter,
@@ -22,7 +27,11 @@ import { createServer } from "node:http";
 import { parse as parseUrl } from "node:url";
 
 // Load package.json for version
-const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8"));
+const pkgPath = existsSync(new URL("../package.json", import.meta.url))
+  ? new URL("../package.json", import.meta.url)
+  : new URL("../../package.json", import.meta.url);
+
+const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
 
 program.name("agenteval").description("AI coding agent evaluation framework").version(pkg.version);
 
@@ -73,6 +82,9 @@ async function runAction(opts: any): Promise<void> {
       // Import the test file to register tests
       await import(`file://${file}?t=${Date.now()}`);
       let tests = getRegisteredTests();
+
+      // NEW: Upfront validation against config runners
+      validateTestsAgainstConfig(tests, config.runners);
 
       // Apply filters
       if (opts.filter) {

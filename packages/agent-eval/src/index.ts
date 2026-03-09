@@ -11,17 +11,17 @@ import { DEFAULT_THRESHOLDS } from "./core/types.js";
 
 // ─── Global test registry (via globalThis for cross-instance singleton) ───
 
-const REGISTRY_KEY = Symbol.for("__agenteval_registry__");
+const REGISTRY_KEY = "__agenteval_registry__";
 
 interface AgentEvalRegistry {
-  tests: TestDefinition[];
+  tests: TestDefinition<any>[];
   suiteStack: string[];
   beforeEachHooks: HookDefinition[];
   afterEachHooks: HookDefinition[];
 }
 
 function getRegistry(): AgentEvalRegistry {
-  const g = globalThis as Record<symbol, AgentEvalRegistry | undefined>;
+  const g = globalThis as any;
   if (!g[REGISTRY_KEY]) {
     g[REGISTRY_KEY] = {
       tests: [],
@@ -30,45 +30,50 @@ function getRegistry(): AgentEvalRegistry {
       afterEachHooks: [],
     };
   }
-  return g[REGISTRY_KEY]!;
+  return g[REGISTRY_KEY];
 }
 
 /**
- * Unified Test Registration API.
- *
- * Supports both standard runs and A/B experiments.
- *
- * @example
- * // Standard
- * test("Refactor Header", async ({ ctx }) => {
- *   ctx.prompt("Refactor this component...");
- *   await expect(ctx).toPassJudge({ criteria: "..." });
- * });
- *
- * @example
- * // Experiment
- * test("Refactor Header", [ { id: 'v1', runnerId: 'sonnet' }, ... ], async ({ ctx }) => {
- *   ctx.prompt("Refactor this component...");
- *   await expect(ctx).toPassJudge({ criteria: "..." });
- * });
+ * Define a test (mission) for an agent.
+ * All tests must explicitly define at least one variant (baseline).
  */
-export function test(title: string, variantsOrFn: TestVariant[] | TestFn, maybeFn?: TestFn): void {
+export function test<TRunnerId extends string = string>(
+  title: string,
+  variants: TestVariant<TRunnerId>[],
+  fn: TestFn<TRunnerId>,
+): void {
   const reg = getRegistry();
-  const variants = Array.isArray(variantsOrFn) ? variantsOrFn : undefined;
-  const fn = Array.isArray(variantsOrFn) ? maybeFn! : variantsOrFn;
 
-  reg.tests.push({
+  if (!variants || variants.length === 0) {
+    throw new Error(`Test "${title}" must define at least one variant.`);
+  }
+
+  if (!fn) {
+    throw new Error(`Test "${title}" is missing its implementation function.`);
+  }
+
+  const testDef: TestDefinition<TRunnerId> = {
     title,
     fn,
-    variants,
+    variants: [...variants],
     suitePath: reg.suiteStack.length > 0 ? [...reg.suiteStack] : undefined,
-  });
+  };
+
+  reg.tests.push(testDef);
+}
+
+/**
+ * Create a type-safe test registration function.
+ */
+export function createTest<TRunnerId extends string = string>() {
+  return (title: string, variants: TestVariant<TRunnerId>[], fn: TestFn<TRunnerId>) =>
+    test<TRunnerId>(title, variants, fn);
 }
 
 /**
  * Skip a test.
  */
-test.skip = function (_title: string, _variantsOrFn: any, _maybeFn?: any): void {
+test.skip = function (_title: string, _variants: any, _fn: any): void {
   // no-op
 };
 
@@ -88,62 +93,73 @@ export function describe(name: string, fn: () => void): void {
 /**
  * Get all registered tests.
  */
-export function getRegisteredTests(): TestDefinition[] {
-  return [...getRegistry().tests];
+export function getRegisteredTests(): TestDefinition<any>[] {
+  const reg = getRegistry();
+  return reg.tests.map((t) => ({
+    ...t,
+    variants: t.variants ? [...t.variants] : [],
+    suitePath: t.suitePath ? [...t.suitePath] : undefined,
+  }));
 }
 
 /**
- * Clear all registered tests (used between file loads).
+ * Clear all registered tests.
  */
 export function clearRegisteredTests(): void {
   const reg = getRegistry();
-  reg.tests.length = 0;
-  reg.suiteStack.length = 0;
-  reg.beforeEachHooks.length = 0;
-  reg.afterEachHooks.length = 0;
+  reg.tests = [];
+  reg.suiteStack = [];
+  reg.beforeEachHooks = [];
+  reg.afterEachHooks = [];
 }
 
-// ─── Lifecycle Hooks ───
-
 /**
- * Register a beforeEach hook.
+ * Register a hook to run before each test.
  */
 export function beforeEach(fn: HookFn): void {
   const reg = getRegistry();
-  reg.beforeEachHooks.push({ fn, suitePath: [...reg.suiteStack] });
+  reg.beforeEachHooks.push({
+    fn,
+    suitePath: [...reg.suiteStack],
+  });
 }
 
 /**
- * Register an afterEach hook.
+ * Register a hook to run after each test.
  */
 export function afterEach(fn: HookFn): void {
   const reg = getRegistry();
-  reg.afterEachHooks.push({ fn, suitePath: [...reg.suiteStack] });
+  reg.afterEachHooks.push({
+    fn,
+    suitePath: [...reg.suiteStack],
+  });
 }
 
-/**
- * Get hooks matching a test's suite path.
- */
-export function getMatchingHooks(
-  hooks: HookDefinition[],
-  testSuitePath?: string[],
-): HookDefinition[] {
-  const path = testSuitePath ?? [];
-  return hooks.filter((h) => h.suitePath.every((s, i) => path[i] === s));
-}
-
-/**
- * Get all registered beforeEach hooks.
- */
 export function getRegisteredBeforeEachHooks(): HookDefinition[] {
-  return [...getRegistry().beforeEachHooks];
+  const reg = getRegistry();
+  return reg.beforeEachHooks.map((h) => ({
+    ...h,
+    suitePath: [...h.suitePath],
+  }));
+}
+
+export function getRegisteredAfterEachHooks(): HookDefinition[] {
+  const reg = getRegistry();
+  return reg.afterEachHooks.map((h) => ({
+    ...h,
+    suitePath: [...h.suitePath],
+  }));
 }
 
 /**
- * Get all registered afterEach hooks.
+ * Filter hooks that apply to the given suite path.
  */
-export function getRegisteredAfterEachHooks(): HookDefinition[] {
-  return [...getRegistry().afterEachHooks];
+export function getMatchingHooks(hooks: HookDefinition[], suitePath?: string[]): HookDefinition[] {
+  return hooks.filter((h) => {
+    if (h.suitePath.length === 0) return true;
+    if (!suitePath || h.suitePath.length > suitePath.length) return false;
+    return h.suitePath.every((p, i) => p === suitePath[i]);
+  });
 }
 
 /**
@@ -157,14 +173,19 @@ export function initSession(config: AgentEvalConfig): void {
 // ─── Re-exports ───
 
 export { expect } from "./core/expect.js";
-export { defineConfig, assertValidPlugins } from "./core/config.js";
+export {
+  defineConfig,
+  assertValidPlugins,
+  loadConfig,
+  validateRunnerNames,
+} from "./core/config.js";
 export {
   DefaultReporter,
   SilentReporter,
   VerboseReporter,
   CIReporter,
-  LivePanel,
   Spinner,
+  LivePanel,
   isCI,
 } from "./core/reporter.js";
 export type {
@@ -205,13 +226,11 @@ export type {
   TestVariant,
 } from "./core/types.js";
 export { DEFAULT_THRESHOLDS, computeStatus } from "./core/types.js";
-export { validateRunnerNames } from "./core/config.js";
 
 // ─── Plugin interfaces & implementations ───
 
 export type {
   IModelPlugin,
-  ModelSettings,
   ICliModel,
   CliOutputMetrics,
   CliOutputParser,

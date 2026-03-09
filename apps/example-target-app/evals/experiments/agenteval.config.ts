@@ -11,7 +11,7 @@ import { AnthropicModel, CliModel } from "@tlahey/agent-eval/llm";
  *   agenteval run --config evals/experiments/agenteval.config.ts
  */
 export default defineConfig({
-  rootDir: "../..",
+  rootDir: ".",
 
   runners: [
     {
@@ -35,7 +35,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/experiments/**/*.eval.ts",
+  testFiles: "evals/experiments/prompt-engineering.eval.ts",
   outputDir: ".agenteval",
   timeout: 60_000,
 });

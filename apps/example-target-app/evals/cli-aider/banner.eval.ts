@@ -1,29 +1,33 @@
 import { test, expect } from "@tlahey/agent-eval";
 
-test("Add a Close button to the Banner", async ({ ctx }) => {
-  ctx.prompt(`
+test(
+  "Add a Close button to the Banner",
+  [{ name: "Aider Sonnet (baseline)", runner: "aider-sonnet" }],
+  async ({ ctx }) => {
+    ctx.prompt(`
       Add a Close button to the Banner component in src/components/Banner.tsx.
       The Banner should accept an onClose prop.
       When onClose is provided, render a button with aria-label='Close'.
       Also update the test file src/components/Banner.test.tsx with tests for the close button.
     `);
 
-  ctx.addTask({
-    name: "Close button renders",
-    action: ({ exec }) => exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
-    criteria:
-      'A close button with aria-label="Close" is rendered when onClose is provided and calls onClose when clicked',
-    weight: 2,
-  });
+    ctx.addTask({
+      name: "Close button renders",
+      action: ({ exec }) => exec('grep -q "aria-label" src/components/Banner.tsx && echo "found"'),
+      criteria:
+        'A close button with aria-label="Close" is rendered when onClose is provided and calls onClose when clicked',
+      weight: 2,
+    });
 
-  await expect(ctx).toPassJudge({
-    criteria: `
+    await expect(ctx).toPassJudge({
+      criteria: `
       - Uses a proper close button component
       - Has aria-label "Close"
       - Calls onClose when clicked
       - All tests pass
       - Build succeeds
     `,
-    expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
-  });
-});
+      expectedFiles: ["src/components/Banner.tsx", "src/components/Banner.test.tsx"],
+    });
+  },
+);

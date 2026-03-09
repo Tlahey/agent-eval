@@ -17,7 +17,7 @@ import { AnthropicModel, OllamaModel } from "@tlahey/agent-eval/llm";
  *   agenteval run --config evals/ollama/agenteval.config.ts
  */
 export default defineConfig({
-  rootDir: "../..",
+  rootDir: ".",
 
   runners: [
     {
@@ -46,7 +46,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/ollama/**/*.eval.ts",
+  testFiles: "evals/ollama/banner.eval.ts",
   outputDir: ".agenteval",
   timeout: 300_000,
 });

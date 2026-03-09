@@ -15,7 +15,7 @@ import { AnthropicModel, OpenAIModel } from "@tlahey/agent-eval/llm";
  *   agenteval run --config evals/anthropic/agenteval.config.ts
  */
 export default defineConfig({
-  rootDir: "../..",
+  rootDir: ".",
 
   runners: [
     {
@@ -44,7 +44,7 @@ export default defineConfig({
     });
   },
 
-  testFiles: "evals/anthropic/**/*.eval.ts",
+  testFiles: "evals/anthropic/banner.eval.ts",
   outputDir: ".agenteval",
   timeout: 180_000,
 });

@@ -31,19 +31,19 @@ import { AnthropicModel } from "@tlahey/agent-eval/llm";
 
 export default defineConfig({
   runners: [{ id: "sonnet", model: new AnthropicModel({ model: "claude-3-5-sonnet-20241022" }) }],
-  defaultRunner: "sonnet", // Required for standard tests
   judge: {
     model: new AnthropicModel({ model: "claude-3-5-sonnet-20241022" }),
   },
 });
 ```
 
-## Full Example (with registry and defaults)
+## Full Example (with registry and plugins)
 
 ```ts
 import { defineConfig } from "@tlahey/agent-eval";
 import { AnthropicModel, CliModel, OpenAIModel } from "@tlahey/agent-eval/llm";
 import { SqliteLedger } from "@tlahey/agent-eval/ledger";
+import { DockerEnvironment } from "@tlahey/agent-eval/environment";
 
 export default defineConfig({
   // --- Registry of technical resources ---
@@ -53,15 +53,13 @@ export default defineConfig({
     { id: "aider", model: new CliModel({ command: 'aider --message "{{prompt}}" --yes' }) },
   ],
 
-  // --- Default execution target ---
-  defaultRunner: "sonnet",
-
   judge: {
-    name: "gpt-4o-judge",
     model: new OpenAIModel({ model: "gpt-4o" }),
   },
 
   ledger: new SqliteLedger({ outputDir: ".agenteval" }),
+
+  environment: new DockerEnvironment({ image: "node:22" }),
 
   beforeEach: ({ ctx }) => {
     ctx.addTask({
@@ -79,37 +77,27 @@ export default defineConfig({
 
 ## Options Reference
 
-| Option          | Type                 | Default                     | Description                                               |
-| :-------------- | :------------------- | :-------------------------- | :-------------------------------------------------------- |
-| `runners`       | `RunnerConfig[]`     | _required_                  | Registry of available AI agents.                          |
-| `defaultRunner` | `string`             | —                           | The runner ID to use for `test()` calls without variants. |
-| `judge`         | `JudgeConfig`        | _required_                  | LLM-as-a-Judge configuration.                             |
-| `testFiles`     | `string \| string[]` | `**/*.{eval,agent-eval}.ts` | Glob pattern(s) for test discovery.                       |
-| `rootDir`       | `string`             | `process.cwd()`             | Project root directory.                                   |
-| `outputDir`     | `string`             | `.agenteval`                | Ledger output directory.                                  |
-| `timeout`       | `number`             | `300000`                    | Max duration for agent mission (ms).                      |
-| `thresholds`    | `Thresholds`         | `{ warn: 0.8, fail: 0.5 }`  | Global scoring thresholds.                                |
-| `ledger`        | `ILedgerPlugin`      | `SqliteLedger`              | Custom storage plugin.                                    |
-| `environment`   | `IEnvironmentPlugin` | `LocalEnvironment`          | Custom execution environment.                             |
+| Option        | Type                 | Default                     | Description                                          |
+| :------------ | :------------------- | :-------------------------- | :--------------------------------------------------- |
+| `runners`     | `RunnerConfig[]`     | _required_                  | Registry of available AI agents.                     |
+| `judge`       | `JudgeConfig`        | _required_                  | LLM-as-a-Judge configuration.                        |
+| `testFiles`   | `string \| string[]` | `**/*.{eval,agent-eval}.ts` | Glob pattern(s) for test discovery.                  |
+| `rootDir`     | `string`             | `process.cwd()`             | Project root directory.                              |
+| `outputDir`   | `string`             | `.agenteval`                | Ledger output directory.                             |
+| `timeout`     | `number`             | `300000`                    | Max duration for agent mission (ms).                 |
+| `thresholds`  | `Thresholds`         | `{ warn: 0.8, fail: 0.5 }`  | Global scoring thresholds.                           |
+| `ledger`      | `ILedgerPlugin`      | `SqliteLedger`              | Custom storage plugin.                               |
+| `environment` | `IEnvironmentPlugin` | `LocalEnvironment`          | Custom execution environment (supports parallelism). |
 
-## Runner Registry
+## Zero Magic Philosophy
 
-Runners are defined once in the config and used by ID.
+AgentEval avoids automatic behavior. You must explicitly define which runner to use for every test via variants.
 
 ```ts
-runners: [
-  { id: "sonnet", model: new AnthropicModel(...) },
-  { id: "gpt4", model: new OpenAIModel(...) }
-]
+test("My Mission", [{ name: "Claude Baseline", runner: "sonnet" }], async ({ ctx }) => {
+  // ...
+});
 ```
-
-### Standard Matrix Mode
-
-To run **all** tests against **all** runners (the legacy behavior), simply omit `defaultRunner` and do not use variants in your tests. AgentEval will loop through the registry.
-
-### Experiment Mode
-
-If a test uses `test.variants()`, it ignores the `defaultRunner` and only uses the runners specified in its variants.
 
 ## Scoring Thresholds
 

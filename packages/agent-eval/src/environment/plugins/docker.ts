@@ -29,6 +29,7 @@ export interface DockerEnvironmentOptions {
 
 export class DockerEnvironment implements IEnvironmentPlugin {
   readonly name = "docker";
+  readonly supportsConcurrency = true;
   private readonly image: string;
   private readonly dockerfile?: string;
   private readonly workDir: string;
