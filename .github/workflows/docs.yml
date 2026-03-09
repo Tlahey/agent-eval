@@ -1,11 +1,9 @@
 name: Deploy Docs
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/docs/**"
-      - "README.md"
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +18,8 @@ concurrency:
 jobs:
   build:
     name: Build VitePress
+    # Run if manually dispatched OR if the triggering workflow (Release) was successful
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
