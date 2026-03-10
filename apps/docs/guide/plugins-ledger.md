@@ -13,6 +13,8 @@ interface ILedgerPlugin {
   getRuns(testId?: string): LedgerEntry[] | Promise<LedgerEntry[]>;
   getRunById(id: number): LedgerEntry | undefined | Promise<LedgerEntry | undefined>;
   getTestIds(): string[] | Promise<string[]>;
+  /** Get all unique tags across all runs */
+  getTags(): string[] | Promise<string[]>;
   getTestTree(): TestTreeNode[] | Promise<TestTreeNode[]>;
   getLatestEntries(): Map<string, LedgerEntry> | Promise<Map<string, LedgerEntry>>;
   getStats(testId?: string): RunnerStats[] | Promise<RunnerStats[]>;
@@ -50,7 +52,7 @@ export default defineConfig({
 
 - SQL-powered aggregations (stats, filtering, grouping)
 - Indexed queries on `test_id` and `timestamp`
-- Score override audit trail (`score_overrides` table)
+- **Score overrides** stored directly in the `runs` table for fast access
 - Dashboard API support (all endpoints)
 
 ::: info Node.js 22+ required
@@ -65,29 +67,32 @@ erDiagram
         int id PK "auto-increment"
         text test_id "indexed"
         text suite_path "JSON array"
+        text variant_name "Optional variant label"
         text timestamp "indexed, ISO 8601"
         text agent_runner "runner name"
-        text judge_model "LLM model used"
+        text instruction "Mission prompt"
+        text base_prompt "Optional system prompt"
+        text criteria "Success criteria"
+        text diff "Raw git diff"
+        text changed_files "JSON array"
+        text commands "JSON array of CommandResult"
+        text task_results "JSON array of TaskResult"
+        text timing "JSON: {totalMs, agentMs, judgeMs}"
+        text logs "Raw agent logs"
+        text judge_model "LLM model used for evaluation"
         real score "0.0 – 1.0"
         int pass "0 or 1"
         text status "PASS / WARN / FAIL"
-        text reason "judge explanation"
-        text improvement "suggestions"
-        text diff "raw git diff"
-        text commands "JSON array"
-        int duration_ms "agent run time"
-        text thresholds "JSON: {warn, fail}"
+        text reason "Judge explanation"
+        text improvement "Judge suggestions"
+        text tags "JSON array of strings"
+        text expected_files "JSON array"
+        text required_commands "JSON array"
+        real warn_threshold "Default 0.8"
+        real fail_threshold "Default 0.5"
+        int duration_ms "Total run time"
+        text override "JSON: {score, reason, timestamp, status, pass}"
     }
-    SCORE_OVERRIDES {
-        int id PK "auto-increment"
-        int run_id FK "→ runs.id"
-        real score "0.0 – 1.0"
-        int pass "0 or 1"
-        text status "PASS / WARN / FAIL"
-        text reason "human explanation"
-        text timestamp "ISO 8601"
-    }
-    RUNS ||--o{ SCORE_OVERRIDES : "has overrides"
 ```
 
 ### JsonLedger
@@ -118,7 +123,7 @@ export default defineConfig({
 
 - No SQL queries — stats are computed in-memory
 - Slower for large datasets (full file scan)
-- No indexed queries
+- Overrides require rewriting the file
 
 ## Choosing a Ledger
 
@@ -142,7 +147,7 @@ flowchart TD
 | Query language      | SQL                | In-memory          |
 | Performance (large) | Fast (indexed)     | Slower (file scan) |
 | Dashboard support   | Full               | Full               |
-| Score overrides     | Audit trail table  | In-memory          |
+| Score overrides     | Embedded JSON      | File Rewrite       |
 | Dependencies        | `node:sqlite`      | None               |
 | Format              | Binary (`.sqlite`) | Text (`.jsonl`)    |
 
@@ -168,50 +173,22 @@ class PostgresLedger implements ILedgerPlugin {
   async initialize() {
     const { Pool } = await import("pg");
     this.pool = new Pool({ connectionString: this.connectionString });
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS runs (
-        id SERIAL PRIMARY KEY,
-        test_id TEXT NOT NULL,
-        timestamp TIMESTAMPTZ DEFAULT NOW(),
-        score REAL,
-        pass BOOLEAN,
-        status TEXT,
-        reason TEXT,
-        improvement TEXT
-      )
-    `);
+    // ... setup table schema ...
   }
 
   async recordRun(entry: LedgerEntry) {
-    await this.pool.query(
-      "INSERT INTO runs (test_id, score, pass, status, reason, improvement) VALUES ($1,$2,$3,$4,$5,$6)",
-      [entry.testId, entry.score, entry.pass, entry.status, entry.reason, entry.improvement],
-    );
+    // ... insert run ...
   }
 
   async getRuns(testId?: string) {
-    const { rows } = testId
-      ? await this.pool.query("SELECT * FROM runs WHERE test_id = $1", [testId])
-      : await this.pool.query("SELECT * FROM runs");
-    return rows;
+    // ... select runs ...
+  }
+
+  async getTags(): Promise<string[]> {
+    // ... select unique tags ...
+    return [];
   }
 
   // ... implement remaining ILedgerPlugin methods
-
-  async close() {
-    await this.pool.end();
-  }
 }
-```
-
-### Usage
-
-```ts
-import { defineConfig } from "@tlahey/agent-eval";
-import { PostgresLedger } from "./my-plugins/postgres-ledger";
-
-export default defineConfig({
-  ledger: new PostgresLedger("postgresql://localhost:5432/agenteval"),
-  // ...
-});
 ```

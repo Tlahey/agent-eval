@@ -1,4 +1,4 @@
-import type { IModelPlugin } from "../../core/interfaces.js";
+import type { IModelPlugin, ModelSettings } from "../../core/interfaces.js";
 import { env } from "../../core/env.js";
 
 export interface AnthropicModelOptions {
@@ -8,6 +8,10 @@ export interface AnthropicModelOptions {
   apiKey?: string;
   /** Custom base URL */
   baseURL?: string;
+  /** Generation settings */
+  settings?: ModelSettings;
+  /** AI SDK tools for agentic execution */
+  tools?: Record<string, unknown>;
 }
 
 /**
@@ -23,6 +27,8 @@ export interface AnthropicModelOptions {
 export class AnthropicModel implements IModelPlugin {
   readonly name = "anthropic";
   readonly modelId: string;
+  readonly settings?: ModelSettings;
+  readonly tools?: Record<string, unknown>;
   private apiKey?: string;
   private baseURL?: string;
 
@@ -30,6 +36,8 @@ export class AnthropicModel implements IModelPlugin {
     this.modelId = options.model ?? "claude-sonnet-4-20250514";
     this.apiKey = options.apiKey;
     this.baseURL = options.baseURL;
+    this.settings = options.settings;
+    this.tools = options.tools;
   }
 
   async createModel(): Promise<unknown> {

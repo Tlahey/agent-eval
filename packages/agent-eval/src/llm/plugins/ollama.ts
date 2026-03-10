@@ -1,10 +1,14 @@
-import type { IModelPlugin } from "../../core/interfaces.js";
+import type { IModelPlugin, ModelSettings } from "../../core/interfaces.js";
 
 export interface OllamaModelOptions {
   /** Model identifier (default: "llama3") */
   model?: string;
   /** Custom base URL (default: "http://localhost:11434/v1") */
   baseURL?: string;
+  /** Generation settings */
+  settings?: ModelSettings;
+  /** AI SDK tools for agentic execution */
+  tools?: Record<string, unknown>;
 }
 
 /**
@@ -20,11 +24,15 @@ export interface OllamaModelOptions {
 export class OllamaModel implements IModelPlugin {
   readonly name = "ollama";
   readonly modelId: string;
+  readonly settings?: ModelSettings;
+  readonly tools?: Record<string, unknown>;
   private baseURL: string;
 
   constructor(options: OllamaModelOptions = {}) {
     this.modelId = options.model ?? "llama3";
     this.baseURL = options.baseURL ?? "http://localhost:11434/v1";
+    this.settings = options.settings;
+    this.tools = options.tools;
   }
 
   async createModel(): Promise<unknown> {

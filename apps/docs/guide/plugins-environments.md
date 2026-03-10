@@ -1,12 +1,14 @@
 # Environment / Execution Plugins
 
-Environment plugins control **where and how** agent tests execute — locally via Git, inside Docker containers, over SSH, or any custom sandbox. They implement the `IEnvironmentPlugin` interface.
+Environment plugins control **where and how** agent tests execute — locally via Git, inside Docker containers, or using macOS's `sandbox-exec`. They implement the `IEnvironmentPlugin` interface.
 
 ## Interface
 
 ```ts
 interface IEnvironmentPlugin {
   readonly name: string;
+  /** Whether this environment supports parallel execution */
+  readonly supportsConcurrency: boolean;
 
   /** Prepare workspace before each test iteration */
   setup(cwd: string): void | Promise<void>;
@@ -38,6 +40,10 @@ interface EnvironmentCommandResult {
 
 Runs tests directly on the host machine. Uses Git for workspace isolation and `child_process.execSync` for command execution. This is the zero-dependency default.
 
+::: warning No Concurrency
+`LocalEnvironment` does not support parallel execution because it modifies the host's filesystem directly.
+:::
+
 ```ts
 import { defineConfig } from "@tlahey/agent-eval";
 import { LocalEnvironment } from "@tlahey/agent-eval/environment";
@@ -49,14 +55,20 @@ export default defineConfig({
 
 | Lifecycle    | Implementation                                |
 | ------------ | --------------------------------------------- |
-| `setup()`    | `git reset --hard HEAD` + `git clean -fd`     |
+| `setup()`    | Captures current uncommitted changes          |
 | `execute()`  | `child_process.execSync` with captured output |
-| `getDiff()`  | `git diff --cached` + `git diff`              |
-| `teardown()` | No-op                                         |
+| `getDiff()`  | `git add -N .` + `git diff HEAD`              |
+| `teardown()` | Resets Git state + Restores captured changes  |
+
+---
 
 ### DockerEnvironment
 
-Runs each test iteration inside a **Docker container** with the project directory mounted as a volume. Provides strong isolation.
+Runs each test iteration inside a **Docker container** with the project directory mounted as a volume. Provides strong isolation and reproducibility.
+
+::: tip Concurrency Supported
+`DockerEnvironment` supports parallel execution as each test runs in its own isolated container.
+:::
 
 ```ts
 import { defineConfig } from "@tlahey/agent-eval";
@@ -77,6 +89,34 @@ export default defineConfig({
 | `workDir`    | `string`   | `/workspace` | Working directory inside the container.      |
 | `dockerArgs` | `string[]` | `[]`         | Additional `docker create` arguments.        |
 
+---
+
+### SandboxExecEnvironment (macOS Only)
+
+Uses macOS's native `sandbox-exec` (Seatbelt) to isolate processes while allowing controlled filesystem access.
+
+::: tip Concurrency Supported
+`SandboxExecEnvironment` supports parallel execution by cloning the project into unique temporary folders for each run.
+:::
+
+```ts
+import { defineConfig } from "@tlahey/agent-eval";
+import { SandboxExecEnvironment } from "@tlahey/agent-eval/environment";
+
+export default defineConfig({
+  environment: new SandboxExecEnvironment({
+    permissive: true, // Allow all filesystem R/W
+  }),
+});
+```
+
+| Option       | Type      | Default           | Description                                        |
+| :----------- | :-------- | :---------------- | :------------------------------------------------- |
+| `profile`    | `string`  | `(allow default)` | Custom seatbelt profile content or path.           |
+| `permissive` | `boolean` | `true`            | Allow all filesystem read/write (permissive mode). |
+
+---
+
 ## Execution Flow
 
 ```mermaid
@@ -88,7 +128,7 @@ sequenceDiagram
 
     loop For each iteration
         R->>E: setup(cwd)
-        Note over E: workspace reset
+        Note over E: workspace reset or container start
 
         R->>A: Automatic execution of Mission
         A->>E: execute(command, cwd)
@@ -99,6 +139,7 @@ sequenceDiagram
         E-->>C: diff string
 
         R->>E: teardown?(cwd)
+        Note over E: container stop or git restore
     end
 ```
 
@@ -113,6 +154,7 @@ import type { IEnvironmentPlugin, EnvironmentCommandResult } from "@tlahey/agent
 
 class SSHEnvironment implements IEnvironmentPlugin {
   readonly name = "ssh";
+  readonly supportsConcurrency = false;
 
   constructor(
     private host: string,
